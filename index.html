@@ -314,31 +314,87 @@
 
 
     <!-- İŞLEMLER SAYFASI -->
-    <section id="transactionsPage" class="page">
+<section id="transactionsPage" class="page">
 
-      <header class="page-header">
+  <header class="page-header">
 
-        <div>
-          <span class="brand-subtitle">
-            Finans Hareketleri
-          </span>
+    <div>
+      <span class="brand-subtitle">
+        Finans Hareketleri
+      </span>
 
-          <h1>
-            İşlemler
-          </h1>
-        </div>
+      <h1>
+        İşlemler
+      </h1>
+    </div>
 
-      </header>
+    <button
+      id="openTransactionFormButton"
+      class="add-button"
+      type="button"
+    >
+      + İşlem Ekle
+    </button>
 
-      <section class="section-block">
+  </header>
 
-        <div class="empty-state">
-          İşlemler bölümü sonraki sürümde eklenecek.
-        </div>
 
-      </section>
+  <section class="cards-summary">
 
-    </section>
+    <article>
+      <span>Toplam Gelir</span>
+
+      <strong id="totalIncome">
+        ₺0,00
+      </strong>
+    </article>
+
+    <article>
+      <span>Toplam Gider</span>
+
+      <strong id="totalExpense">
+        ₺0,00
+      </strong>
+    </article>
+
+    <article>
+      <span>İşlem Bakiyesi</span>
+
+      <strong id="transactionBalance">
+        ₺0,00
+      </strong>
+    </article>
+
+  </section>
+
+
+  <section class="section-block">
+
+    <div class="section-header">
+
+      <div>
+        <span class="section-subtitle">
+          Kayıtlar
+        </span>
+
+        <h2>
+          Son İşlemler
+        </h2>
+      </div>
+
+    </div>
+
+    <div id="transactionsList" class="payment-list">
+
+      <div id="emptyTransactions" class="empty-state">
+        Henüz işlem eklenmedi.
+      </div>
+
+    </div>
+
+  </section>
+
+</section>
 
 
     <!-- ANALİZ SAYFASI -->
