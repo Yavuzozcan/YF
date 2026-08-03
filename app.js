@@ -1067,16 +1067,12 @@ transactionForm?.addEventListener("submit", (event) => {
     const card = cards.find(c => c.id === transactionCard.value);
 
     if (card) {
-  card.debt += amount;
-  saveCards();
+        card.debt += amount;
+        saveCards();
+    }
 }
 
-renderCards();
-renderDashboard();
-renderUpcomingPayments();
-
-transactions.unshift(transaction);
-
+  transactions.unshift(transaction);
 
   saveTransactions();
   renderTransactions();
