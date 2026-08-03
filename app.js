@@ -1072,10 +1072,28 @@ transactionForm?.addEventListener("submit", (event) => {
     }
 }
 
-  transactions.unshift(transaction);
+  if (
+  transaction.type === "expense" &&
+  transaction.paymentMethod === "card" &&
+  transaction.cardId
+) {
+  const card = cards.find(
+    card => card.id === transaction.cardId
+  );
 
-  saveTransactions();
-  renderTransactions();
+  if (card) {
+    card.debt += amount;
+    saveCards();
+  }
+}
+
+transactions.unshift(transaction);
+
+saveTransactions();
+renderTransactions();
+renderCards();
+renderDashboard();
+renderUpcomingPayments();
 
   transactionForm.reset();
 
