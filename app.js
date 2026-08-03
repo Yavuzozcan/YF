@@ -948,4 +948,257 @@ transactionModalBackdrop?.addEventListener("click", () => {
       }
     );
   }
+  // =========================================
+// İŞLEM KAYIT SİSTEMİ
+// =========================================
+
+const TRANSACTION_STORAGE_KEY = "yf_transactions_v1";
+
+let transactions = loadTransactions();
+
+const transactionType =
+  document.getElementById("transactionType");
+
+const transactionName =
+  document.getElementById("transactionName");
+
+const transactionAmount =
+  document.getElementById("transactionAmount");
+
+const transactionCategory =
+  document.getElementById("transactionCategory");
+
+const transactionDate =
+  document.getElementById("transactionDate");
+
+const transactionsList =
+  document.getElementById("transactionsList");
+
+const totalIncome =
+  document.getElementById("totalIncome");
+
+const totalExpense =
+  document.getElementById("totalExpense");
+
+const transactionBalance =
+  document.getElementById("transactionBalance");
+
+const totalAssets =
+  document.getElementById("totalAssets");
+
+const monthlyPayment =
+  document.getElementById("monthlyPayment");
+
+if (transactionDate && !transactionDate.value) {
+  transactionDate.value =
+    new Date().toISOString().split("T")[0];
+}
+
+transactionForm?.addEventListener("submit", (event) => {
+  event.preventDefault();
+
+  const amount = Number(transactionAmount.value);
+
+  if (!transactionName.value.trim()) {
+    alert("Lütfen işlem açıklamasını yaz.");
+    return;
+  }
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    alert("Lütfen geçerli bir tutar gir.");
+    return;
+  }
+
+  if (!transactionCategory.value) {
+    alert("Lütfen kategori seç.");
+    return;
+  }
+
+  if (!transactionDate.value) {
+    alert("Lütfen tarih seç.");
+    return;
+  }
+
+  const transaction = {
+    id: createId(),
+    type: transactionType.value,
+    name: transactionName.value.trim(),
+    amount,
+    category: transactionCategory.value,
+    date: transactionDate.value,
+    createdAt: new Date().toISOString()
+  };
+
+  transactions.unshift(transaction);
+
+  saveTransactions();
+  renderTransactions();
+
+  transactionForm.reset();
+
+  transactionType.value = "income";
+  transactionDate.value =
+    new Date().toISOString().split("T")[0];
+
+  transactionModal.classList.add("hidden");
+  document.body.style.overflow = "";
+});
+
+function loadTransactions() {
+  try {
+    const saved =
+      localStorage.getItem(TRANSACTION_STORAGE_KEY);
+
+    return saved ? JSON.parse(saved) : [];
+  } catch (error) {
+    console.error("İşlemler okunamadı:", error);
+    return [];
+  }
+}
+
+function saveTransactions() {
+  localStorage.setItem(
+    TRANSACTION_STORAGE_KEY,
+    JSON.stringify(transactions)
+  );
+}
+
+function deleteTransaction(id) {
+  const approved =
+    confirm("Bu işlem silinsin mi?");
+
+  if (!approved) return;
+
+  transactions =
+    transactions.filter(
+      transaction => transaction.id !== id
+    );
+
+  saveTransactions();
+  renderTransactions();
+}
+
+function renderTransactions() {
+  if (!transactionsList) return;
+
+  transactionsList.innerHTML = "";
+
+  if (transactions.length === 0) {
+    transactionsList.innerHTML = `
+      <div class="empty-state">
+        Henüz işlem eklenmedi.
+      </div>
+    `;
+  } else {
+    transactions.forEach(transaction => {
+      const item = document.createElement("article");
+
+      item.className = "transaction-item";
+
+      const amountClass =
+        transaction.type === "income"
+          ? "transaction-income"
+          : "transaction-expense";
+
+      const amountPrefix =
+        transaction.type === "income"
+          ? "+"
+          : "-";
+
+      item.innerHTML = `
+        <div>
+          <h3>${escapeHtml(transaction.name)}</h3>
+
+          <small>
+            ${escapeHtml(transaction.category)}
+            ·
+            ${formatDate(transaction.date)}
+          </small>
+        </div>
+
+        <div>
+          <strong class="${amountClass}">
+            ${amountPrefix}${formatMoney(transaction.amount)}
+          </strong>
+
+          <button
+            type="button"
+            data-delete-transaction="${transaction.id}"
+          >
+            Sil
+          </button>
+        </div>
+      `;
+
+      item
+        .querySelector("[data-delete-transaction]")
+        .addEventListener("click", () => {
+          deleteTransaction(transaction.id);
+        });
+
+      transactionsList.appendChild(item);
+    });
+  }
+
+  const income = transactions
+    .filter(transaction => transaction.type === "income")
+    .reduce(
+      (sum, transaction) => sum + Number(transaction.amount),
+      0
+    );
+
+  const expense = transactions
+    .filter(transaction => transaction.type === "expense")
+    .reduce(
+      (sum, transaction) => sum + Number(transaction.amount),
+      0
+    );
+
+  const balance = income - expense;
+
+  totalIncome.textContent = formatMoney(income);
+  totalExpense.textContent = formatMoney(expense);
+  transactionBalance.textContent = formatMoney(balance);
+
+  if (totalAssets) {
+    totalAssets.textContent =
+      formatMoney(Math.max(0, balance));
+  }
+
+  const currentMonth = new Date().getMonth();
+  const currentYear = new Date().getFullYear();
+
+  const thisMonthExpense = transactions
+    .filter(transaction => {
+      const date =
+        new Date(`${transaction.date}T12:00:00`);
+
+      return (
+        transaction.type === "expense" &&
+        date.getMonth() === currentMonth &&
+        date.getFullYear() === currentYear
+      );
+    })
+    .reduce(
+      (sum, transaction) => sum + Number(transaction.amount),
+      0
+    );
+
+  if (monthlyPayment) {
+    monthlyPayment.textContent =
+      formatMoney(thisMonthExpense);
+  }
+
+  const cardDebt = cards.reduce(
+    (sum, card) => sum + Number(card.debt || 0),
+    0
+  );
+
+  if (netBalance) {
+    netBalance.textContent =
+      formatMoney(balance - cardDebt);
+  }
+}
+
+renderTransactions();
 });
