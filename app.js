@@ -177,6 +177,25 @@ const transactionModalBackdrop =
       "submit",
       saveCard
     );
+    openTransactionFormButton?.addEventListener("click", () => {
+    transactionModal?.classList.remove("hidden");
+    document.body.style.overflow = "hidden";
+});
+
+closeTransactionFormButton?.addEventListener("click", () => {
+    transactionModal?.classList.add("hidden");
+    document.body.style.overflow = "";
+});
+
+cancelTransactionButton?.addEventListener("click", () => {
+    transactionModal?.classList.add("hidden");
+    document.body.style.overflow = "";
+});
+
+transactionModalBackdrop?.addEventListener("click", () => {
+    transactionModal?.classList.add("hidden");
+    document.body.style.overflow = "";
+});
   }
 
   function openNewCardForm() {
