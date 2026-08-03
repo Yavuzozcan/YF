@@ -1,0 +1,1 @@
+// YF JavaScript Dosyası
