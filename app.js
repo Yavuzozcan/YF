@@ -1041,62 +1041,68 @@ transactionForm?.addEventListener("submit", (event) => {
     return;
   }
 
-  if (!transactionDate.value) {
-    alert("Lütfen tarih seç.");
+  const paymentMethod = transactionPaymentMethod.value;
+  const selectedCardId =
+    paymentMethod === "card" ? transactionCard.value : "";
+
+  if (
+    transactionType.value === "expense" &&
+    paymentMethod === "card" &&
+    !selectedCardId
+  ) {
+    alert("Lütfen kredi kartını seç.");
     return;
   }
 
   const transaction = {
-  id: createId(),
-  type: transactionType.value,
-  name: transactionName.value.trim(),
-  amount,
-  category: transactionCategory.value,
-  date: transactionDate.value,
-  paymentMethod: transactionPaymentMethod.value,
-  cardId:
-    transactionPaymentMethod.value === "card"
-      ? transactionCard.value
-      : "",
-  createdAt: new Date().toISOString()
-};
-  if (transaction.type === "expense" &&
-    transactionPaymentMethod.value === "card" &&
-    transactionCard.value) {
-
-    const card = cards.find(c => c.id === transactionCard.value);
-
-    if (card) {
-        card.debt += amount;
-        saveCards();
-    }
-}
+    id: createId(),
+    type: transactionType.value,
+    name: transactionName.value.trim(),
+    amount,
+    category: transactionCategory.value,
+    date: transactionDate.value,
+    paymentMethod,
+    cardId: selectedCardId,
+    cardDebtDelta: 0,
+    createdAt: new Date().toISOString()
+  };
 
   if (
-  transaction.type === "expense" &&
-  transaction.paymentMethod === "card" &&
-  transaction.cardId
-) {
-  const card = cards.find(
-    card => card.id === transaction.cardId
-  );
+    transaction.type === "expense" &&
+    paymentMethod === "card" &&
+    selectedCardId
+  ) {
+    const selectedCard = cards.find(
+      card => card.id === selectedCardId
+    );
 
-}
+    if (!selectedCard) {
+      alert("Seçilen kart bulunamadı.");
+      return;
+    }
 
-transactions.unshift(transaction);
+    selectedCard.debt =
+      Number(selectedCard.debt || 0) + amount;
 
-saveTransactions();
-renderTransactions();
-renderCards();
-renderDashboard();
-renderUpcomingPayments();
+    transaction.cardDebtDelta = amount;
+
+    saveCards();
+  }
+
+  transactions.unshift(transaction);
+  saveTransactions();
+
+  renderTransactions();
+  renderCards();
+  renderDashboard();
+  renderUpcomingPayments();
 
   transactionForm.reset();
-
   transactionType.value = "income";
   transactionDate.value =
     new Date().toISOString().split("T")[0];
 
+  transactionCardField.classList.add("hidden");
   transactionModal.classList.add("hidden");
   document.body.style.overflow = "";
 });
@@ -1121,18 +1127,50 @@ function saveTransactions() {
 }
 
 function deleteTransaction(id) {
-  const approved =
-    confirm("Bu işlem silinsin mi?");
+  const approved = confirm("Bu işlem silinsin mi?");
 
   if (!approved) return;
 
-  transactions =
-    transactions.filter(
-      transaction => transaction.id !== id
+  const transactionToDelete = transactions.find(
+    transaction => transaction.id === id
+  );
+
+  if (!transactionToDelete) return;
+
+  const debtToReverse = Number(
+    transactionToDelete.cardDebtDelta || 0
+  );
+
+  if (
+    transactionToDelete.type === "expense" &&
+    transactionToDelete.paymentMethod === "card" &&
+    transactionToDelete.cardId &&
+    debtToReverse > 0
+  ) {
+    const selectedCard = cards.find(
+      card => card.id === transactionToDelete.cardId
     );
 
+    if (selectedCard) {
+      selectedCard.debt = Math.max(
+        0,
+        Number(selectedCard.debt || 0) - debtToReverse
+      );
+
+      saveCards();
+    }
+  }
+
+  transactions = transactions.filter(
+    transaction => transaction.id !== id
+  );
+
   saveTransactions();
+
   renderTransactions();
+  renderCards();
+  renderDashboard();
+  renderUpcomingPayments();
 }
 
 function renderTransactions() {
