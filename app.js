@@ -1025,6 +1025,13 @@ transactionForm?.addEventListener("submit", (event) => {
   event.preventDefault();
 
   const amount = Number(transactionAmount.value);
+  const type = transactionType.value;
+  const paymentMethod = transactionPaymentMethod.value;
+
+  const selectedCardId =
+    type === "card-payment" || paymentMethod === "card"
+      ? transactionCard.value
+      : "";
 
   if (!transactionName.value.trim()) {
     alert("Lütfen işlem açıklamasını yaz.");
@@ -1041,13 +1048,14 @@ transactionForm?.addEventListener("submit", (event) => {
     return;
   }
 
-  const paymentMethod = transactionPaymentMethod.value;
-  const selectedCardId =
-    paymentMethod === "card" ? transactionCard.value : "";
+  if (!transactionDate.value) {
+    alert("Lütfen tarih seç.");
+    return;
+  }
 
   if (
-    transactionType.value === "expense" &&
-    paymentMethod === "card" &&
+    (type === "card-payment" ||
+      (type === "expense" && paymentMethod === "card")) &&
     !selectedCardId
   ) {
     alert("Lütfen kredi kartını seç.");
@@ -1056,7 +1064,7 @@ transactionForm?.addEventListener("submit", (event) => {
 
   const transaction = {
     id: createId(),
-    type: transactionType.value,
+    type,
     name: transactionName.value.trim(),
     amount,
     category: transactionCategory.value,
@@ -1066,6 +1074,77 @@ transactionForm?.addEventListener("submit", (event) => {
     cardDebtDelta: 0,
     createdAt: new Date().toISOString()
   };
+
+  if (
+    type === "expense" &&
+    paymentMethod === "card" &&
+    selectedCardId
+  ) {
+    const selectedCard = cards.find(
+      card => card.id === selectedCardId
+    );
+
+    if (!selectedCard) {
+      alert("Seçilen kart bulunamadı.");
+      return;
+    }
+
+    selectedCard.debt =
+      Number(selectedCard.debt || 0) + amount;
+
+    transaction.cardDebtDelta = amount;
+
+    saveCards();
+  }
+
+  if (type === "card-payment" && selectedCardId) {
+    const selectedCard = cards.find(
+      card => card.id === selectedCardId
+    );
+
+    if (!selectedCard) {
+      alert("Seçilen kart bulunamadı.");
+      return;
+    }
+
+    const currentDebt = Number(selectedCard.debt || 0);
+
+    if (amount > currentDebt) {
+      alert(
+        `Ödeme tutarı kart borcundan büyük olamaz. Güncel borç: ${formatMoney(
+          currentDebt
+        )}`
+      );
+      return;
+    }
+
+    selectedCard.debt = Math.max(0, currentDebt - amount);
+
+    transaction.cardDebtDelta = -amount;
+
+    saveCards();
+  }
+
+  transactions.unshift(transaction);
+  saveTransactions();
+
+  renderTransactions();
+  renderCards();
+  renderDashboard();
+  renderUpcomingPayments();
+
+  transactionForm.reset();
+
+  transactionType.value = "income";
+  transactionDate.value =
+    new Date().toISOString().split("T")[0];
+
+  transactionCard.value = "";
+  transactionCardField.classList.add("hidden");
+
+  transactionModal.classList.add("hidden");
+  document.body.style.overflow = "";
+});
 
   if (
     transaction.type === "expense" &&
