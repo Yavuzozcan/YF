@@ -43,6 +43,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
 const transactionForm =
     document.getElementById("transactionForm");
+  const transactionPaymentMethod =
+  document.getElementById("transactionPaymentMethod");
+
+const transactionCard =
+  document.getElementById("transactionCard");
+
+const transactionCardField =
+  document.getElementById("transactionCardField");
 
 const openTransactionFormButton =
     document.getElementById("openTransactionFormButton");
@@ -195,6 +203,14 @@ cancelTransactionButton?.addEventListener("click", () => {
 transactionModalBackdrop?.addEventListener("click", () => {
     transactionModal?.classList.add("hidden");
     document.body.style.overflow = "";
+});
+    transactionPaymentMethod?.addEventListener("change", () => {
+  if (transactionPaymentMethod.value === "card") {
+    transactionCardField.classList.remove("hidden");
+  } else {
+    transactionCardField.classList.add("hidden");
+    transactionCard.value = "";
+  }
 });
   }
 
