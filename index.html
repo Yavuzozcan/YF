@@ -2,82 +2,158 @@
 <html lang="tr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>YF - Yavuz Finans</title>
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, viewport-fit=cover"
+  >
+
+  <meta name="theme-color" content="#08111f">
+
+  <title>YF — Yavuz Finans</title>
 
   <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 
-<header class="header">
-    <h1>YF</h1>
-    <p>Yavuz Finans</p>
-</header>
+  <main class="app">
 
-<main>
+    <header class="top-header">
 
-<section class="welcome">
-    <h2>Günaydın Yavuz 👋</h2>
-    <p>Finans durumuna hoş geldin.</p>
-</section>
+      <div class="brand-area">
+        <div class="logo">YF</div>
 
-<section class="net-card">
-    <span>Net Durum</span>
-    <h1>₺0,00</h1>
-</section>
+        <div>
+          <span class="brand-subtitle">Yavuz Finans</span>
+          <h1 id="welcomeText">Günaydın Yavuz 👋</h1>
+        </div>
+      </div>
 
-<section class="cards">
+      <button class="profile-button" type="button">
+        Y
+      </button>
 
-<div class="box">
-    <p>Toplam Borç</p>
-    <h2>₺0,00</h2>
-</div>
+    </header>
 
-<div class="box">
-    <p>Toplam Varlık</p>
-    <h2>₺0,00</h2>
-</div>
 
-<div class="box">
-    <p>Bu Ay Ödenen</p>
-    <h2>₺0,00</h2>
-</div>
+    <section class="balance-card">
 
-<div class="box">
-    <p>Kart Sayısı</p>
-    <h2>0</h2>
-</div>
+      <div class="balance-top">
 
-</section>
+        <div>
+          <span class="card-label">Net Durum</span>
+          <strong id="netBalance">₺0,00</strong>
+        </div>
 
-</main>
+        <span class="status-badge">
+          Güncel
+        </span>
 
-<nav class="bottom-nav">
+      </div>
 
-<div>
-🏠
-<p>Ana Sayfa</p>
-</div>
+      <div class="balance-footer">
 
-<div>
-💳
-<p>Kartlar</p>
-</div>
+        <span>
+          Tüm varlıklar ve borçlar
+        </span>
 
-<div>
-💸
-<p>İşlemler</p>
-</div>
+        <span id="balanceStatus">
+          Dengeli
+        </span>
 
-<div>
-📊
-<p>Analiz</p>
-</div>
+      </div>
 
-</nav>
+    </section>
 
-<script src="app.js"></script>
 
-</body>
-</html>
+    <section class="summary-grid">
+
+      <article class="summary-card debt-card">
+
+        <div class="summary-icon">
+          💳
+        </div>
+
+        <span>Toplam Borç</span>
+
+        <strong id="totalDebt">
+          ₺0,00
+        </strong>
+
+      </article>
+
+
+      <article class="summary-card asset-card">
+
+        <div class="summary-icon">
+          💰
+        </div>
+
+        <span>Toplam Varlık</span>
+
+        <strong id="totalAssets">
+          ₺0,00
+        </strong>
+
+      </article>
+
+
+      <article class="summary-card payment-card">
+
+        <div class="summary-icon">
+          ✓
+        </div>
+
+        <span>Bu Ay Ödenen</span>
+
+        <strong id="monthlyPayment">
+          ₺0,00
+        </strong>
+
+      </article>
+
+
+      <article class="summary-card card-count-card">
+
+        <div class="summary-icon">
+          ▣
+        </div>
+
+        <span>Kart Sayısı</span>
+
+        <strong id="cardCount">
+          0
+        </strong>
+
+      </article>
+
+    </section>
+
+
+    <section class="section-block">
+
+      <div class="section-header">
+
+        <div>
+          <span class="section-subtitle">
+            Ödeme Takibi
+          </span>
+
+          <h2>
+            Yaklaşan Ödemeler
+          </h2>
+        </div>
+
+        <button class="text-button" type="button">
+          Tümünü Gör
+        </button>
+
+      </div>
+
+
+      <div class="payment-list">
+
+        <article class="payment-item">
+
+          <div class="bank-icon
