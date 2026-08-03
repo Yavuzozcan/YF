@@ -186,8 +186,19 @@ const transactionModalBackdrop =
       saveCard
     );
     openTransactionFormButton?.addEventListener("click", () => {
-    transactionModal?.classList.remove("hidden");
-    document.body.style.overflow = "hidden";
+  transactionCard.innerHTML = '<option value="">Kart seç</option>';
+
+  cards.forEach((card) => {
+    const option = document.createElement("option");
+
+    option.value = card.id;
+    option.textContent = `${card.bank} - ${card.name}`;
+
+    transactionCard.appendChild(option);
+  });
+
+  transactionModal?.classList.remove("hidden");
+  document.body.style.overflow = "hidden";
 });
 
 closeTransactionFormButton?.addEventListener("click", () => {
