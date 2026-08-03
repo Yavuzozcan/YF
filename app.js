@@ -1081,10 +1081,6 @@ transactionForm?.addEventListener("submit", (event) => {
     card => card.id === transaction.cardId
   );
 
-  if (card) {
-    card.debt += amount;
-    saveCards();
-  }
 }
 
 transactions.unshift(transaction);
