@@ -1047,14 +1047,19 @@ transactionForm?.addEventListener("submit", (event) => {
   }
 
   const transaction = {
-    id: createId(),
-    type: transactionType.value,
-    name: transactionName.value.trim(),
-    amount,
-    category: transactionCategory.value,
-    date: transactionDate.value,
-    createdAt: new Date().toISOString()
-  };
+  id: createId(),
+  type: transactionType.value,
+  name: transactionName.value.trim(),
+  amount,
+  category: transactionCategory.value,
+  date: transactionDate.value,
+  paymentMethod: transactionPaymentMethod.value,
+  cardId:
+    transactionPaymentMethod.value === "card"
+      ? transactionCard.value
+      : "",
+  createdAt: new Date().toISOString()
+};
   if (transaction.type === "expense" &&
     transactionPaymentMethod.value === "card" &&
     transactionCard.value) {
@@ -1192,7 +1197,19 @@ function renderTransactions() {
       0
     );
 
-  const balance = income - expense;
+  const nonCardExpense = transactions
+  .filter(
+    transaction =>
+      transaction.type === "expense" &&
+      transaction.paymentMethod !== "card"
+  )
+  .reduce(
+    (sum, transaction) =>
+      sum + Number(transaction.amount),
+    0
+  );
+
+const balance = income - nonCardExpense;
 
   totalIncome.textContent = formatMoney(income);
   totalExpense.textContent = formatMoney(expense);
