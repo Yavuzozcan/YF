@@ -1076,6 +1076,9 @@ transactionForm?.addEventListener("submit", (event) => {
 
   saveTransactions();
   renderTransactions();
+  renderCards();
+renderDashboard();
+renderUpcomingPayments();
 
   transactionForm.reset();
 
@@ -1104,6 +1107,7 @@ function saveTransactions() {
     TRANSACTION_STORAGE_KEY,
     JSON.stringify(transactions)
   );
+
 }
 
 function deleteTransaction(id) {
@@ -1111,7 +1115,31 @@ function deleteTransaction(id) {
     confirm("Bu işlem silinsin mi?");
 
   if (!approved) return;
+const transactionToDelete =
+  transactions.find(
+    transaction => transaction.id === id
+  );
 
+if (
+  transactionToDelete &&
+  transactionToDelete.type === "expense" &&
+  transactionToDelete.paymentMethod === "card" &&
+  transactionToDelete.cardId
+) {
+  const card = cards.find(
+    card => card.id === transactionToDelete.cardId
+  );
+
+  if (card) {
+    card.debt = Math.max(
+      0,
+      Number(card.debt || 0) -
+        Number(transactionToDelete.amount || 0)
+    );
+
+    saveCards();
+  }
+}
   transactions =
     transactions.filter(
       transaction => transaction.id !== id
@@ -1119,6 +1147,9 @@ function deleteTransaction(id) {
 
   saveTransactions();
   renderTransactions();
+  renderCards();
+renderDashboard();
+renderUpcomingPayments();
 }
 
 function renderTransactions() {
