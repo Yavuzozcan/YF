@@ -519,6 +519,23 @@
         </select>
       </label>
 
+    <label>
+  Ödeme yöntemi
+
+  <select id="transactionPaymentMethod" required>
+    <option value="cash">Nakit</option>
+    <option value="card">Kredi Kartı</option>
+    <option value="account">Banka Hesabı</option>
+  </select>
+</label>
+
+<label id="transactionCardField" class="hidden">
+  Kart seç
+
+  <select id="transactionCard">
+    <option value="">Kart seç</option>
+  </select>
+</label>
       <label>
         Tarih
 
