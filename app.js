@@ -199,6 +199,7 @@ const transactionModalBackdrop =
 
   transactionModal?.classList.remove("hidden");
   document.body.style.overflow = "hidden";
+      
 });
 
 closeTransactionFormButton?.addEventListener("click", () => {
@@ -223,7 +224,11 @@ transactionModalBackdrop?.addEventListener("click", () => {
     transactionCard.value = "";
   }
 });
-    const quickAddIncomeButton =
+    transactionModal?.classList.remove("hidden");
+document.body.style.overflow = "hidden";
+});
+
+const quickAddIncomeButton =
   document.getElementById("quickAddIncomeButton");
 
 const quickAddExpenseButton =
@@ -233,11 +238,13 @@ const quickReportsButton =
   document.getElementById("quickReportsButton");
 
 quickAddIncomeButton?.addEventListener("click", () => {
+  showPage("transactionsPage");
   transactionType.value = "income";
   openTransactionFormButton?.click();
 });
 
 quickAddExpenseButton?.addEventListener("click", () => {
+  showPage("transactionsPage");
   transactionType.value = "expense";
   openTransactionFormButton?.click();
 });
@@ -245,7 +252,9 @@ quickAddExpenseButton?.addEventListener("click", () => {
 quickReportsButton?.addEventListener("click", () => {
   showPage("analysisPage");
 });
-    
+
+closeTransactionFormButton?.addEventListener(
+  }
 
   function openNewCardForm() {
     resetCardForm();
