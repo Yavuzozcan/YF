@@ -26,14 +26,10 @@
 
         <div class="brand-area">
 
-          <div class="logo">
-            YF
-          </div>
+          <div class="logo">YF</div>
 
           <div>
-            <span class="brand-subtitle">
-              Yavuz Finans
-            </span>
+            <span class="brand-subtitle">Yavuz Finans</span>
 
             <h1 id="welcomeText">
               Günaydın Yavuz 👋
@@ -170,6 +166,14 @@
             </h2>
           </div>
 
+          <button
+            id="showAllPaymentsButton"
+            class="text-button"
+            type="button"
+          >
+            Tümünü Gör
+          </button>
+
         </div>
 
         <div id="upcomingPayments" class="payment-list">
@@ -274,10 +278,22 @@
         <article>
 
           <span>
-            Toplam Limit
+            Toplam Kart Limiti
           </span>
 
           <strong id="cardsTotalLimit">
+            ₺0,00
+          </strong>
+
+        </article>
+
+        <article>
+
+          <span>
+            Kullanılabilir Limit
+          </span>
+
+          <strong id="cardsAvailableLimit">
             ₺0,00
           </strong>
 
@@ -317,7 +333,7 @@
       <section class="section-block">
 
         <div class="empty-state">
-          İşlemler bölümü daha sonra eklenecek.
+          İşlemler bölümü sonraki sürümde eklenecek.
         </div>
 
       </section>
@@ -345,7 +361,7 @@
       <section class="section-block">
 
         <div class="empty-state">
-          Grafikler ve analizler daha sonra eklenecek.
+          Grafikler ve analizler sonraki sürümde eklenecek.
         </div>
 
       </section>
@@ -355,10 +371,15 @@
   </main>
 
 
-  <!-- KART EKLEME FORMU -->
+  <!-- KART EKLEME / DÜZENLEME PENCERESİ -->
   <div id="cardModal" class="modal hidden">
 
-    <div class="modal-backdrop"></div>
+    <button
+      id="modalBackdrop"
+      class="modal-backdrop"
+      type="button"
+      aria-label="Pencereyi kapat"
+    ></button>
 
     <section class="modal-content">
 
@@ -378,6 +399,7 @@
           id="closeCardFormButton"
           class="close-button"
           type="button"
+          aria-label="Kapat"
         >
           ×
         </button>
@@ -427,6 +449,34 @@
               TOM Bankası
             </option>
 
+            <option value="Yapı Kredi">
+              Yapı Kredi
+            </option>
+
+            <option value="Halkbank">
+              Halkbank
+            </option>
+
+            <option value="VakıfBank">
+              VakıfBank
+            </option>
+
+            <option value="DenizBank">
+              DenizBank
+            </option>
+
+            <option value="TEB">
+              TEB
+            </option>
+
+            <option value="ING">
+              ING
+            </option>
+
+            <option value="Enpara">
+              Enpara
+            </option>
+
             <option value="Diğer">
               Diğer
             </option>
@@ -443,6 +493,7 @@
           <input
             id="cardName"
             type="text"
+            maxlength="50"
             placeholder="Örn. Maximum Gold"
             required
           >
@@ -506,6 +557,9 @@
           >
 
         </label>
+
+
+        <p id="cardFormMessage" class="form-message hidden"></p>
 
 
         <div class="form-buttons">
