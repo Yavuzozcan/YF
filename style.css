@@ -1181,3 +1181,89 @@ button {
     color:#ff6b6b;
     font-weight:700;
 }
+
+
+/* =========================
+   İŞLEM EKLEME PENCERESİ
+   ========================= */
+
+#transactionModal .modal-content {
+  width: min(92%, 760px);
+  max-height: calc(100vh - 70px);
+  overflow-y: auto;
+  padding: 28px;
+  border-radius: 28px;
+}
+
+#transactionForm {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+#transactionForm label {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  color: #9ba7c5;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+#transactionForm input,
+#transactionForm select {
+  width: 100%;
+  min-height: 58px;
+  padding: 0 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  background: #182842;
+  color: #ffffff;
+  font-size: 17px;
+  box-sizing: border-box;
+}
+
+#transactionForm input::placeholder {
+  color: #9ba7c5;
+}
+
+#transactionForm input:focus,
+#transactionForm select:focus {
+  outline: none;
+  border-color: #4d8dff;
+  box-shadow: 0 0 0 3px rgba(77, 141, 255, 0.15);
+}
+
+#transactionCardField.hidden {
+  display: none;
+}
+
+#transactionModal .form-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: 8px;
+}
+
+#transactionModal .form-actions button {
+  min-height: 58px;
+  border-radius: 18px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+@media (max-width: 600px) {
+  #transactionModal .modal-content {
+    width: calc(100% - 32px);
+    padding: 24px 20px;
+    border-radius: 26px;
+  }
+
+  #transactionForm {
+    gap: 17px;
+  }
+
+  #transactionModal .form-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+}
