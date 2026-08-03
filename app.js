@@ -38,6 +38,23 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const modalBackdrop =
     document.getElementById("modalBackdrop");
+  const transactionModal =
+    document.getElementById("transactionModal");
+
+const transactionForm =
+    document.getElementById("transactionForm");
+
+const openTransactionFormButton =
+    document.getElementById("openTransactionFormButton");
+
+const closeTransactionFormButton =
+    document.getElementById("closeTransactionFormButton");
+
+const cancelTransactionButton =
+    document.getElementById("cancelTransactionButton");
+
+const transactionModalBackdrop =
+    document.getElementById("transactionModalBackdrop");
 
   const cardsList =
     document.getElementById("cardsList");
