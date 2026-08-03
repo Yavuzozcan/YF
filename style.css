@@ -1122,3 +1122,62 @@ button {
     grid-column: 1 / -1;
   }
 }
+/* ===== İşlemler ===== */
+
+.cards-summary{
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:16px;
+    margin-bottom:20px;
+}
+
+.cards-summary article{
+    background:#131c2f;
+    border:1px solid rgba(255,255,255,.06);
+    border-radius:18px;
+    padding:18px;
+}
+
+.cards-summary span{
+    display:block;
+    color:#9ba7c5;
+    font-size:14px;
+    margin-bottom:8px;
+}
+
+.cards-summary strong{
+    color:#fff;
+    font-size:24px;
+}
+
+.payment-list{
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+}
+
+.transaction-item{
+    background:#131c2f;
+    border-radius:18px;
+    padding:16px;
+    border:1px solid rgba(255,255,255,.06);
+}
+
+.transaction-item h3{
+    margin:0 0 6px;
+    color:#fff;
+}
+
+.transaction-item small{
+    color:#9ba7c5;
+}
+
+.transaction-income{
+    color:#42d392;
+    font-weight:700;
+}
+
+.transaction-expense{
+    color:#ff6b6b;
+    font-weight:700;
+}
