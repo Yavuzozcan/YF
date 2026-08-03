@@ -1,16 +1,22 @@
-// =======================================
+// =====================================
 // YF - Yavuz Finans
-// app.js
-// Sürüm: v0.1
-// =======================================
+// Sürüm: v0.1.0
+// =====================================
 
 document.addEventListener("DOMContentLoaded", () => {
-    console.log("✅ YF v0.1 başarıyla yüklendi.");
+    console.log("YF v0.1 başlatıldı");
 
-    // İleride burada:
-    // - Dashboard
-    // - Kart Yönetimi
-    // - İşlemler
-    // - Analiz
-    // modülleri çalışacak.
+    // Saat bazlı karşılama
+    const hour = new Date().getHours();
+    const welcome = document.getElementById("welcomeText");
+
+    if (welcome) {
+        if (hour < 12) {
+            welcome.textContent = "Günaydın Yavuz 👋";
+        } else if (hour < 18) {
+            welcome.textContent = "İyi Günler Yavuz 👋";
+        } else {
+            welcome.textContent = "İyi Akşamlar Yavuz 👋";
+        }
+    }
 });
