@@ -199,7 +199,6 @@ const transactionModalBackdrop =
 
   transactionModal?.classList.remove("hidden");
   document.body.style.overflow = "hidden";
-      
 });
 
 closeTransactionFormButton?.addEventListener("click", () => {
@@ -224,36 +223,6 @@ transactionModalBackdrop?.addEventListener("click", () => {
     transactionCard.value = "";
   }
 });
-    transactionModal?.classList.remove("hidden");
-document.body.style.overflow = "hidden";
-});
-
-const quickAddIncomeButton =
-  document.getElementById("quickAddIncomeButton");
-
-const quickAddExpenseButton =
-  document.getElementById("quickAddExpenseButton");
-
-const quickReportsButton =
-  document.getElementById("quickReportsButton");
-
-quickAddIncomeButton?.addEventListener("click", () => {
-  showPage("transactionsPage");
-  transactionType.value = "income";
-  openTransactionFormButton?.click();
-});
-
-quickAddExpenseButton?.addEventListener("click", () => {
-  showPage("transactionsPage");
-  transactionType.value = "expense";
-  openTransactionFormButton?.click();
-});
-
-quickReportsButton?.addEventListener("click", () => {
-  showPage("analysisPage");
-});
-
-closeTransactionFormButton?.addEventListener(
   }
 
   function openNewCardForm() {
@@ -1107,9 +1076,6 @@ transactionForm?.addEventListener("submit", (event) => {
 
   saveTransactions();
   renderTransactions();
-  renderCards();
-renderDashboard();
-renderUpcomingPayments();
 
   transactionForm.reset();
 
@@ -1138,7 +1104,6 @@ function saveTransactions() {
     TRANSACTION_STORAGE_KEY,
     JSON.stringify(transactions)
   );
-
 }
 
 function deleteTransaction(id) {
@@ -1146,31 +1111,7 @@ function deleteTransaction(id) {
     confirm("Bu işlem silinsin mi?");
 
   if (!approved) return;
-const transactionToDelete =
-  transactions.find(
-    transaction => transaction.id === id
-  );
 
-if (
-  transactionToDelete &&
-  transactionToDelete.type === "expense" &&
-  transactionToDelete.paymentMethod === "card" &&
-  transactionToDelete.cardId
-) {
-  const card = cards.find(
-    card => card.id === transactionToDelete.cardId
-  );
-
-  if (card) {
-    card.debt = Math.max(
-      0,
-      Number(card.debt || 0) -
-        Number(transactionToDelete.amount || 0)
-    );
-
-    saveCards();
-  }
-}
   transactions =
     transactions.filter(
       transaction => transaction.id !== id
@@ -1178,9 +1119,6 @@ if (
 
   saveTransactions();
   renderTransactions();
-  renderCards();
-renderDashboard();
-renderUpcomingPayments();
 }
 
 function renderTransactions() {
