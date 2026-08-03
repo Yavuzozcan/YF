@@ -223,7 +223,29 @@ transactionModalBackdrop?.addEventListener("click", () => {
     transactionCard.value = "";
   }
 });
-  }
+    const quickAddIncomeButton =
+  document.getElementById("quickAddIncomeButton");
+
+const quickAddExpenseButton =
+  document.getElementById("quickAddExpenseButton");
+
+const quickReportsButton =
+  document.getElementById("quickReportsButton");
+
+quickAddIncomeButton?.addEventListener("click", () => {
+  transactionType.value = "income";
+  openTransactionFormButton?.click();
+});
+
+quickAddExpenseButton?.addEventListener("click", () => {
+  transactionType.value = "expense";
+  openTransactionFormButton?.click();
+});
+
+quickReportsButton?.addEventListener("click", () => {
+  showPage("analysisPage");
+});
+    
 
   function openNewCardForm() {
     resetCardForm();
