@@ -8,7 +8,7 @@
     content="width=device-width, initial-scale=1, viewport-fit=cover"
   >
 
-  <meta name="theme-color" content="#08111f">
+  <meta name="theme-color" content="#07101f">
 
   <title>YF — Yavuz Finans</title>
 
@@ -19,141 +19,567 @@
 
   <main class="app">
 
-    <header class="top-header">
+    <!-- ANA SAYFA -->
+    <section id="homePage" class="page active">
 
-      <div class="brand-area">
-        <div class="logo">YF</div>
+      <header class="top-header">
 
-        <div>
-          <span class="brand-subtitle">Yavuz Finans</span>
-          <h1 id="welcomeText">Günaydın Yavuz 👋</h1>
-        </div>
-      </div>
+        <div class="brand-area">
 
-      <button class="profile-button" type="button">
-        Y
-      </button>
+          <div class="logo">
+            YF
+          </div>
 
-    </header>
+          <div>
+            <span class="brand-subtitle">
+              Yavuz Finans
+            </span>
 
+            <h1 id="welcomeText">
+              Günaydın Yavuz 👋
+            </h1>
+          </div>
 
-    <section class="balance-card">
-
-      <div class="balance-top">
-
-        <div>
-          <span class="card-label">Net Durum</span>
-          <strong id="netBalance">₺0,00</strong>
         </div>
 
-        <span class="status-badge">
-          Güncel
-        </span>
+        <button class="profile-button" type="button">
+          Y
+        </button>
 
-      </div>
-
-      <div class="balance-footer">
-
-        <span>
-          Tüm varlıklar ve borçlar
-        </span>
-
-        <span id="balanceStatus">
-          Dengeli
-        </span>
-
-      </div>
-
-    </section>
+      </header>
 
 
-    <section class="summary-grid">
+      <section class="balance-card">
 
-      <article class="summary-card debt-card">
+        <div class="balance-top">
 
-        <div class="summary-icon">
-          💳
-        </div>
+          <div>
+            <span class="card-label">
+              Net Durum
+            </span>
 
-        <span>Toplam Borç</span>
+            <strong id="netBalance">
+              ₺0,00
+            </strong>
+          </div>
 
-        <strong id="totalDebt">
-          ₺0,00
-        </strong>
-
-      </article>
-
-
-      <article class="summary-card asset-card">
-
-        <div class="summary-icon">
-          💰
-        </div>
-
-        <span>Toplam Varlık</span>
-
-        <strong id="totalAssets">
-          ₺0,00
-        </strong>
-
-      </article>
-
-
-      <article class="summary-card payment-card">
-
-        <div class="summary-icon">
-          ✓
-        </div>
-
-        <span>Bu Ay Ödenen</span>
-
-        <strong id="monthlyPayment">
-          ₺0,00
-        </strong>
-
-      </article>
-
-
-      <article class="summary-card card-count-card">
-
-        <div class="summary-icon">
-          ▣
-        </div>
-
-        <span>Kart Sayısı</span>
-
-        <strong id="cardCount">
-          0
-        </strong>
-
-      </article>
-
-    </section>
-
-
-    <section class="section-block">
-
-      <div class="section-header">
-
-        <div>
-          <span class="section-subtitle">
-            Ödeme Takibi
+          <span class="status-badge">
+            Güncel
           </span>
 
-          <h2>
-            Yaklaşan Ödemeler
+        </div>
+
+        <div class="balance-footer">
+
+          <span>
+            Tüm varlıklar ve borçlar
+          </span>
+
+          <span id="balanceStatus">
+            Dengeli
+          </span>
+
+        </div>
+
+      </section>
+
+
+      <section class="summary-grid">
+
+        <article class="summary-card debt-card">
+
+          <div class="summary-icon">
+            💳
+          </div>
+
+          <span>
+            Toplam Borç
+          </span>
+
+          <strong id="totalDebt">
+            ₺0,00
+          </strong>
+
+        </article>
+
+
+        <article class="summary-card asset-card">
+
+          <div class="summary-icon">
+            💰
+          </div>
+
+          <span>
+            Toplam Varlık
+          </span>
+
+          <strong id="totalAssets">
+            ₺0,00
+          </strong>
+
+        </article>
+
+
+        <article class="summary-card payment-card">
+
+          <div class="summary-icon">
+            ✓
+          </div>
+
+          <span>
+            Bu Ay Ödenen
+          </span>
+
+          <strong id="monthlyPayment">
+            ₺0,00
+          </strong>
+
+        </article>
+
+
+        <article class="summary-card card-count-card">
+
+          <div class="summary-icon">
+            ▣
+          </div>
+
+          <span>
+            Kart Sayısı
+          </span>
+
+          <strong id="cardCount">
+            0
+          </strong>
+
+        </article>
+
+      </section>
+
+
+      <section class="section-block">
+
+        <div class="section-header">
+
+          <div>
+            <span class="section-subtitle">
+              Ödeme Takibi
+            </span>
+
+            <h2>
+              Yaklaşan Ödemeler
+            </h2>
+          </div>
+
+        </div>
+
+        <div id="upcomingPayments" class="payment-list">
+
+          <div class="empty-state">
+            Henüz kart veya ödeme kaydı bulunmuyor.
+          </div>
+
+        </div>
+
+      </section>
+
+
+      <section class="section-block">
+
+        <div class="section-header">
+
+          <div>
+            <span class="section-subtitle">
+              Kısayollar
+            </span>
+
+            <h2>
+              Hızlı İşlemler
+            </h2>
+          </div>
+
+        </div>
+
+        <div class="quick-actions">
+
+          <button type="button">
+            <span>＋</span>
+            Gelir Ekle
+          </button>
+
+          <button type="button">
+            <span>−</span>
+            Gider Ekle
+          </button>
+
+          <button
+            id="quickAddCardButton"
+            type="button"
+          >
+            <span>💳</span>
+            Kart Ekle
+          </button>
+
+          <button type="button">
+            <span>📊</span>
+            Raporlar
+          </button>
+
+        </div>
+
+      </section>
+
+    </section>
+
+
+    <!-- KARTLAR SAYFASI -->
+    <section id="cardsPage" class="page">
+
+      <header class="page-header">
+
+        <div>
+          <span class="brand-subtitle">
+            Kart Yönetimi
+          </span>
+
+          <h1>
+            Kartlarım
+          </h1>
+        </div>
+
+        <button
+          id="openCardFormButton"
+          class="add-button"
+          type="button"
+        >
+          + Kart Ekle
+        </button>
+
+      </header>
+
+
+      <section class="cards-summary">
+
+        <article>
+
+          <span>
+            Toplam Kart Borcu
+          </span>
+
+          <strong id="cardsTotalDebt">
+            ₺0,00
+          </strong>
+
+        </article>
+
+        <article>
+
+          <span>
+            Toplam Limit
+          </span>
+
+          <strong id="cardsTotalLimit">
+            ₺0,00
+          </strong>
+
+        </article>
+
+      </section>
+
+
+      <section id="cardsList" class="bank-cards-list">
+
+        <div id="emptyCards" class="empty-state">
+          Henüz kart eklenmedi.
+        </div>
+
+      </section>
+
+    </section>
+
+
+    <!-- İŞLEMLER SAYFASI -->
+    <section id="transactionsPage" class="page">
+
+      <header class="page-header">
+
+        <div>
+          <span class="brand-subtitle">
+            Finans Hareketleri
+          </span>
+
+          <h1>
+            İşlemler
+          </h1>
+        </div>
+
+      </header>
+
+      <section class="section-block">
+
+        <div class="empty-state">
+          İşlemler bölümü daha sonra eklenecek.
+        </div>
+
+      </section>
+
+    </section>
+
+
+    <!-- ANALİZ SAYFASI -->
+    <section id="analysisPage" class="page">
+
+      <header class="page-header">
+
+        <div>
+          <span class="brand-subtitle">
+            Finans Raporları
+          </span>
+
+          <h1>
+            Analiz
+          </h1>
+        </div>
+
+      </header>
+
+      <section class="section-block">
+
+        <div class="empty-state">
+          Grafikler ve analizler daha sonra eklenecek.
+        </div>
+
+      </section>
+
+    </section>
+
+  </main>
+
+
+  <!-- KART EKLEME FORMU -->
+  <div id="cardModal" class="modal hidden">
+
+    <div class="modal-backdrop"></div>
+
+    <section class="modal-content">
+
+      <div class="modal-header">
+
+        <div>
+          <span class="brand-subtitle">
+            Kart Yönetimi
+          </span>
+
+          <h2 id="cardFormTitle">
+            Yeni Kart Ekle
           </h2>
         </div>
 
-        <button class="text-button" type="button">
-          Tümünü Gör
+        <button
+          id="closeCardFormButton"
+          class="close-button"
+          type="button"
+        >
+          ×
         </button>
 
       </div>
 
 
-      <div class="payment-list">
+      <form id="cardForm">
 
-        <article class="payment-item">
+        <input
+          id="cardId"
+          type="hidden"
+        >
 
-          <div class="bank-icon
+
+        <label>
+
+          Banka
+
+          <select id="bankName" required>
+
+            <option value="">
+              Banka seç
+            </option>
+
+            <option value="Garanti BBVA">
+              Garanti BBVA
+            </option>
+
+            <option value="İş Bankası">
+              İş Bankası
+            </option>
+
+            <option value="Ziraat Bankası">
+              Ziraat Bankası
+            </option>
+
+            <option value="Akbank">
+              Akbank
+            </option>
+
+            <option value="QNB">
+              QNB
+            </option>
+
+            <option value="TOM Bankası">
+              TOM Bankası
+            </option>
+
+            <option value="Diğer">
+              Diğer
+            </option>
+
+          </select>
+
+        </label>
+
+
+        <label>
+
+          Kart adı
+
+          <input
+            id="cardName"
+            type="text"
+            placeholder="Örn. Maximum Gold"
+            required
+          >
+
+        </label>
+
+
+        <label>
+
+          Kart limiti
+
+          <input
+            id="cardLimit"
+            type="number"
+            inputmode="decimal"
+            min="0"
+            step="0.01"
+            placeholder="0,00"
+            required
+          >
+
+        </label>
+
+
+        <label>
+
+          Güncel borç
+
+          <input
+            id="cardDebt"
+            type="number"
+            inputmode="decimal"
+            min="0"
+            step="0.01"
+            placeholder="0,00"
+            required
+          >
+
+        </label>
+
+
+        <label>
+
+          Hesap kesim tarihi
+
+          <input
+            id="statementDate"
+            type="date"
+          >
+
+        </label>
+
+
+        <label>
+
+          Son ödeme tarihi
+
+          <input
+            id="dueDate"
+            type="date"
+          >
+
+        </label>
+
+
+        <div class="form-buttons">
+
+          <button
+            id="cancelCardButton"
+            class="secondary-button"
+            type="button"
+          >
+            Vazgeç
+          </button>
+
+          <button
+            class="primary-button"
+            type="submit"
+          >
+            Kartı Kaydet
+          </button>
+
+        </div>
+
+      </form>
+
+    </section>
+
+  </div>
+
+
+  <!-- ALT MENÜ -->
+  <nav class="bottom-nav">
+
+    <button
+      class="nav-item active"
+      data-page="homePage"
+      type="button"
+    >
+      <span>⌂</span>
+      Ana Sayfa
+    </button>
+
+
+    <button
+      class="nav-item"
+      data-page="cardsPage"
+      type="button"
+    >
+      <span>▣</span>
+      Kartlar
+    </button>
+
+
+    <button
+      class="nav-item"
+      data-page="transactionsPage"
+      type="button"
+    >
+      <span>＋</span>
+      İşlemler
+    </button>
+
+
+    <button
+      class="nav-item"
+      data-page="analysisPage"
+      type="button"
+    >
+      <span>◔</span>
+      Analiz
+    </button>
+
+  </nav>
+
+
+  <script src="app.js"></script>
+
+</body>
+</html>
