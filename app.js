@@ -1055,6 +1055,17 @@ transactionForm?.addEventListener("submit", (event) => {
     date: transactionDate.value,
     createdAt: new Date().toISOString()
   };
+  if (transaction.type === "expense" &&
+    transactionPaymentMethod.value === "card" &&
+    transactionCard.value) {
+
+    const card = cards.find(c => c.id === transactionCard.value);
+
+    if (card) {
+        card.debt += amount;
+        saveCards();
+    }
+}
 
   transactions.unshift(transaction);
 
