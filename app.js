@@ -3125,4 +3125,483 @@ document.addEventListener("DOMContentLoaded", () => {
 
   setTimeout(openSavedPage, 300);
 });
+// =========================================
+// YF v2.3.4 — Borç Seçim Penceresi
+// Bu kod app.js dosyasının EN ALTINA eklenir.
+// =========================================
+
+document.addEventListener("DOMContentLoaded", () => {
+  const CARD_KEY = "yf_cards_v1";
+  const nativeSelect = document.getElementById("debtPaymentCard");
+
+  if (!nativeSelect || document.getElementById("debtPickerButton")) return;
+
+  installDebtPickerStyles();
+  createDebtPicker();
+  refreshDebtPickerButton();
+
+  nativeSelect.addEventListener("change", refreshDebtPickerButton);
+
+  document
+    .querySelectorAll('[data-page="debtPaymentPage"]')
+    .forEach(button => {
+      button.addEventListener("click", () => {
+        setTimeout(refreshDebtPickerButton, 180);
+      });
+    });
+
+  function createDebtPicker() {
+    const button = document.createElement("button");
+    button.id = "debtPickerButton";
+    button.type = "button";
+    button.className = "debt-picker-button";
+    button.innerHTML = `
+      <span id="debtPickerButtonText">Kart veya kredi seç</span>
+      <span class="debt-picker-arrow">›</span>
+    `;
+
+    nativeSelect.classList.add("hidden");
+    nativeSelect.insertAdjacentElement("afterend", button);
+
+    const layer = document.createElement("div");
+    layer.id = "debtPickerLayer";
+    layer.className = "debt-picker-layer hidden";
+
+    layer.innerHTML = `
+      <div class="debt-picker-backdrop"></div>
+
+      <section class="debt-picker-sheet">
+        <div class="debt-picker-header">
+          <div>
+            <span>BORÇ SEÇİMİ</span>
+            <h2>Kart veya kredi seç</h2>
+          </div>
+
+          <button
+            id="closeDebtPicker"
+            class="debt-picker-close"
+            type="button"
+            aria-label="Kapat"
+          >
+            ×
+          </button>
+        </div>
+
+        <input
+          id="debtPickerSearch"
+          class="debt-picker-search"
+          type="search"
+          placeholder="Banka veya borç ara"
+          autocomplete="off"
+        >
+
+        <div id="debtPickerList" class="debt-picker-list"></div>
+      </section>
+    `;
+
+    document.body.appendChild(layer);
+
+    button.addEventListener("click", openPicker);
+
+    layer
+      .querySelector(".debt-picker-backdrop")
+      ?.addEventListener("click", closePicker);
+
+    document
+      .getElementById("closeDebtPicker")
+      ?.addEventListener("click", closePicker);
+
+    document
+      .getElementById("debtPickerSearch")
+      ?.addEventListener("input", renderPickerList);
+  }
+
+  function openPicker() {
+    const layer = document.getElementById("debtPickerLayer");
+    const search = document.getElementById("debtPickerSearch");
+
+    if (!layer) return;
+
+    renderPickerList();
+
+    layer.classList.remove("hidden");
+    document.body.style.overflow = "hidden";
+
+    if (search) {
+      search.value = "";
+      setTimeout(() => search.focus(), 120);
+    }
+  }
+
+  function closePicker() {
+    document
+      .getElementById("debtPickerLayer")
+      ?.classList.add("hidden");
+
+    document.body.style.overflow = "";
+  }
+
+  function renderPickerList() {
+    const list = document.getElementById("debtPickerList");
+    const searchValue = String(
+      document.getElementById("debtPickerSearch")?.value || ""
+    )
+      .toLocaleLowerCase("tr-TR")
+      .trim();
+
+    if (!list) return;
+
+    const debts = loadJson(CARD_KEY)
+      .filter(item => Number(item.debt || 0) > 0)
+      .filter(item => {
+        if (!searchValue) return true;
+
+        const haystack = `${item.bank || ""} ${item.name || ""}`
+          .toLocaleLowerCase("tr-TR");
+
+        return haystack.includes(searchValue);
+      });
+
+    const loans = debts.filter(
+      item => item.type === "personal-loan"
+    );
+
+    const cards = debts.filter(
+      item => item.type !== "personal-loan"
+    );
+
+    list.innerHTML = "";
+
+    if (!debts.length) {
+      list.innerHTML = `
+        <div class="debt-picker-empty">
+          Eşleşen kart veya kredi bulunamadı.
+        </div>
+      `;
+      return;
+    }
+
+    appendGroup("🏦 İhtiyaç Kredileri", loans);
+    appendGroup("💳 Kredi Kartları", cards);
+
+    function appendGroup(title, items) {
+      if (!items.length) return;
+
+      const group = document.createElement("section");
+      group.className = "debt-picker-group";
+
+      const heading = document.createElement("h3");
+      heading.textContent = title;
+      group.appendChild(heading);
+
+      items.forEach(item => {
+        const row = document.createElement("button");
+        row.type = "button";
+        row.className = "debt-picker-row";
+
+        const isLoan = item.type === "personal-loan";
+
+        row.innerHTML = `
+          <span class="debt-picker-row-icon">
+            ${isLoan ? "🏦" : "💳"}
+          </span>
+
+          <span class="debt-picker-row-info">
+            <strong>${escapeHtml(item.bank || "Banka")}</strong>
+            <small>${escapeHtml(item.name || "")}</small>
+          </span>
+
+          <span class="debt-picker-row-amount">
+            <strong>${formatMoney(item.debt)}</strong>
+            <small>${isLoan ? "Kalan kredi" : "Kart borcu"}</small>
+          </span>
+        `;
+
+        row.addEventListener("click", () => {
+          nativeSelect.value = item.id;
+          nativeSelect.dispatchEvent(
+            new Event("change", { bubbles: true })
+          );
+
+          refreshDebtPickerButton();
+          closePicker();
+        });
+
+        group.appendChild(row);
+      });
+
+      list.appendChild(group);
+    }
+  }
+
+  function refreshDebtPickerButton() {
+    const text = document.getElementById("debtPickerButtonText");
+    if (!text) return;
+
+    const selected = loadJson(CARD_KEY).find(
+      item => item.id === nativeSelect.value
+    );
+
+    if (!selected) {
+      text.textContent = "Kart veya kredi seç";
+      return;
+    }
+
+    text.textContent =
+      `${selected.type === "personal-loan" ? "🏦" : "💳"} ` +
+      `${selected.bank} - ${selected.name}`;
+  }
+
+  function loadJson(key) {
+    try {
+      return JSON.parse(localStorage.getItem(key) || "[]");
+    } catch {
+      return [];
+    }
+  }
+
+  function formatMoney(value) {
+    return new Intl.NumberFormat("tr-TR", {
+      style: "currency",
+      currency: "TRY"
+    }).format(Number(value) || 0);
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function installDebtPickerStyles() {
+    if (document.getElementById("debtPickerStyles")) return;
+
+    const style = document.createElement("style");
+    style.id = "debtPickerStyles";
+
+    style.textContent = `
+      .debt-picker-button {
+        width: 100%;
+        min-height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 0 15px;
+        border: 1px solid rgba(255,255,255,.12);
+        border-radius: 14px;
+        color: inherit;
+        background: rgba(255,255,255,.06);
+        font: inherit;
+        font-weight: 750;
+        text-align: left;
+      }
+
+      .debt-picker-arrow {
+        color: #73bbff;
+        font-size: 25px;
+        transform: rotate(90deg);
+      }
+
+      .debt-picker-layer {
+        position: fixed;
+        z-index: 3000;
+        inset: 0;
+      }
+
+      .debt-picker-backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(0,0,0,.72);
+        backdrop-filter: blur(5px);
+        -webkit-backdrop-filter: blur(5px);
+      }
+
+      .debt-picker-sheet {
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        max-height: 82vh;
+        display: flex;
+        flex-direction: column;
+        padding:
+          18px
+          18px
+          calc(22px + env(safe-area-inset-bottom));
+        border: 1px solid rgba(255,255,255,.10);
+        border-radius: 26px 26px 0 0;
+        background:
+          linear-gradient(
+            180deg,
+            rgba(18,43,69,.99),
+            rgba(8,23,38,.99)
+          );
+        box-shadow: 0 -24px 60px rgba(0,0,0,.45);
+      }
+
+      .debt-picker-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 14px;
+        margin-bottom: 14px;
+      }
+
+      .debt-picker-header span {
+        display: block;
+        margin-bottom: 4px;
+        color: #67baff;
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: .14em;
+      }
+
+      .debt-picker-header h2 {
+        margin: 0;
+        font-size: 22px;
+      }
+
+      .debt-picker-close {
+        width: 40px;
+        height: 40px;
+        flex: 0 0 40px;
+        border: 1px solid rgba(255,255,255,.10);
+        border-radius: 13px;
+        color: inherit;
+        background: rgba(255,255,255,.05);
+        font-size: 25px;
+      }
+
+      .debt-picker-search {
+        width: 100%;
+        min-height: 48px;
+        margin-bottom: 14px;
+        padding: 0 14px;
+        border: 1px solid rgba(255,255,255,.10);
+        border-radius: 14px;
+        color: inherit;
+        background: rgba(255,255,255,.055);
+        font: inherit;
+        box-sizing: border-box;
+      }
+
+      .debt-picker-list {
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      .debt-picker-group + .debt-picker-group {
+        margin-top: 18px;
+      }
+
+      .debt-picker-group h3 {
+        margin: 0 0 9px;
+        color: #8fa2ba;
+        font-size: 11px;
+        letter-spacing: .06em;
+      }
+
+      .debt-picker-row {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        padding: 13px;
+        border: 1px solid rgba(255,255,255,.07);
+        border-radius: 16px;
+        color: inherit;
+        background: rgba(255,255,255,.035);
+        text-align: left;
+        font: inherit;
+      }
+
+      .debt-picker-row + .debt-picker-row {
+        margin-top: 8px;
+      }
+
+      .debt-picker-row-icon {
+        width: 38px;
+        height: 38px;
+        flex: 0 0 38px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 12px;
+        background: rgba(15,140,255,.10);
+      }
+
+      .debt-picker-row-info {
+        min-width: 0;
+        flex: 1;
+      }
+
+      .debt-picker-row-info strong,
+      .debt-picker-row-info small,
+      .debt-picker-row-amount strong,
+      .debt-picker-row-amount small {
+        display: block;
+      }
+
+      .debt-picker-row-info strong {
+        overflow: hidden;
+        font-size: 13px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .debt-picker-row-info small {
+        margin-top: 4px;
+        color: #8fa2ba;
+        font-size: 10px;
+      }
+
+      .debt-picker-row-amount {
+        flex: 0 0 auto;
+        text-align: right;
+      }
+
+      .debt-picker-row-amount strong {
+        font-size: 12px;
+      }
+
+      .debt-picker-row-amount small {
+        margin-top: 4px;
+        color: #8fa2ba;
+        font-size: 9px;
+      }
+
+      .debt-picker-empty {
+        padding: 22px;
+        border: 1px dashed rgba(255,255,255,.09);
+        border-radius: 16px;
+        color: #8fa2ba;
+        text-align: center;
+        font-size: 12px;
+      }
+
+      body.light-theme .debt-picker-sheet {
+        color: #102033;
+        background:
+          linear-gradient(
+            180deg,
+            rgba(250,253,255,.99),
+            rgba(235,244,251,.99)
+          );
+      }
+
+      body.light-theme .debt-picker-row,
+      body.light-theme .debt-picker-search,
+      body.light-theme .debt-picker-button {
+        background: rgba(255,255,255,.82);
+        border-color: rgba(20,73,112,.10);
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+});
 
