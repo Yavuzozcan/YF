@@ -1340,3 +1340,1351 @@ document.addEventListener("DOMContentLoaded", () => {
     document.head.appendChild(style);
   }
 });
+// =========================================
+// YF v2.3 — İhtiyaç Kredisi Sistemi
+// Bu kod app.js dosyasının EN ALTINA eklenir.
+// =========================================
+
+document.addEventListener("DOMContentLoaded", () => {
+  const CARD_KEY = "yf_cards_v1";
+  const TRANSACTION_KEY = "yf_transactions_v1";
+
+  const $ = id => document.getElementById(id);
+
+  const form = $("cardForm");
+  const cardModal = $("cardModal");
+  const cardId = $("cardId");
+  const bankName = $("bankName");
+
+  const creditRadio = $("debtTypeCreditCard");
+  const loanRadio = $("debtTypePersonalLoan");
+  const creditFields = $("creditCardFields");
+  const loanFields = $("personalLoanFields");
+
+  const cardName = $("cardName");
+  const cardLimit = $("cardLimit");
+  const cardDebt = $("cardDebt");
+  const statementDate = $("statementDate");
+  const dueDate = $("dueDate");
+
+  const loanName = $("loanName");
+  const loanRemainingDebt = $("loanRemainingDebt");
+  const loanMonthlyInstallment = $("loanMonthlyInstallment");
+  const loanRemainingInstallments = $("loanRemainingInstallments");
+  const loanPaymentDay = $("loanPaymentDay");
+  const loanNextPaymentDate = $("loanNextPaymentDate");
+
+  if (!form || !creditRadio || !loanRadio) return;
+
+  normalizeDebtTypes();
+  installLoanStyles();
+  setupDebtTypeSwitch();
+  setupLoanSave();
+  setupLoanPayment();
+  setupLoanRendering();
+
+  setTimeout(() => {
+    toggleDebtFields();
+    renderMixedDebts();
+    refreshLoanAwareSummaries();
+    refreshLoanAwareUpcoming();
+    refreshLoanAwareTodayTasks();
+    populateMixedPaymentList();
+  }, 200);
+
+  // -----------------------------
+  // VERİLERİ ESKİ SÜRÜMDEN UYARLA
+  // -----------------------------
+  function normalizeDebtTypes() {
+    const debts = loadJson(CARD_KEY);
+
+    const normalized = debts.map(item => ({
+      ...item,
+      type: item.type || "credit-card",
+      id: item.id || createId(),
+      debt: Number(item.debt || 0),
+      limit: Number(item.limit || 0),
+      monthlyInstallment: Number(item.monthlyInstallment || 0),
+      remainingInstallments: Number(item.remainingInstallments || 0),
+      paymentDay: Number(item.paymentDay || 0)
+    }));
+
+    saveJson(CARD_KEY, normalized);
+  }
+
+  // -----------------------------
+  // FORMDA KART / KREDİ SEÇİMİ
+  // -----------------------------
+  function setupDebtTypeSwitch() {
+    creditRadio.addEventListener("change", toggleDebtFields);
+    loanRadio.addEventListener("change", toggleDebtFields);
+
+    $("openCardFormButton")?.addEventListener("click", () => {
+      setTimeout(() => {
+        if (!cardId?.value) {
+          creditRadio.checked = true;
+          loanRadio.checked = false;
+        }
+        toggleDebtFields();
+      }, 0);
+    });
+
+    $("quickAddCardButton")?.addEventListener("click", () => {
+      setTimeout(() => {
+        if (!cardId?.value) {
+          creditRadio.checked = true;
+          loanRadio.checked = false;
+        }
+        toggleDebtFields();
+      }, 0);
+    });
+  }
+
+  function toggleDebtFields() {
+    const isLoan = loanRadio.checked;
+
+    creditFields?.classList.toggle("hidden", isLoan);
+    loanFields?.classList.toggle("hidden", !isLoan);
+
+    setRequired(cardName, !isLoan);
+    setRequired(cardLimit, !isLoan);
+    setRequired(cardDebt, !isLoan);
+
+    setRequired(loanName, isLoan);
+    setRequired(loanRemainingDebt, isLoan);
+    setRequired(loanMonthlyInstallment, isLoan);
+    setRequired(loanRemainingInstallments, isLoan);
+    setRequired(loanPaymentDay, isLoan);
+    setRequired(loanNextPaymentDate, isLoan);
+
+    const title = $("cardFormTitle");
+    if (title && !cardId?.value) {
+      title.textContent = isLoan
+        ? "Yeni İhtiyaç Kredisi Ekle"
+        : "Yeni Kart Ekle";
+    }
+  }
+
+  function setRequired(element, required) {
+    if (!element) return;
+    element.required = required;
+    element.disabled = false;
+  }
+
+  // -----------------------------
+  // İHTİYAÇ KREDİSİNİ KAYDET
+  // capture=true: eski kart kaydetme kodundan önce çalışır
+  // -----------------------------
+  function setupLoanSave() {
+    form.addEventListener("submit", event => {
+      if (!loanRadio.checked) return;
+
+      event.preventDefault();
+      event.stopImmediatePropagation();
+
+      const bank = bankName?.value || "";
+      const name = loanName?.value.trim() || "";
+      const debt = Number(loanRemainingDebt?.value);
+      const installment = Number(loanMonthlyInstallment?.value);
+      const installments = Number(loanRemainingInstallments?.value);
+      const paymentDay = Number(loanPaymentDay?.value);
+      const nextDate = loanNextPaymentDate?.value || "";
+
+      if (!bank) {
+        alert("Lütfen banka seç.");
+        return;
+      }
+
+      if (!name) {
+        alert("Lütfen kredi adını yaz.");
+        return;
+      }
+
+      if (!Number.isFinite(debt) || debt <= 0) {
+        alert("Kalan borcu doğru gir.");
+        return;
+      }
+
+      if (!Number.isFinite(installment) || installment <= 0) {
+        alert("Aylık taksiti doğru gir.");
+        return;
+      }
+
+      if (!Number.isInteger(installments) || installments <= 0) {
+        alert("Kalan taksit sayısını doğru gir.");
+        return;
+      }
+
+      if (
+        !Number.isInteger(paymentDay) ||
+        paymentDay < 1 ||
+        paymentDay > 31
+      ) {
+        alert("Ödeme günü 1 ile 31 arasında olmalı.");
+        return;
+      }
+
+      if (!nextDate) {
+        alert("Sonraki ödeme tarihini seç.");
+        return;
+      }
+
+      const debts = loadJson(CARD_KEY);
+      const old = debts.find(item => item.id === cardId?.value);
+
+      const loan = {
+        id: cardId?.value || createId(),
+        type: "personal-loan",
+        bank,
+        name,
+        debt: roundMoney(debt),
+        originalDebt: Number(old?.originalDebt || debt),
+        monthlyInstallment: roundMoney(installment),
+        remainingInstallments: installments,
+        paymentDay,
+        nextPaymentDate: nextDate,
+        dueDate: nextDate,
+
+        // Eski ekranların hata vermemesi için:
+        limit: 0,
+        statementDebt: 0,
+        statementDate: "",
+        statementCycle: "",
+
+        createdAt: old?.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      const index = debts.findIndex(item => item.id === loan.id);
+
+      if (index >= 0) {
+        debts[index] = loan;
+      } else {
+        debts.unshift(loan);
+      }
+
+      saveJson(CARD_KEY, debts);
+
+      sessionStorage.setItem("yf_open_cards_after_reload", "1");
+      window.location.reload();
+    }, true);
+  }
+
+  // -----------------------------
+  // KREDİ TAKSİTİ ÖDEME
+  // -----------------------------
+  function setupLoanPayment() {
+    const paymentForm = $("debtPaymentForm");
+    const paymentSelect = $("debtPaymentCard");
+    const paymentAmount = $("debtPaymentAmount");
+
+    if (!paymentForm || !paymentSelect || !paymentAmount) return;
+
+    paymentSelect.addEventListener("change", () => {
+      setTimeout(updateLoanPaymentPanel, 10);
+    });
+
+    paymentForm.addEventListener("submit", event => {
+      const debts = loadJson(CARD_KEY);
+      const selected = debts.find(
+        item => item.id === paymentSelect.value
+      );
+
+      if (!selected || selected.type !== "personal-loan") return;
+
+      event.preventDefault();
+      event.stopImmediatePropagation();
+
+      const amount = Number(paymentAmount.value);
+
+      if (!Number.isFinite(amount) || amount <= 0) {
+        alert("Lütfen geçerli bir ödeme tutarı gir.");
+        return;
+      }
+
+      if (amount > Number(selected.debt || 0)) {
+        alert("Ödeme tutarı kalan kredi borcundan büyük olamaz.");
+        return;
+      }
+
+      selected.debt = roundMoney(
+        Math.max(0, Number(selected.debt || 0) - amount)
+      );
+
+      if (selected.remainingInstallments > 0) {
+        selected.remainingInstallments -= 1;
+      }
+
+      if (selected.debt <= 0) {
+        selected.debt = 0;
+        selected.remainingInstallments = 0;
+      }
+
+      selected.nextPaymentDate =
+        selected.debt > 0
+          ? addOneMonth(selected.nextPaymentDate)
+          : "";
+
+      selected.dueDate = selected.nextPaymentDate;
+      selected.updatedAt = new Date().toISOString();
+
+      const transactions = loadJson(TRANSACTION_KEY);
+      const now = new Date();
+
+      transactions.unshift({
+        id: createId(),
+        type: "loan-payment",
+        name: "İhtiyaç Kredisi Taksit Ödemesi",
+        amount: roundMoney(amount),
+        category: "loan-payment",
+        date: now.toISOString().split("T")[0],
+        paymentMethod: "cash",
+        cardId: selected.id,
+        cardName: `${selected.bank} - ${selected.name}`,
+        debtType: "personal-loan",
+        createdAt: now.toISOString()
+      });
+
+      saveJson(CARD_KEY, debts);
+      saveJson(TRANSACTION_KEY, transactions);
+
+      sessionStorage.setItem("yf_open_payment_after_reload", "1");
+      window.location.reload();
+    }, true);
+  }
+
+  function updateLoanPaymentPanel() {
+    const paymentSelect = $("debtPaymentCard");
+    const amountInput = $("debtPaymentAmount");
+    const summaryTitle = document.querySelector(
+      ".debt-payment-summary span"
+    );
+    const submitButton = $("debtPaymentForm")
+      ?.querySelector('button[type="submit"]');
+
+    if (!paymentSelect) return;
+
+    const selected = loadJson(CARD_KEY).find(
+      item => item.id === paymentSelect.value
+    );
+
+    const smartPanel = $("smartMinimumPanel");
+
+    if (selected?.type === "personal-loan") {
+      smartPanel?.classList.add("hidden");
+
+      if (summaryTitle) {
+        summaryTitle.textContent = "Seçilen kredinin kalan borcu";
+      }
+
+      if (submitButton) {
+        submitButton.textContent = "Taksiti Öde";
+      }
+
+      if (amountInput) {
+        amountInput.value = Math.min(
+          Number(selected.monthlyInstallment || 0),
+          Number(selected.debt || 0)
+        ).toFixed(2);
+
+        amountInput.max = Number(selected.debt || 0);
+      }
+
+      const selectedDebt = $("selectedCardDebt");
+      if (selectedDebt) {
+        selectedDebt.textContent = formatMoney(selected.debt);
+      }
+    } else {
+      smartPanel?.classList.remove("hidden");
+
+      if (summaryTitle) {
+        summaryTitle.textContent = "Seçilen kartın güncel borcu";
+      }
+
+      if (submitButton) {
+        submitButton.textContent = "Borcu Öde";
+      }
+    }
+  }
+
+  function populateMixedPaymentList() {
+    const select = $("debtPaymentCard");
+    if (!select) return;
+
+    const oldValue = select.value;
+    const debts = loadJson(CARD_KEY);
+
+    select.innerHTML = '<option value="">Kart veya kredi seç</option>';
+
+    debts
+      .filter(item => Number(item.debt || 0) > 0)
+      .forEach(item => {
+        const option = document.createElement("option");
+        option.value = item.id;
+
+        if (item.type === "personal-loan") {
+          option.textContent =
+            `🏦 ${item.bank} - ${item.name} (${formatMoney(item.debt)})`;
+        } else {
+          option.textContent =
+            `💳 ${item.bank} - ${item.name} (${formatMoney(item.debt)})`;
+        }
+
+        select.appendChild(option);
+      });
+
+    if (debts.some(item => item.id === oldValue)) {
+      select.value = oldValue;
+    }
+
+    updateLoanPaymentPanel();
+  }
+
+  document
+    .querySelectorAll('[data-page="debtPaymentPage"]')
+    .forEach(button => {
+      button.addEventListener("click", () => {
+        setTimeout(() => {
+          populateMixedPaymentList();
+          updateLoanPaymentPanel();
+        }, 160);
+      });
+    });
+
+  // -----------------------------
+  // KARTLARIM SAYFASINDA İKİ TÜRÜ GÖSTER
+  // -----------------------------
+  function setupLoanRendering() {
+    document
+      .querySelectorAll('[data-page="cardsPage"]')
+      .forEach(button => {
+        button.addEventListener("click", () => {
+          setTimeout(() => {
+            renderMixedDebts();
+            refreshLoanAwareSummaries();
+          }, 160);
+        });
+      });
+
+    window.addEventListener("storage", () => {
+      renderMixedDebts();
+      refreshLoanAwareSummaries();
+    });
+  }
+
+  function renderMixedDebts() {
+    const list = $("cardsList");
+    if (!list) return;
+
+    const debts = loadJson(CARD_KEY);
+    const transactions = loadJson(TRANSACTION_KEY);
+
+    list.innerHTML = "";
+
+    if (!debts.length) {
+      list.innerHTML =
+        '<div class="empty-state">Henüz kart veya kredi eklenmedi.</div>';
+      return;
+    }
+
+    debts.forEach(item => {
+      if (item.type === "personal-loan") {
+        list.appendChild(createLoanCard(item));
+      } else {
+        list.appendChild(createCreditCard(item, transactions));
+      }
+    });
+  }
+
+  function createLoanCard(loan) {
+    const element = document.createElement("article");
+    element.className = "bank-card loan-bank-card";
+
+    const paid =
+      Math.max(
+        0,
+        Number(loan.originalDebt || loan.debt) -
+        Number(loan.debt || 0)
+      );
+
+    const progress =
+      Number(loan.originalDebt || 0) > 0
+        ? Math.min(
+            100,
+            Math.round(
+              (paid / Number(loan.originalDebt)) * 100
+            )
+          )
+        : 0;
+
+    element.innerHTML = `
+      <div class="bank-card-header">
+        <div>
+          <span>${escapeHtml(loan.bank)}</span>
+          <h3>${escapeHtml(loan.name)}</h3>
+        </div>
+
+        <div class="bank-card-actions">
+          <button type="button" data-loan-edit="${loan.id}">
+            Düzenle
+          </button>
+          <button type="button" data-loan-delete="${loan.id}">
+            Sil
+          </button>
+        </div>
+      </div>
+
+      <span class="loan-type-badge">🏦 İhtiyaç Kredisi</span>
+
+      <strong class="bank-card-debt">
+        ${formatMoney(loan.debt)}
+      </strong>
+
+      <div class="loan-installment-box">
+        <div>
+          <span>Aylık taksit</span>
+          <strong>${formatMoney(loan.monthlyInstallment)}</strong>
+        </div>
+
+        <div>
+          <span>Kalan taksit</span>
+          <strong>${Number(loan.remainingInstallments || 0)}</strong>
+        </div>
+      </div>
+
+      <div class="card-minimum-status-track">
+        <div style="width:${progress}%"></div>
+      </div>
+
+      <small class="loan-progress-text">
+        Toplam ilerleme: %${progress}
+      </small>
+
+      <div class="bank-card-dates">
+        <div>
+          <span>Ödeme günü</span>
+          <strong>Her ayın ${Number(loan.paymentDay || 0)}'i</strong>
+        </div>
+
+        <div>
+          <span>Sonraki ödeme</span>
+          <strong>${formatDate(loan.nextPaymentDate)}</strong>
+        </div>
+      </div>
+    `;
+
+    element
+      .querySelector("[data-loan-edit]")
+      ?.addEventListener("click", () => openLoanForEdit(loan));
+
+    element
+      .querySelector("[data-loan-delete]")
+      ?.addEventListener("click", () => deleteDebt(loan));
+
+    return element;
+  }
+
+  function createCreditCard(card, transactions) {
+    const element = document.createElement("article");
+    element.className = "bank-card";
+
+    const limit = Number(card.limit || 0);
+    const debt = Number(card.debt || 0);
+    const available = Math.max(0, limit - debt);
+    const usage = limit > 0
+      ? Math.min(100, Math.round((debt / limit) * 100))
+      : 0;
+
+    const statementDebt = Number(
+      card.statementDebt ?? card.debt ?? 0
+    );
+
+    const minimum = roundMoney(statementDebt * 0.20);
+    const paid = getCardPayments(card, transactions);
+    const remaining = Math.max(0, minimum - paid);
+    const percent = minimum > 0
+      ? Math.min(100, Math.round((paid / minimum) * 100))
+      : 100;
+
+    element.innerHTML = `
+      <div class="bank-card-header">
+        <div>
+          <span>${escapeHtml(card.bank)}</span>
+          <h3>${escapeHtml(card.name)}</h3>
+        </div>
+
+        <div class="bank-card-actions">
+          <button type="button" data-card-edit="${card.id}">
+            Düzenle
+          </button>
+          <button type="button" data-card-delete="${card.id}">
+            Sil
+          </button>
+        </div>
+      </div>
+
+      <span class="credit-type-badge">💳 Kredi Kartı</span>
+
+      <strong class="bank-card-debt">
+        ${formatMoney(debt)}
+      </strong>
+
+      <div class="card-minimum-status">
+        <div class="card-minimum-status-head">
+          <div>
+            <span>Otomatik asgari (%20)</span>
+            <strong>${formatMoney(minimum)}</strong>
+          </div>
+
+          <span class="card-minimum-status-badge ${
+            remaining <= 0
+              ? "completed"
+              : paid > 0
+                ? "partial"
+                : "waiting"
+          }">
+            ${
+              remaining <= 0
+                ? "Asgari ödendi ✓"
+                : paid > 0
+                  ? `${formatMoney(remaining)} kaldı`
+                  : "Asgari bekliyor"
+            }
+          </span>
+        </div>
+
+        <div class="card-minimum-status-track">
+          <div style="width:${percent}%"></div>
+        </div>
+
+        <small>
+          Bu dönem: ${formatMoney(paid)} /
+          ${formatMoney(minimum)}
+        </small>
+      </div>
+
+      <div class="bank-card-details">
+        <div>
+          <span>Kart Limiti</span>
+          <strong>${formatMoney(limit)}</strong>
+        </div>
+
+        <div>
+          <span>Kalan Limit</span>
+          <strong>${formatMoney(available)}</strong>
+        </div>
+
+        <div>
+          <span>Kullanım</span>
+          <strong>%${usage}</strong>
+        </div>
+      </div>
+
+      <div class="bank-card-dates">
+        <div>
+          <span>Hesap Kesim</span>
+          <strong>${formatDate(card.statementDate)}</strong>
+        </div>
+
+        <div>
+          <span>Son Ödeme</span>
+          <strong>${formatDate(card.dueDate)}</strong>
+        </div>
+      </div>
+    `;
+
+    element
+      .querySelector("[data-card-edit]")
+      ?.addEventListener("click", () => openCardForEdit(card));
+
+    element
+      .querySelector("[data-card-delete]")
+      ?.addEventListener("click", () => deleteDebt(card));
+
+    return element;
+  }
+
+  function openLoanForEdit(loan) {
+    cardId.value = loan.id;
+    bankName.value = loan.bank;
+
+    loanRadio.checked = true;
+    creditRadio.checked = false;
+
+    loanName.value = loan.name || "";
+    loanRemainingDebt.value = loan.debt || "";
+    loanMonthlyInstallment.value = loan.monthlyInstallment || "";
+    loanRemainingInstallments.value =
+      loan.remainingInstallments || "";
+    loanPaymentDay.value = loan.paymentDay || "";
+    loanNextPaymentDate.value = loan.nextPaymentDate || "";
+
+    $("cardFormTitle").textContent = "İhtiyaç Kredisini Düzenle";
+
+    toggleDebtFields();
+    cardModal?.classList.remove("hidden");
+    document.body.style.overflow = "hidden";
+  }
+
+  function openCardForEdit(card) {
+    cardId.value = card.id;
+    bankName.value = card.bank;
+
+    creditRadio.checked = true;
+    loanRadio.checked = false;
+
+    cardName.value = card.name || "";
+    cardLimit.value = card.limit || "";
+    cardDebt.value = card.debt || "";
+    statementDate.value = card.statementDate || "";
+    dueDate.value = card.dueDate || "";
+
+    $("cardFormTitle").textContent = "Kartı Düzenle";
+
+    toggleDebtFields();
+    cardModal?.classList.remove("hidden");
+    document.body.style.overflow = "hidden";
+  }
+
+  function deleteDebt(item) {
+    const label =
+      item.type === "personal-loan"
+        ? "ihtiyaç kredisi"
+        : "kart";
+
+    if (!confirm(`${item.bank} ${label} kaydı silinsin mi?`)) {
+      return;
+    }
+
+    const debts = loadJson(CARD_KEY).filter(
+      debt => debt.id !== item.id
+    );
+
+    saveJson(CARD_KEY, debts);
+    window.location.reload();
+  }
+
+  // -----------------------------
+  // ÖZETLER
+  // -----------------------------
+  function refreshLoanAwareSummaries() {
+    const debts = loadJson(CARD_KEY);
+
+    const creditCards = debts.filter(
+      item => item.type !== "personal-loan"
+    );
+
+    const totalCreditDebt = creditCards.reduce(
+      (sum, item) => sum + Number(item.debt || 0),
+      0
+    );
+
+    const totalCreditLimit = creditCards.reduce(
+      (sum, item) => sum + Number(item.limit || 0),
+      0
+    );
+
+    setText("cardsTotalDebt", formatMoney(totalCreditDebt));
+    setText("cardsTotalLimit", formatMoney(totalCreditLimit));
+    setText(
+      "cardsAvailableLimit",
+      formatMoney(Math.max(0, totalCreditLimit - totalCreditDebt))
+    );
+
+    setText("cardCount", String(creditCards.length));
+
+    const totalAllDebt = debts.reduce(
+      (sum, item) => sum + Number(item.debt || 0),
+      0
+    );
+
+    setText("totalDebt", formatMoney(totalAllDebt));
+  }
+
+  // -----------------------------
+  // YAKLAŞAN ÖDEMELER
+  // -----------------------------
+  function refreshLoanAwareUpcoming() {
+    const container = $("upcomingPayments");
+    if (!container) return;
+
+    const debts = loadJson(CARD_KEY);
+    const transactions = loadJson(TRANSACTION_KEY);
+
+    const items = debts
+      .filter(item => {
+        const paymentDate =
+          item.type === "personal-loan"
+            ? item.nextPaymentDate
+            : item.dueDate;
+
+        return paymentDate && Number(item.debt || 0) > 0;
+      })
+      .map(item => {
+        const paymentDate =
+          item.type === "personal-loan"
+            ? item.nextPaymentDate
+            : item.dueDate;
+
+        return {
+          ...item,
+          paymentDate,
+          daysLeft: getDaysLeft(paymentDate)
+        };
+      })
+      .sort((a, b) => a.daysLeft - b.daysLeft);
+
+    container.innerHTML = "";
+
+    if (!items.length) {
+      container.innerHTML =
+        '<div class="empty-state">Henüz yaklaşan ödeme bulunmuyor.</div>';
+      return;
+    }
+
+    items.slice(0, 6).forEach(item => {
+      const element = document.createElement("article");
+      element.className = "smart-upcoming-card";
+
+      const isLoan = item.type === "personal-loan";
+      const minimum = isLoan
+        ? Number(item.monthlyInstallment || 0)
+        : roundMoney(
+            Number(item.statementDebt ?? item.debt ?? 0) * 0.20
+          );
+
+      const paid = isLoan ? 0 : getCardPayments(item, transactions);
+      const remaining = isLoan
+        ? Math.min(minimum, Number(item.debt || 0))
+        : Math.max(0, minimum - paid);
+
+      const status =
+        item.daysLeft < 0
+          ? "Gecikmiş"
+          : item.daysLeft === 0
+            ? "Bugün"
+            : item.daysLeft === 1
+              ? "Yarın"
+              : `${item.daysLeft} gün kaldı`;
+
+      element.innerHTML = `
+        <div class="smart-upcoming-left">
+          <div class="smart-upcoming-icon">
+            ${isLoan ? "🏦" : "💳"}
+          </div>
+
+          <div class="smart-upcoming-info">
+            <div class="smart-upcoming-title-row">
+              <strong>${escapeHtml(item.bank)}</strong>
+              <span class="smart-upcoming-badge ${
+                item.daysLeft <= 2 ? "urgent" :
+                item.daysLeft <= 7 ? "warning" : "safe"
+              }">
+                ${escapeHtml(status)}
+              </span>
+            </div>
+
+            <span class="smart-upcoming-card-name">
+              ${escapeHtml(item.name)}
+            </span>
+
+            <div class="smart-upcoming-meta">
+              <span>
+                ${isLoan ? "Sonraki taksit" : "Son ödeme"}:
+                <strong>${formatDate(item.paymentDate)}</strong>
+              </span>
+
+              <span>
+                ${isLoan ? "Taksit" : "Kalan asgari"}:
+                <strong>${formatMoney(remaining)}</strong>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div class="smart-upcoming-right">
+          <strong>${formatMoney(item.debt)}</strong>
+          <span>${isLoan ? "Kalan kredi" : "Kart borcu"}</span>
+        </div>
+      `;
+
+      element.addEventListener("click", () => {
+        document
+          .querySelector('[data-page="debtPaymentPage"]')
+          ?.click();
+
+        setTimeout(() => {
+          populateMixedPaymentList();
+
+          const select = $("debtPaymentCard");
+          if (!select) return;
+
+          select.value = item.id;
+          select.dispatchEvent(
+            new Event("change", { bubbles: true })
+          );
+        }, 220);
+      });
+
+      container.appendChild(element);
+    });
+  }
+
+  // -----------------------------
+  // BUGÜN YAPILACAKLAR
+  // -----------------------------
+  function refreshLoanAwareTodayTasks() {
+    const content = $("todayTasksContent");
+    if (!content) return;
+
+    const debts = loadJson(CARD_KEY);
+    const transactions = loadJson(TRANSACTION_KEY);
+
+    const items = debts
+      .filter(item => {
+        const date =
+          item.type === "personal-loan"
+            ? item.nextPaymentDate
+            : item.dueDate;
+
+        return date && Number(item.debt || 0) > 0;
+      })
+      .map(item => {
+        const date =
+          item.type === "personal-loan"
+            ? item.nextPaymentDate
+            : item.dueDate;
+
+        const isLoan = item.type === "personal-loan";
+
+        const dueAmount = isLoan
+          ? Math.min(
+              Number(item.monthlyInstallment || 0),
+              Number(item.debt || 0)
+            )
+          : Math.max(
+              0,
+              roundMoney(
+                Number(item.statementDebt ?? item.debt ?? 0) * 0.20
+              ) - getCardPayments(item, transactions)
+            );
+
+        return {
+          ...item,
+          date,
+          isLoan,
+          daysLeft: getDaysLeft(date),
+          dueAmount
+        };
+      })
+      .sort((a, b) => a.daysLeft - b.daysLeft);
+
+    content.innerHTML = "";
+
+    if (!items.length) {
+      content.innerHTML =
+        '<div class="today-tasks-empty">Bugün için ödeme görevi bulunmuyor.</div>';
+      return;
+    }
+
+    const first = items[0];
+
+    const rows = [
+      {
+        item: first,
+        icon: first.isLoan ? "🏦" : "💳",
+        title: first.isLoan
+          ? `${first.bank} kredi taksidini öde`
+          : `${first.bank} asgarisini tamamla`,
+        text:
+          `${remainingDaysText(first.daysLeft)} · ` +
+          `${formatMoney(first.dueAmount)}`
+      }
+    ];
+
+    if (items[1]) {
+      const second = items[1];
+
+      rows.push({
+        item: second,
+        icon: second.isLoan ? "🏦" : "💳",
+        title: `Sıradaki ödeme: ${second.bank}`,
+        text:
+          `${remainingDaysText(second.daysLeft)} · ` +
+          `${formatMoney(second.dueAmount)}`
+      });
+    }
+
+    const monthlyPaid = transactions
+      .filter(transaction =>
+        (
+          transaction.type === "card-payment" ||
+          transaction.type === "loan-payment"
+        ) &&
+        isCurrentMonth(transaction.createdAt || transaction.date)
+      )
+      .reduce(
+        (sum, transaction) =>
+          sum + Number(transaction.amount || 0),
+        0
+      );
+
+    rows.push({
+      item: first,
+      icon: "💸",
+      title: "Bu ay toplam ödenen",
+      text: formatMoney(monthlyPaid)
+    });
+
+    rows.slice(0, 3).forEach(rowData => {
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "today-task-row";
+
+      row.innerHTML = `
+        <span class="today-task-row-icon">${rowData.icon}</span>
+        <span class="today-task-row-text">
+          <strong>${escapeHtml(rowData.title)}</strong>
+          <small>${escapeHtml(rowData.text)}</small>
+        </span>
+        <span class="today-task-arrow">›</span>
+      `;
+
+      row.addEventListener("click", () => {
+        document
+          .querySelector('[data-page="debtPaymentPage"]')
+          ?.click();
+
+        setTimeout(() => {
+          populateMixedPaymentList();
+
+          const select = $("debtPaymentCard");
+          if (!select) return;
+
+          select.value = rowData.item.id;
+          select.dispatchEvent(
+            new Event("change", { bubbles: true })
+          );
+        }, 220);
+      });
+
+      content.appendChild(row);
+    });
+  }
+
+  document
+    .querySelectorAll('[data-page="dashboardPage"]')
+    .forEach(button => {
+      button.addEventListener("click", () => {
+        setTimeout(() => {
+          refreshLoanAwareSummaries();
+          refreshLoanAwareUpcoming();
+          refreshLoanAwareTodayTasks();
+        }, 220);
+      });
+    });
+
+  // -----------------------------
+  // SAYFAYI YENİLEDİKTEN SONRA
+  // DOĞRU SAYFAYI AÇ
+  // -----------------------------
+  if (sessionStorage.getItem("yf_open_cards_after_reload") === "1") {
+    sessionStorage.removeItem("yf_open_cards_after_reload");
+
+    setTimeout(() => {
+      document
+        .querySelector('[data-page="cardsPage"]')
+        ?.click();
+    }, 250);
+  }
+
+  if (sessionStorage.getItem("yf_open_payment_after_reload") === "1") {
+    sessionStorage.removeItem("yf_open_payment_after_reload");
+
+    setTimeout(() => {
+      document
+        .querySelector('[data-page="debtPaymentPage"]')
+        ?.click();
+    }, 250);
+  }
+
+  // -----------------------------
+  // YARDIMCI FONKSİYONLAR
+  // -----------------------------
+  function getCardPayments(card, transactions) {
+    const cycle =
+      card.statementCycle ||
+      cycleKey(card.dueDate);
+
+    return roundMoney(
+      transactions
+        .filter(transaction => {
+          if (
+            transaction.type !== "card-payment" ||
+            transaction.cardId !== card.id
+          ) {
+            return false;
+          }
+
+          if (transaction.statementCycle) {
+            return transaction.statementCycle === cycle;
+          }
+
+          return isCurrentMonth(
+            transaction.createdAt || transaction.date
+          );
+        })
+        .reduce(
+          (sum, transaction) =>
+            sum + Number(transaction.amount || 0),
+          0
+        )
+    );
+  }
+
+  function addOneMonth(value) {
+    if (!value) return "";
+
+    const date = new Date(`${value}T12:00:00`);
+    const originalDay = date.getDate();
+
+    date.setDate(1);
+    date.setMonth(date.getMonth() + 1);
+
+    const lastDay = new Date(
+      date.getFullYear(),
+      date.getMonth() + 1,
+      0
+    ).getDate();
+
+    date.setDate(Math.min(originalDay, lastDay));
+
+    return [
+      date.getFullYear(),
+      String(date.getMonth() + 1).padStart(2, "0"),
+      String(date.getDate()).padStart(2, "0")
+    ].join("-");
+  }
+
+  function getDaysLeft(value) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const date = new Date(`${value}T00:00:00`);
+    date.setHours(0, 0, 0, 0);
+
+    return Math.ceil((date - today) / 86400000);
+  }
+
+  function remainingDaysText(days) {
+    if (days < 0) return `${Math.abs(days)} gün gecikti`;
+    if (days === 0) return "Bugün son gün";
+    if (days === 1) return "Yarın son gün";
+    return `${days} gün kaldı`;
+  }
+
+  function cycleKey(value) {
+    const match = String(value || "").match(/^(\d{4})-(\d{2})/);
+
+    if (match) return `${match[1]}-${match[2]}`;
+
+    const now = new Date();
+
+    return `${now.getFullYear()}-${String(
+      now.getMonth() + 1
+    ).padStart(2, "0")}`;
+  }
+
+  function isCurrentMonth(value) {
+    if (!value) return false;
+
+    const date = new Date(
+      String(value).includes("T")
+        ? value
+        : `${value}T12:00:00`
+    );
+
+    const now = new Date();
+
+    return (
+      !Number.isNaN(date.getTime()) &&
+      date.getMonth() === now.getMonth() &&
+      date.getFullYear() === now.getFullYear()
+    );
+  }
+
+  function formatMoney(value) {
+    return new Intl.NumberFormat("tr-TR", {
+      style: "currency",
+      currency: "TRY"
+    }).format(Number(value) || 0);
+  }
+
+  function formatDate(value) {
+    if (!value) return "Tamamlandı";
+
+    const date = new Date(`${value}T12:00:00`);
+
+    if (Number.isNaN(date.getTime())) {
+      return "Belirtilmedi";
+    }
+
+    return date.toLocaleDateString("tr-TR", {
+      day: "numeric",
+      month: "long",
+      year: "numeric"
+    });
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function roundMoney(value) {
+    return Math.round(
+      (Number(value) + Number.EPSILON) * 100
+    ) / 100;
+  }
+
+  function createId() {
+    if (window.crypto?.randomUUID) {
+      return crypto.randomUUID();
+    }
+
+    return String(Date.now() + Math.random());
+  }
+
+  function loadJson(key) {
+    try {
+      return JSON.parse(localStorage.getItem(key) || "[]");
+    } catch {
+      return [];
+    }
+  }
+
+  function saveJson(key, value) {
+    localStorage.setItem(key, JSON.stringify(value));
+  }
+
+  function setText(id, value) {
+    const element = $(id);
+    if (element) element.textContent = value;
+  }
+
+  function installLoanStyles() {
+    if ($("yfLoanStyles")) return;
+
+    const style = document.createElement("style");
+    style.id = "yfLoanStyles";
+
+    style.textContent = `
+      .loan-bank-card {
+        border-color: rgba(255, 193, 74, .24);
+        background:
+          radial-gradient(
+            circle at 90% 90%,
+            rgba(255, 188, 58, .13),
+            transparent 35%
+          ),
+          linear-gradient(
+            145deg,
+            rgba(29, 64, 91, .98),
+            rgba(13, 38, 60, .98)
+          );
+      }
+
+      .loan-type-badge,
+      .credit-type-badge {
+        display: inline-flex;
+        align-items: center;
+        min-height: 27px;
+        margin: 8px 0 2px;
+        padding: 0 10px;
+        border-radius: 999px;
+        font-size: 10px;
+        font-weight: 850;
+      }
+
+      .loan-type-badge {
+        color: #ffd47b;
+        background: rgba(255, 190, 69, .11);
+        border: 1px solid rgba(255, 190, 69, .20);
+      }
+
+      .credit-type-badge {
+        color: #75c3ff;
+        background: rgba(15, 140, 255, .10);
+        border: 1px solid rgba(76, 174, 255, .18);
+      }
+
+      .loan-installment-box {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        margin: 14px 0;
+      }
+
+      .loan-installment-box > div {
+        padding: 13px;
+        border-radius: 15px;
+        background: rgba(255,255,255,.04);
+        border: 1px solid rgba(255,255,255,.06);
+      }
+
+      .loan-installment-box span,
+      .loan-installment-box strong {
+        display: block;
+      }
+
+      .loan-installment-box span {
+        margin-bottom: 6px;
+        color: #8fa2ba;
+        font-size: 10px;
+      }
+
+      .loan-installment-box strong {
+        color: #fff;
+        font-size: 14px;
+      }
+
+      .loan-progress-text {
+        display: block;
+        margin-top: 8px;
+        color: #8fa2ba;
+        font-size: 10px;
+      }
+
+      body.light-theme .loan-bank-card {
+        background:
+          linear-gradient(
+            145deg,
+            rgba(255,255,255,.98),
+            rgba(247,242,225,.98)
+          );
+      }
+
+      body.light-theme .loan-installment-box > div {
+        background: rgba(20,73,112,.04);
+        border-color: rgba(20,73,112,.08);
+      }
+
+      body.light-theme .loan-installment-box strong {
+        color: #102033;
+      }
+
+      @media(max-width:370px) {
+        .loan-installment-box {
+          grid-template-columns: 1fr;
+        }
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+});
+
