@@ -173,3 +173,137 @@ document.addEventListener("DOMContentLoaded", () => {
 
   loadCardsForPayment();
 });
+// =========================================
+// YF v2.0.2 — Ana Sayfa ödeme sonrası canlı güncelleme
+// Bu kod app.js dosyasının EN ALTINA eklenir.
+// =========================================
+
+document.addEventListener("DOMContentLoaded", () => {
+  const CARD_KEY = "yf_cards_v1";
+  const TRANSACTION_KEY = "yf_transactions_v1";
+
+  function loadJson(key) {
+    try {
+      return JSON.parse(localStorage.getItem(key) || "[]");
+    } catch {
+      return [];
+    }
+  }
+
+  function formatMoney(value) {
+    return new Intl.NumberFormat("tr-TR", {
+      style: "currency",
+      currency: "TRY"
+    }).format(Number(value) || 0);
+  }
+
+  function isCurrentMonth(value) {
+    if (!value) return false;
+
+    const date = new Date(
+      String(value).includes("T")
+        ? value
+        : `${value}T12:00:00`
+    );
+
+    if (Number.isNaN(date.getTime())) return false;
+
+    const now = new Date();
+
+    return (
+      date.getMonth() === now.getMonth() &&
+      date.getFullYear() === now.getFullYear()
+    );
+  }
+
+  function refreshDashboardFromStorage() {
+    const cards = loadJson(CARD_KEY);
+    const transactions = loadJson(TRANSACTION_KEY);
+
+    const totalCardDebt = cards.reduce(
+      (sum, card) => sum + Number(card.debt || 0),
+      0
+    );
+
+    const income = transactions
+      .filter(item => item.type === "income")
+      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+    const nonCardExpense = transactions
+      .filter(
+        item =>
+          item.type === "expense" &&
+          item.paymentMethod !== "card"
+      )
+      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+    const monthlyCardPayments = transactions
+      .filter(
+        item =>
+          item.type === "card-payment" &&
+          isCurrentMonth(item.createdAt || item.date)
+      )
+      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+    const cashBalance =
+      income - nonCardExpense - monthlyCardPayments;
+
+    const netBalance = cashBalance - totalCardDebt;
+
+    const totalDebtEl = document.getElementById("totalDebt");
+    const totalAssetsEl = document.getElementById("totalAssets");
+    const monthlyPaymentEl = document.getElementById("monthlyPayment");
+    const netBalanceEl = document.getElementById("netBalance");
+    const cardCountEl = document.getElementById("cardCount");
+    const balanceStatusEl = document.getElementById("balanceStatus");
+
+    if (totalDebtEl) {
+      totalDebtEl.textContent = formatMoney(totalCardDebt);
+    }
+
+    if (totalAssetsEl) {
+      totalAssetsEl.textContent = formatMoney(Math.max(0, cashBalance));
+    }
+
+    if (monthlyPaymentEl) {
+      monthlyPaymentEl.textContent = formatMoney(monthlyCardPayments);
+    }
+
+    if (netBalanceEl) {
+      netBalanceEl.textContent = formatMoney(netBalance);
+    }
+
+    if (cardCountEl) {
+      cardCountEl.textContent = String(cards.length);
+    }
+
+    if (balanceStatusEl) {
+      balanceStatusEl.textContent =
+        netBalance < 0
+          ? "Ekside"
+          : netBalance > 0
+            ? "Pozitif"
+            : "Dengeli";
+    }
+  }
+
+  document
+    .querySelectorAll('[data-page="dashboardPage"]')
+    .forEach(button => {
+      button.addEventListener("click", () => {
+        setTimeout(refreshDashboardFromStorage, 50);
+      });
+    });
+
+  window.addEventListener(
+    "yf-refresh-dashboard",
+    refreshDashboardFromStorage
+  );
+
+  window.addEventListener(
+    "storage",
+    refreshDashboardFromStorage
+  );
+
+  refreshDashboardFromStorage();
+});
