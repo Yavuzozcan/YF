@@ -869,3 +869,474 @@ document.addEventListener("DOMContentLoaded", () => {
     document.head.appendChild(style);
   }
 });
+
+// =========================================
+// YF v2.2 — Bugün Yapılacaklar Kartı
+// Bu kod app.js dosyasının EN ALTINA eklenir.
+// Beğenmezsen yalnızca bu bloğu silebilirsin.
+// =========================================
+
+document.addEventListener("DOMContentLoaded", () => {
+  const CARD_KEY = "yf_cards_v1";
+  const TRANSACTION_KEY = "yf_transactions_v1";
+
+  installTodayTasksStyles();
+  createTodayTasksCard();
+  refreshTodayTasks();
+
+  document
+    .querySelectorAll('[data-page="dashboardPage"]')
+    .forEach(button => {
+      button.addEventListener("click", () => {
+        setTimeout(refreshTodayTasks, 100);
+      });
+    });
+
+  window.addEventListener("storage", refreshTodayTasks);
+  window.addEventListener("yf-refresh-dashboard", refreshTodayTasks);
+
+  function createTodayTasksCard() {
+    if (document.getElementById("todayTasksCard")) return;
+
+    const dashboard = document.getElementById("dashboardPage");
+    const heroCard = dashboard?.querySelector(".hero-card");
+
+    if (!dashboard || !heroCard) return;
+
+    const card = document.createElement("section");
+    card.id = "todayTasksCard";
+    card.className = "today-tasks-card";
+
+    card.innerHTML = `
+      <div class="today-tasks-head">
+        <div>
+          <span class="today-tasks-label">BUGÜN YAPILACAKLAR</span>
+          <h2>Finans planın</h2>
+        </div>
+        <span class="today-tasks-icon">🔔</span>
+      </div>
+
+      <div id="todayTasksContent" class="today-tasks-content">
+        <div class="today-tasks-empty">
+          Henüz yapılacak ödeme bulunmuyor.
+        </div>
+      </div>
+    `;
+
+    heroCard.insertAdjacentElement("afterend", card);
+  }
+
+  function refreshTodayTasks() {
+    const content = document.getElementById("todayTasksContent");
+    if (!content) return;
+
+    const cards = loadJson(CARD_KEY);
+    const transactions = loadJson(TRANSACTION_KEY);
+
+    const activeCards = cards
+      .filter(card => card.dueDate && Number(card.debt || 0) > 0)
+      .map(card => {
+        const daysLeft = getDaysLeft(card.dueDate);
+        const statementDebt = Number(
+          card.statementDebt !== undefined
+            ? card.statementDebt
+            : card.debt || 0
+        );
+
+        const minimum = roundMoney(statementDebt * 0.20);
+        const paid = getPaidForCard(card, transactions);
+        const remainingMinimum = roundMoney(
+          Math.max(0, minimum - paid)
+        );
+
+        return {
+          ...card,
+          daysLeft,
+          minimum,
+          paid,
+          remainingMinimum
+        };
+      })
+      .sort((a, b) => a.daysLeft - b.daysLeft);
+
+    const monthlyPayments = transactions
+      .filter(
+        transaction =>
+          transaction.type === "card-payment" &&
+          isCurrentMonth(transaction.createdAt || transaction.date)
+      )
+      .reduce(
+        (sum, transaction) =>
+          sum + Number(transaction.amount || 0),
+        0
+      );
+
+    content.innerHTML = "";
+
+    if (activeCards.length === 0) {
+      content.innerHTML = `
+        <div class="today-tasks-empty">
+          Bugün için ödeme görevi bulunmuyor.
+        </div>
+      `;
+      return;
+    }
+
+    const nearestCard = activeCards[0];
+    const taskItems = [];
+
+    if (nearestCard.remainingMinimum > 0) {
+      taskItems.push({
+        icon: getTaskIcon(nearestCard.daysLeft),
+        title: `${nearestCard.bank} asgarisini tamamla`,
+        text:
+          `${formatRemaining(nearestCard.daysLeft)} · ` +
+          `Kalan ${formatMoney(nearestCard.remainingMinimum)}`
+      });
+    } else {
+      taskItems.push({
+        icon: "✅",
+        title: `${nearestCard.bank} asgarisi tamamlandı`,
+        text:
+          `${formatRemaining(nearestCard.daysLeft)} · ` +
+          `Güncel borç ${formatMoney(nearestCard.debt)}`
+      });
+    }
+
+    if (activeCards.length > 1) {
+      const nextCard = activeCards[1];
+
+      taskItems.push({
+        icon: getTaskIcon(nextCard.daysLeft),
+        title: `Sıradaki ödeme: ${nextCard.bank}`,
+        text:
+          `${formatRemaining(nextCard.daysLeft)} · ` +
+          `Asgari ${formatMoney(nextCard.minimum)}`
+      });
+    }
+
+    taskItems.push({
+      icon: "💸",
+      title: "Bu ay toplam ödenen",
+      text: formatMoney(monthlyPayments)
+    });
+
+    taskItems.slice(0, 3).forEach(item => {
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "today-task-row";
+
+      row.innerHTML = `
+        <span class="today-task-row-icon">${item.icon}</span>
+        <span class="today-task-row-text">
+          <strong>${escapeHtml(item.title)}</strong>
+          <small>${escapeHtml(item.text)}</small>
+        </span>
+        <span class="today-task-arrow">›</span>
+      `;
+
+      row.addEventListener("click", () => {
+        document
+          .querySelector('[data-page="debtPaymentPage"]')
+          ?.click();
+
+        setTimeout(() => {
+          const select = document.getElementById("debtPaymentCard");
+
+          if (!select) return;
+
+          select.value = nearestCard.id;
+          select.dispatchEvent(
+            new Event("change", { bubbles: true })
+          );
+        }, 180);
+      });
+
+      content.appendChild(row);
+    });
+  }
+
+  function getPaidForCard(card, transactions) {
+    const cycle =
+      card.statementCycle ||
+      getCycleKey(card.dueDate) ||
+      getCurrentCycleKey();
+
+    return roundMoney(
+      transactions
+        .filter(transaction => {
+          if (
+            transaction.type !== "card-payment" ||
+            transaction.cardId !== card.id
+          ) {
+            return false;
+          }
+
+          if (transaction.statementCycle) {
+            return transaction.statementCycle === cycle;
+          }
+
+          return isSameMonth(
+            transaction.createdAt || transaction.date,
+            card.dueDate
+          );
+        })
+        .reduce(
+          (sum, transaction) =>
+            sum + Number(transaction.amount || 0),
+          0
+        )
+    );
+  }
+
+  function getDaysLeft(value) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const due = new Date(`${value}T00:00:00`);
+    due.setHours(0, 0, 0, 0);
+
+    return Math.ceil((due - today) / 86400000);
+  }
+
+  function getTaskIcon(days) {
+    if (days < 0) return "🔴";
+    if (days <= 2) return "🟠";
+    if (days <= 7) return "🟡";
+    return "🟢";
+  }
+
+  function formatRemaining(days) {
+    if (days < 0) return `${Math.abs(days)} gün gecikti`;
+    if (days === 0) return "Bugün son gün";
+    if (days === 1) return "Yarın son gün";
+
+    return `${days} gün kaldı`;
+  }
+
+  function isCurrentMonth(value) {
+    if (!value) return false;
+
+    const date = new Date(
+      String(value).includes("T")
+        ? value
+        : `${value}T12:00:00`
+    );
+
+    if (Number.isNaN(date.getTime())) return false;
+
+    const now = new Date();
+
+    return (
+      date.getMonth() === now.getMonth() &&
+      date.getFullYear() === now.getFullYear()
+    );
+  }
+
+  function isSameMonth(firstValue, secondValue) {
+    if (!firstValue || !secondValue) return false;
+
+    const first = new Date(
+      String(firstValue).includes("T")
+        ? firstValue
+        : `${firstValue}T12:00:00`
+    );
+
+    const second = new Date(`${secondValue}T12:00:00`);
+
+    return (
+      first.getMonth() === second.getMonth() &&
+      first.getFullYear() === second.getFullYear()
+    );
+  }
+
+  function getCycleKey(value) {
+    if (!value) return "";
+
+    const match = String(value).match(/^(\d{4})-(\d{2})/);
+    return match ? `${match[1]}-${match[2]}` : "";
+  }
+
+  function getCurrentCycleKey() {
+    const now = new Date();
+
+    return `${now.getFullYear()}-${String(
+      now.getMonth() + 1
+    ).padStart(2, "0")}`;
+  }
+
+  function roundMoney(value) {
+    return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+  }
+
+  function formatMoney(value) {
+    return new Intl.NumberFormat("tr-TR", {
+      style: "currency",
+      currency: "TRY"
+    }).format(Number(value) || 0);
+  }
+
+  function loadJson(key) {
+    try {
+      return JSON.parse(localStorage.getItem(key) || "[]");
+    } catch {
+      return [];
+    }
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function installTodayTasksStyles() {
+    if (document.getElementById("todayTasksStyles")) return;
+
+    const style = document.createElement("style");
+    style.id = "todayTasksStyles";
+
+    style.textContent = `
+      .today-tasks-card {
+        margin: 18px 0;
+        padding: 18px;
+        border-radius: 22px;
+        border: 1px solid rgba(88, 181, 255, .16);
+        background:
+          linear-gradient(
+            145deg,
+            rgba(18, 54, 86, .96),
+            rgba(12, 37, 61, .96)
+          );
+        box-shadow: 0 18px 42px rgba(0,0,0,.18);
+      }
+
+      .today-tasks-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 14px;
+        margin-bottom: 14px;
+      }
+
+      .today-tasks-label {
+        display: block;
+        margin-bottom: 5px;
+        color: #62b8ff;
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: .14em;
+      }
+
+      .today-tasks-head h2 {
+        margin: 0;
+        font-size: 20px;
+      }
+
+      .today-tasks-icon {
+        width: 38px;
+        height: 38px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 13px;
+        background: rgba(15, 140, 255, .12);
+      }
+
+      .today-tasks-content {
+        display: grid;
+        gap: 9px;
+      }
+
+      .today-task-row {
+        width: 100%;
+        min-height: 62px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 11px 12px;
+        border: 1px solid rgba(255,255,255,.07);
+        border-radius: 16px;
+        color: inherit;
+        background: rgba(255,255,255,.035);
+        text-align: left;
+        font: inherit;
+        cursor: pointer;
+      }
+
+      .today-task-row:active {
+        transform: scale(.985);
+      }
+
+      .today-task-row-icon {
+        width: 34px;
+        height: 34px;
+        flex: 0 0 34px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 11px;
+        background: rgba(255,255,255,.05);
+      }
+
+      .today-task-row-text {
+        min-width: 0;
+        flex: 1;
+      }
+
+      .today-task-row-text strong,
+      .today-task-row-text small {
+        display: block;
+      }
+
+      .today-task-row-text strong {
+        font-size: 13px;
+      }
+
+      .today-task-row-text small {
+        margin-top: 4px;
+        color: #91a3b8;
+        font-size: 10.5px;
+      }
+
+      .today-task-arrow {
+        color: #6aaef0;
+        font-size: 23px;
+      }
+
+      .today-tasks-empty {
+        padding: 17px;
+        border: 1px dashed rgba(255,255,255,.08);
+        border-radius: 15px;
+        color: #91a3b8;
+        text-align: center;
+        font-size: 12px;
+      }
+
+      body.light-theme .today-tasks-card {
+        background:
+          linear-gradient(
+            145deg,
+            rgba(255,255,255,.96),
+            rgba(239,247,255,.96)
+          );
+        border-color: rgba(18,57,90,.08);
+      }
+
+      body.light-theme .today-task-row {
+        background: rgba(255,255,255,.78);
+        border-color: rgba(18,57,90,.07);
+      }
+
+      body.light-theme .today-task-row-text small,
+      body.light-theme .today-tasks-empty {
+        color: #687b8f;
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+});
