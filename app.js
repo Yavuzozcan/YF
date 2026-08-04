@@ -444,3 +444,428 @@ document.addEventListener("DOMContentLoaded", () => {
 
   refreshCorrectDashboard();
 });
+// =========================================
+// YF v2.1 — Akıllı Yaklaşan Ödemeler
+// Bu kod app.js dosyasının EN ALTINA eklenir.
+// =========================================
+
+document.addEventListener("DOMContentLoaded", () => {
+  const CARD_KEY = "yf_cards_v1";
+  const TRANSACTION_KEY = "yf_transactions_v1";
+  const MINIMUM_RATE = 0.20;
+
+  const upcomingContainer = document.getElementById("upcomingPayments");
+  if (!upcomingContainer) return;
+
+  installUpcomingPaymentStyles();
+  refreshUpcomingPayments();
+
+  document
+    .querySelectorAll('[data-page="dashboardPage"]')
+    .forEach(button => {
+      button.addEventListener("click", () => {
+        setTimeout(refreshUpcomingPayments, 100);
+      });
+    });
+
+  window.addEventListener("storage", refreshUpcomingPayments);
+  window.addEventListener("yf-refresh-upcoming-payments", refreshUpcomingPayments);
+
+  function refreshUpcomingPayments() {
+    const cards = loadJson(CARD_KEY);
+    const transactions = loadJson(TRANSACTION_KEY);
+
+    const paymentCards = cards
+      .filter(card => card.dueDate && Number(card.debt || 0) > 0)
+      .map(card => ({
+        ...card,
+        daysLeft: getDaysLeft(card.dueDate),
+        minimumInfo: getMinimumInfo(card, transactions)
+      }))
+      .sort((a, b) => a.daysLeft - b.daysLeft);
+
+    upcomingContainer.innerHTML = "";
+
+    if (paymentCards.length === 0) {
+      upcomingContainer.innerHTML = `
+        <div class="empty-state">
+          Henüz yaklaşan kart ödemesi bulunmuyor.
+        </div>
+      `;
+      return;
+    }
+
+    paymentCards.slice(0, 6).forEach(card => {
+      const status = getStatus(card.daysLeft, card.minimumInfo);
+      const item = document.createElement("article");
+      item.className = `smart-upcoming-card ${status.className}`;
+
+      item.innerHTML = `
+        <div class="smart-upcoming-left">
+          <div class="smart-upcoming-icon">
+            ${escapeHtml((card.bank || "K").charAt(0))}
+          </div>
+
+          <div class="smart-upcoming-info">
+            <div class="smart-upcoming-title-row">
+              <strong>${escapeHtml(card.bank || "Banka")}</strong>
+              <span class="smart-upcoming-badge ${status.className}">
+                ${status.label}
+              </span>
+            </div>
+
+            <span class="smart-upcoming-card-name">
+              ${escapeHtml(card.name || "Kart")}
+            </span>
+
+            <div class="smart-upcoming-meta">
+              <span>
+                Son ödeme:
+                <strong>${formatDate(card.dueDate)}</strong>
+              </span>
+
+              <span>
+                Asgari:
+                <strong>${formatMoney(card.minimumInfo.minimum)}</strong>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div class="smart-upcoming-right">
+          <strong>${formatMoney(card.debt)}</strong>
+          <span>${formatRemaining(card.daysLeft)}</span>
+        </div>
+      `;
+
+      item.addEventListener("click", () => {
+        const debtButton = document.querySelector('[data-page="debtPaymentPage"]');
+        debtButton?.click();
+
+        setTimeout(() => {
+          const paymentSelect = document.getElementById("debtPaymentCard");
+          if (!paymentSelect) return;
+
+          paymentSelect.value = card.id;
+          paymentSelect.dispatchEvent(new Event("change", { bubbles: true }));
+        }, 180);
+      });
+
+      upcomingContainer.appendChild(item);
+    });
+  }
+
+  function getMinimumInfo(card, transactions) {
+    const statementDebt = Math.max(
+      0,
+      Number(card.statementDebt !== undefined ? card.statementDebt : card.debt || 0)
+    );
+
+    const minimum = roundMoney(statementDebt * MINIMUM_RATE);
+    const cycle = card.statementCycle || getCycleKey(card.dueDate) || getCurrentCycleKey();
+
+    const paid = roundMoney(
+      transactions
+        .filter(transaction => {
+          if (transaction.type !== "card-payment" || transaction.cardId !== card.id) {
+            return false;
+          }
+
+          if (transaction.statementCycle) {
+            return transaction.statementCycle === cycle;
+          }
+
+          return isSameMonth(
+            transaction.createdAt || transaction.date,
+            card.dueDate
+          );
+        })
+        .reduce((sum, transaction) => sum + Number(transaction.amount || 0), 0)
+    );
+
+    const remaining = Math.max(0, minimum - paid);
+
+    return {
+      minimum,
+      paid,
+      remaining,
+      completed: remaining <= 0
+    };
+  }
+
+  function getStatus(daysLeft, minimumInfo) {
+    if (minimumInfo.completed) {
+      return { className: "paid", label: "Asgari ödendi ✓" };
+    }
+
+    if (daysLeft < 0) {
+      return { className: "overdue", label: "Gecikmiş" };
+    }
+
+    if (daysLeft <= 2) {
+      return {
+        className: "urgent",
+        label: daysLeft === 0 ? "Bugün" : `${daysLeft} gün`
+      };
+    }
+
+    if (daysLeft <= 7) {
+      return { className: "warning", label: `${daysLeft} gün kaldı` };
+    }
+
+    return { className: "safe", label: `${daysLeft} gün kaldı` };
+  }
+
+  function getDaysLeft(value) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const due = new Date(`${value}T00:00:00`);
+    due.setHours(0, 0, 0, 0);
+
+    return Math.ceil((due - today) / 86400000);
+  }
+
+  function formatRemaining(days) {
+    if (days < 0) return `${Math.abs(days)} gün gecikti`;
+    if (days === 0) return "Bugün son gün";
+    if (days === 1) return "Yarın son gün";
+    return `${days} gün kaldı`;
+  }
+
+  function formatMoney(value) {
+    return new Intl.NumberFormat("tr-TR", {
+      style: "currency",
+      currency: "TRY"
+    }).format(Number(value) || 0);
+  }
+
+  function formatDate(value) {
+    if (!value) return "Belirtilmedi";
+
+    const date = new Date(`${value}T12:00:00`);
+    if (Number.isNaN(date.getTime())) return "Belirtilmedi";
+
+    return date.toLocaleDateString("tr-TR", {
+      day: "numeric",
+      month: "long",
+      year: "numeric"
+    });
+  }
+
+  function loadJson(key) {
+    try {
+      return JSON.parse(localStorage.getItem(key) || "[]");
+    } catch {
+      return [];
+    }
+  }
+
+  function roundMoney(value) {
+    return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+  }
+
+  function getCycleKey(value) {
+    if (!value) return "";
+    const match = String(value).match(/^(\d{4})-(\d{2})/);
+    return match ? `${match[1]}-${match[2]}` : "";
+  }
+
+  function getCurrentCycleKey() {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  }
+
+  function isSameMonth(firstValue, secondValue) {
+    if (!firstValue || !secondValue) return false;
+
+    const first = new Date(
+      String(firstValue).includes("T")
+        ? firstValue
+        : `${firstValue}T12:00:00`
+    );
+
+    const second = new Date(`${secondValue}T12:00:00`);
+
+    return (
+      first.getMonth() === second.getMonth() &&
+      first.getFullYear() === second.getFullYear()
+    );
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function installUpcomingPaymentStyles() {
+    if (document.getElementById("smartUpcomingStyles")) return;
+
+    const style = document.createElement("style");
+    style.id = "smartUpcomingStyles";
+
+    style.textContent = `
+      .smart-upcoming-card {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 15px;
+        border-radius: 18px;
+        border: 1px solid rgba(255,255,255,.08);
+        background: rgba(255,255,255,.045);
+        cursor: pointer;
+      }
+
+      .smart-upcoming-card + .smart-upcoming-card {
+        margin-top: 11px;
+      }
+
+      .smart-upcoming-left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+      }
+
+      .smart-upcoming-icon {
+        width: 46px;
+        height: 46px;
+        flex: 0 0 46px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 15px;
+        font-weight: 900;
+        background: rgba(15,140,255,.12);
+        color: #65b8ff;
+      }
+
+      .smart-upcoming-info {
+        min-width: 0;
+      }
+
+      .smart-upcoming-title-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .smart-upcoming-title-row strong {
+        font-size: 14px;
+      }
+
+      .smart-upcoming-card-name {
+        display: block;
+        margin-top: 3px;
+        color: #91a3b8;
+        font-size: 11px;
+      }
+
+      .smart-upcoming-meta {
+        display: grid;
+        gap: 3px;
+        margin-top: 8px;
+        color: #91a3b8;
+        font-size: 10px;
+      }
+
+      .smart-upcoming-meta strong {
+        color: inherit;
+      }
+
+      .smart-upcoming-right {
+        flex: 0 0 auto;
+        text-align: right;
+      }
+
+      .smart-upcoming-right strong {
+        display: block;
+        font-size: 14px;
+      }
+
+      .smart-upcoming-right span {
+        display: block;
+        margin-top: 5px;
+        font-size: 10px;
+        color: #91a3b8;
+      }
+
+      .smart-upcoming-badge {
+        display: inline-flex;
+        align-items: center;
+        min-height: 24px;
+        padding: 0 8px;
+        border-radius: 999px;
+        font-size: 9px;
+        font-weight: 850;
+      }
+
+      .smart-upcoming-badge.paid {
+        color: #47e1aa;
+        background: rgba(42,211,155,.12);
+        border: 1px solid rgba(42,211,155,.22);
+      }
+
+      .smart-upcoming-badge.safe {
+        color: #72c2ff;
+        background: rgba(15,140,255,.12);
+        border: 1px solid rgba(72,171,255,.22);
+      }
+
+      .smart-upcoming-badge.warning {
+        color: #ffd26f;
+        background: rgba(255,190,69,.12);
+        border: 1px solid rgba(255,190,69,.22);
+      }
+
+      .smart-upcoming-badge.urgent,
+      .smart-upcoming-badge.overdue {
+        color: #ff7f99;
+        background: rgba(255,91,122,.12);
+        border: 1px solid rgba(255,91,122,.22);
+      }
+
+      .smart-upcoming-card.warning {
+        border-color: rgba(255,190,69,.18);
+      }
+
+      .smart-upcoming-card.urgent,
+      .smart-upcoming-card.overdue {
+        border-color: rgba(255,91,122,.22);
+      }
+
+      .smart-upcoming-card.paid {
+        border-color: rgba(42,211,155,.18);
+      }
+
+      body.light-theme .smart-upcoming-card {
+        background: rgba(255,255,255,.78);
+        border-color: rgba(18,57,90,.08);
+      }
+
+      body.light-theme .smart-upcoming-card-name,
+      body.light-theme .smart-upcoming-meta,
+      body.light-theme .smart-upcoming-right span {
+        color: #687b8f;
+      }
+
+      @media (max-width: 390px) {
+        .smart-upcoming-card {
+          align-items: flex-start;
+        }
+
+        .smart-upcoming-right {
+          max-width: 112px;
+        }
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+});
