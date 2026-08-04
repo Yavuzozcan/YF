@@ -42,7 +42,7 @@
 
   <main class="app-shell">
     <section id="dashboardPage" class="page active">
-      <header class="top-header"><div><p class="eyebrow">Yavuz Finans</p><h1 id="welcomeText">Merhaba Yavuz 👋</h1></div></header>
+      <header class="top-header"><div><h1 id="welcomeText">Merhaba Yavuz 👋</h1></div></header>
       <section class="hero-card"><div class="hero-card-top"><span>Net Durum</span><span id="balanceStatus" class="status-badge">Dengeli</span></div><strong id="netBalance">₺0,00</strong><p>Toplam gelir ve giderlerin güncel sonucu</p></section>
       <section class="summary-grid">
         <article class="summary-card"><span>Toplam Kalan Borç</span><strong id="totalDebt">₺0,00</strong></article>
@@ -121,5 +121,33 @@
   <script>
     document.addEventListener("DOMContentLoaded",function(){const openButton=document.getElementById("openSideMenu"),closeButton=document.getElementById("closeSideMenu"),layer=document.getElementById("sideMenuLayer"),backdrop=document.getElementById("sideMenuBackdrop"),toast=document.getElementById("menuToast");let toastTimer;function openMenu(){layer.classList.add("open");layer.setAttribute("aria-hidden","false");document.body.style.overflow="hidden"}function closeMenu(){layer.classList.remove("open");layer.setAttribute("aria-hidden","true");document.body.style.overflow=""}function showToast(text){toast.textContent=text;toast.classList.add("show");clearTimeout(toastTimer);toastTimer=setTimeout(()=>toast.classList.remove("show"),1800)}openButton.addEventListener("click",openMenu);closeButton.addEventListener("click",closeMenu);backdrop.addEventListener("click",closeMenu);document.querySelectorAll(".future-menu-item").forEach(button=>button.addEventListener("click",function(){const feature=button.dataset.feature||"Bu özellik";closeMenu();setTimeout(()=>showToast(`${feature} yakında aktif edilecek.`),180)}));document.addEventListener("keydown",event=>{if(event.key==="Escape")closeMenu()})});
   </script>
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      const welcomeText = document.getElementById("welcomeText");
+
+      function updateGreeting() {
+        if (!welcomeText) return;
+
+        const hour = new Date().getHours();
+        let greeting;
+
+        if (hour >= 5 && hour < 11) {
+          greeting = "Günaydın Yavuz 👋";
+        } else if (hour >= 11 && hour < 18) {
+          greeting = "İyi Günler Yavuz ☀️";
+        } else if (hour >= 18 && hour < 22) {
+          greeting = "İyi Akşamlar Yavuz 🌙";
+        } else {
+          greeting = "İyi Geceler Yavuz 🌙";
+        }
+
+        welcomeText.textContent = greeting;
+      }
+
+      updateGreeting();
+      setInterval(updateGreeting, 60000);
+    });
+  </script>
+
 </body>
 </html>
