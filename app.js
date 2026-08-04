@@ -2687,4 +2687,111 @@ document.addEventListener("DOMContentLoaded", () => {
     document.head.appendChild(style);
   }
 });
+// =========================================
+// YF v2.3.1 — Kalan Kredi Borcu Özeti
+// Bu kod app.js dosyasının EN ALTINA eklenir.
+// =========================================
+
+document.addEventListener("DOMContentLoaded", () => {
+  const CARD_KEY = "yf_cards_v1";
+
+  createLoanDebtSummaryCard();
+  refreshDebtSummaryCards();
+
+  document
+    .querySelectorAll('[data-page="cardsPage"]')
+    .forEach(button => {
+      button.addEventListener("click", () => {
+        setTimeout(refreshDebtSummaryCards, 150);
+      });
+    });
+
+  window.addEventListener("storage", refreshDebtSummaryCards);
+  window.addEventListener(
+    "yf-refresh-loan-summary",
+    refreshDebtSummaryCards
+  );
+
+  function createLoanDebtSummaryCard() {
+    if (document.getElementById("loanRemainingDebtSummary")) return;
+
+    const cardsPage = document.getElementById("cardsPage");
+    const summaryGrid = cardsPage?.querySelector(".summary-grid");
+    const totalCardDebtCard =
+      document.getElementById("cardsTotalDebt")?.closest(".summary-card");
+
+    if (!summaryGrid) return;
+
+    const article = document.createElement("article");
+    article.className = "summary-card";
+    article.innerHTML = `
+      <span>Kalan Kredi Borcu</span>
+      <strong id="loanRemainingDebtSummary">₺0,00</strong>
+    `;
+
+    if (totalCardDebtCard) {
+      totalCardDebtCard.insertAdjacentElement("afterend", article);
+    } else {
+      summaryGrid.prepend(article);
+    }
+  }
+
+  function refreshDebtSummaryCards() {
+    const debts = loadJson(CARD_KEY);
+
+    const creditCards = debts.filter(
+      item => item.type !== "personal-loan"
+    );
+
+    const personalLoans = debts.filter(
+      item => item.type === "personal-loan"
+    );
+
+    const totalCardDebt = creditCards.reduce(
+      (sum, item) => sum + Number(item.debt || 0),
+      0
+    );
+
+    const totalLoanDebt = personalLoans.reduce(
+      (sum, item) => sum + Number(item.debt || 0),
+      0
+    );
+
+    const totalCardLimit = creditCards.reduce(
+      (sum, item) => sum + Number(item.limit || 0),
+      0
+    );
+
+    const availableLimit = Math.max(
+      0,
+      totalCardLimit - totalCardDebt
+    );
+
+    setText("cardsTotalDebt", formatMoney(totalCardDebt));
+    setText("loanRemainingDebtSummary", formatMoney(totalLoanDebt));
+    setText("cardsTotalLimit", formatMoney(totalCardLimit));
+    setText("cardsAvailableLimit", formatMoney(availableLimit));
+  }
+
+  function loadJson(key) {
+    try {
+      return JSON.parse(localStorage.getItem(key) || "[]");
+    } catch {
+      return [];
+    }
+  }
+
+  function formatMoney(value) {
+    return new Intl.NumberFormat("tr-TR", {
+      style: "currency",
+      currency: "TRY"
+    }).format(Number(value) || 0);
+  }
+
+  function setText(id, value) {
+    const element = document.getElementById(id);
+    if (element) element.textContent = value;
+  }
+});
+
 
