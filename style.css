@@ -1,74 +1,132 @@
 /* =========================================
    YF — Yavuz Finans
-   Premium Dashboard v0.1
+   Ana Tasarım
+========================================= */
+
+:root {
+  --bg: #06101d;
+  --bg-soft: #0a1727;
+  --panel: rgba(17, 34, 55, 0.92);
+  --panel-soft: rgba(22, 43, 68, 0.78);
+  --panel-light: rgba(255, 255, 255, 0.055);
+
+  --primary: #0f8cff;
+  --primary-light: #52adff;
+  --primary-dark: #0874d9;
+
+  --text: #f6f9ff;
+  --muted: #8fa2ba;
+  --muted-light: #b8c4d4;
+
+  --success: #28d49a;
+  --warning: #ffba4a;
+  --danger: #ff647c;
+
+  --border: rgba(255, 255, 255, 0.075);
+  --border-strong: rgba(255, 255, 255, 0.12);
+
+  --shadow: 0 18px 45px rgba(0, 0, 0, 0.28);
+  --radius: 22px;
+  --radius-small: 16px;
+}
+
+/* =========================================
+   TEMEL
 ========================================= */
 
 * {
-  margin: 0;
-  padding: 0;
   box-sizing: border-box;
-}
-
-:root {
-  --background: #07101f;
-  --surface: #0f1a2d;
-  --surface-light: #15233a;
-  --surface-soft: #1b2941;
-
-  --text: #f8fafc;
-  --muted: #8d9bb1;
-
-  --blue: #3b82f6;
-  --blue-dark: #1e40af;
-  --green: #34d399;
-  --red: #fb7185;
-  --orange: #f59e0b;
-  --purple: #a78bfa;
-
-  --border: rgba(255, 255, 255, 0.07);
-  --shadow: 0 18px 45px rgba(0, 0, 0, 0.32);
+  -webkit-tap-highlight-color: transparent;
 }
 
 html {
-  background: var(--background);
+  min-height: 100%;
+  background: var(--bg);
 }
 
 body {
   min-height: 100vh;
-  background:
-    radial-gradient(
-      circle at top right,
-      rgba(59, 130, 246, 0.16),
-      transparent 32%
-    ),
-    var(--background);
+  margin: 0;
+  padding: 0 0 calc(92px + env(safe-area-inset-bottom));
+  overflow-x: hidden;
 
   color: var(--text);
+  background:
+    radial-gradient(
+      circle at 50% -5%,
+      rgba(26, 102, 173, 0.26),
+      transparent 34%
+    ),
+    linear-gradient(
+      180deg,
+      #071321 0%,
+      #06101d 46%,
+      #040b14 100%
+    );
 
   font-family:
     -apple-system,
     BlinkMacSystemFont,
-    "SF Pro Display",
     "Segoe UI",
+    Roboto,
+    Arial,
     sans-serif;
+}
 
-  -webkit-font-smoothing: antialiased;
+button,
+input,
+select,
+textarea {
+  font: inherit;
 }
 
 button {
-  font-family: inherit;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
+  -webkit-appearance: none;
+  appearance: none;
 }
 
-.app {
-  width: min(100%, 720px);
-  margin: 0 auto;
+button,
+select {
+  cursor: pointer;
+}
 
+.hidden {
+  display: none !important;
+}
+
+/* =========================================
+   UYGULAMA ALANI
+========================================= */
+
+.app-shell {
+  width: min(100%, 560px);
+  min-height: 100vh;
+  margin: 0 auto;
   padding:
-    max(24px, env(safe-area-inset-top))
-    18px
-    130px;
+    calc(22px + env(safe-area-inset-top))
+    16px
+    28px;
+}
+
+.page {
+  display: none;
+  animation: pageOpen 0.22s ease;
+}
+
+.page.active {
+  display: block;
+}
+
+@keyframes pageOpen {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* =========================================
@@ -79,182 +137,120 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-
-  gap: 16px;
-  margin-bottom: 26px;
-}
-
-.brand-area {
-  display: flex;
-  align-items: center;
   gap: 14px;
-}
-
-.logo {
-  width: 50px;
-  height: 50px;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  border-radius: 17px;
-
-  background:
-    linear-gradient(
-      145deg,
-      #60a5fa,
-      #2563eb
-    );
-
-  color: white;
-
-  font-size: 18px;
-  font-weight: 900;
-  letter-spacing: -0.5px;
-
-  box-shadow:
-    0 12px 30px rgba(37, 99, 235, 0.34);
-}
-
-.brand-subtitle {
-  display: block;
-
-  margin-bottom: 4px;
-
-  color: var(--muted);
-
-  font-size: 12px;
-  font-weight: 700;
-
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  margin: 4px 2px 18px;
 }
 
 .top-header h1 {
-  font-size: 24px;
-  font-weight: 800;
-  letter-spacing: -0.7px;
+  margin: 3px 0 0;
+  font-size: clamp(25px, 7vw, 34px);
+  line-height: 1.12;
+  letter-spacing: -0.8px;
 }
 
-.profile-button {
-  width: 48px;
-  height: 48px;
-
-  border: 1px solid var(--border);
-  border-radius: 16px;
-
-  background: var(--surface);
-
-  color: var(--text);
-
-  font-size: 17px;
+.eyebrow {
+  margin: 0;
+  color: var(--primary-light);
+  font-size: 12px;
   font-weight: 800;
-
-  box-shadow: var(--shadow);
+  letter-spacing: 1.3px;
+  text-transform: uppercase;
 }
 
 /* =========================================
    NET DURUM KARTI
 ========================================= */
 
-.balance-card {
-  padding: 24px;
+.hero-card {
+  position: relative;
+  overflow: hidden;
+  min-height: 154px;
+  margin-bottom: 14px;
+  padding: 20px;
 
-  border-radius: 27px;
+  border: 1px solid rgba(71, 170, 255, 0.22);
+  border-radius: 24px;
 
   background:
+    radial-gradient(
+      circle at 92% 12%,
+      rgba(72, 173, 255, 0.28),
+      transparent 33%
+    ),
     linear-gradient(
-      145deg,
-      #2563eb,
-      #153a8a 68%,
-      #102654
+      135deg,
+      #0d4d86 0%,
+      #0c355e 42%,
+      #10263f 100%
     );
 
-  color: white;
-
   box-shadow:
-    0 22px 55px rgba(30, 64, 175, 0.36);
-
-  overflow: hidden;
-  position: relative;
+    0 20px 42px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
-.balance-card::after {
+.hero-card::after {
   content: "";
-
   position: absolute;
-
-  width: 220px;
-  height: 220px;
-
-  top: -115px;
-  right: -85px;
-
+  right: -45px;
+  bottom: -70px;
+  width: 170px;
+  height: 170px;
   border-radius: 50%;
-
-  background:
-    rgba(255, 255, 255, 0.08);
+  background: rgba(62, 170, 255, 0.1);
 }
 
-.balance-top {
+.hero-card-top {
   position: relative;
-  z-index: 2;
-
+  z-index: 1;
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
 }
 
-.card-label {
-  display: block;
-
-  color: rgba(255, 255, 255, 0.75);
-
+.hero-card-top > span:first-child {
+  color: #c4d9ec;
   font-size: 13px;
-  font-weight: 650;
-}
-
-.balance-card strong {
-  display: block;
-
-  margin-top: 13px;
-
-  font-size: 38px;
-  font-weight: 900;
-
-  letter-spacing: -1.6px;
-}
-
-.status-badge {
-  padding: 7px 11px;
-
-  border: 1px solid rgba(255, 255, 255, 0.17);
-  border-radius: 999px;
-
-  background:
-    rgba(255, 255, 255, 0.11);
-
-  font-size: 12px;
   font-weight: 700;
 }
 
-.balance-footer {
+.hero-card > strong {
   position: relative;
-  z-index: 2;
+  z-index: 1;
+  display: block;
+  margin-bottom: 7px;
 
-  display: flex;
-  justify-content: space-between;
+  font-size: clamp(32px, 10vw, 44px);
+  line-height: 1;
+  letter-spacing: -1.8px;
+}
 
-  margin-top: 24px;
-  padding-top: 17px;
+.hero-card > p {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  color: #9fb9d0;
+  font-size: 13px;
+}
 
-  border-top:
-    1px solid rgba(255, 255, 255, 0.15);
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 
-  color: rgba(255, 255, 255, 0.74);
+  min-height: 29px;
+  padding: 0 11px;
+
+  border: 1px solid rgba(67, 235, 176, 0.26);
+  border-radius: 999px;
+
+  color: #42e3ac;
+  background: rgba(41, 212, 154, 0.13);
 
   font-size: 12px;
+  font-weight: 800;
 }
 
 /* =========================================
@@ -263,652 +259,346 @@ button {
 
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-
-  gap: 13px;
-  margin-top: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 11px;
+  margin-bottom: 15px;
 }
 
 .summary-card {
-  min-height: 145px;
-
-  padding: 18px;
+  min-height: 106px;
+  padding: 16px;
 
   border: 1px solid var(--border);
-  border-radius: 23px;
+  border-radius: 19px;
 
   background:
     linear-gradient(
       145deg,
-      var(--surface-light),
-      var(--surface)
+      rgba(23, 46, 72, 0.94),
+      rgba(13, 29, 47, 0.94)
     );
 
-  box-shadow: var(--shadow);
+  box-shadow:
+    0 10px 25px rgba(0, 0, 0, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+.summary-card span {
+  display: block;
+  min-height: 32px;
+  margin-bottom: 7px;
+
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.summary-card strong {
+  display: block;
+  overflow: hidden;
+
+  color: var(--text);
+  font-size: clamp(19px, 5vw, 25px);
+  line-height: 1.1;
+  letter-spacing: -0.6px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* =========================================
+   İÇERİK PANELLERİ
+========================================= */
+
+.content-card {
+  margin-top: 14px;
+  padding: 17px;
+
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+
+  background:
+    linear-gradient(
+      155deg,
+      rgba(18, 37, 59, 0.96),
+      rgba(11, 25, 41, 0.96)
+    );
+
+  box-shadow:
+    0 14px 34px rgba(0, 0, 0, 0.17),
+    inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+.section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.section-heading h2 {
+  margin: 4px 0 0;
+  font-size: 18px;
+  letter-spacing: -0.35px;
+}
+
+/* =========================================
+   HIZLI İŞLEMLER — 2 x 2
+========================================= */
+
+.quick-actions {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 11px !important;
+}
+
+.quick-action-button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 13px;
+
+  width: 100%;
+  min-width: 0;
+  min-height: 126px;
+  padding: 15px;
+
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 18px;
+
+  color: var(--text);
+  background:
+    linear-gradient(
+      150deg,
+      rgba(25, 50, 78, 0.9),
+      rgba(16, 33, 54, 0.92)
+    );
+
+  text-align: left;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.035),
+    0 8px 18px rgba(0, 0, 0, 0.12);
 
   transition:
-    transform 0.18s ease,
-    border-color 0.18s ease;
+    transform 0.14s ease,
+    border-color 0.14s ease,
+    background 0.14s ease;
 }
 
-.summary-card:active {
-  transform: scale(0.98);
+.quick-action-button:active {
+  transform: scale(0.97);
+  border-color: rgba(64, 163, 255, 0.42);
+  background:
+    linear-gradient(
+      150deg,
+      rgba(30, 65, 102, 0.94),
+      rgba(18, 41, 67, 0.96)
+    );
 }
 
-.summary-icon {
-  width: 41px;
-  height: 41px;
-
+.quick-action-button > span {
   display: flex;
   align-items: center;
   justify-content: center;
 
-  margin-bottom: 19px;
+  width: 38px;
+  height: 38px;
 
-  border-radius: 14px;
+  border: 1px solid rgba(75, 171, 255, 0.18);
+  border-radius: 12px;
 
-  font-size: 18px;
-  font-weight: 900;
+  color: #6cbcff;
+  background: rgba(17, 135, 241, 0.13);
+
+  font-size: 20px;
+  line-height: 1;
 }
 
-.debt-card .summary-icon {
-  background: rgba(251, 113, 133, 0.14);
-  color: var(--red);
+.quick-action-button div {
+  min-width: 0;
 }
 
-.asset-card .summary-icon {
-  background: rgba(52, 211, 153, 0.14);
-  color: var(--green);
+.quick-action-button strong {
+  display: block;
+  margin-bottom: 5px;
+
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.2;
 }
 
-.payment-card .summary-icon {
-  background: rgba(59, 130, 246, 0.15);
-  color: #7db1ff;
-}
-
-.card-count-card .summary-icon {
-  background: rgba(167, 139, 250, 0.15);
-  color: var(--purple);
-}
-
-.summary-card > span {
+.quick-action-button small {
   display: block;
 
   color: var(--muted);
-
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.summary-card > strong {
-  display: block;
-
-  margin-top: 9px;
-
-  font-size: 21px;
-  font-weight: 850;
-
-  letter-spacing: -0.6px;
+  font-size: 10.5px;
+  line-height: 1.35;
 }
 
 /* =========================================
-   BÖLÜMLER
+   BOŞ ALANLAR
 ========================================= */
 
-.section-block {
-  margin-top: 18px;
-  padding: 20px;
+.empty-state {
+  padding: 24px 14px;
 
-  border: 1px solid var(--border);
-  border-radius: 25px;
-
-  background: var(--surface);
-
-  box-shadow: var(--shadow);
-}
-
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-
-  gap: 14px;
-  margin-bottom: 18px;
-}
-
-.section-subtitle {
-  display: block;
-
-  margin-bottom: 5px;
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  border-radius: 17px;
 
   color: var(--muted);
+  background: rgba(255, 255, 255, 0.025);
 
-  font-size: 11px;
-  font-weight: 800;
-
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
 }
 
-.section-header h2 {
-  font-size: 20px;
-  font-weight: 800;
+/* =========================================
+   BUTONLAR
+========================================= */
 
-  letter-spacing: -0.4px;
+.primary-button,
+.secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  min-height: 46px;
+  padding: 0 16px;
+
+  border-radius: 14px;
+
+  font-weight: 800;
+  transition:
+    transform 0.13s ease,
+    opacity 0.13s ease;
 }
 
-.text-button {
-  border: 0;
-  background: transparent;
+.primary-button {
+  border: 1px solid rgba(91, 183, 255, 0.26);
+  color: #ffffff;
+  background:
+    linear-gradient(
+      135deg,
+      var(--primary),
+      var(--primary-dark)
+    );
+  box-shadow: 0 10px 22px rgba(8, 116, 217, 0.22);
+}
 
-  color: #73a8ff;
+.secondary-button {
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.055);
+}
 
+.primary-button:active,
+.secondary-button:active {
+  transform: scale(0.97);
+}
+
+.close-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 40px;
+  height: 40px;
+
+  border: 1px solid var(--border);
+  border-radius: 12px;
+
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.055);
+
+  font-size: 25px;
+}
+
+/* =========================================
+   FORMLAR
+========================================= */
+
+form {
+  display: grid;
+  gap: 14px;
+}
+
+form label {
+  display: grid;
+  gap: 7px;
+
+  color: var(--muted-light);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 13px;
+
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  outline: none;
+
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.055);
+
+  font-size: 15px;
+}
+
+textarea {
+  min-height: 100px;
+  padding-top: 12px;
+  resize: vertical;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: rgba(63, 166, 255, 0.62);
+  box-shadow: 0 0 0 3px rgba(15, 140, 255, 0.1);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #64778d;
+}
+
+select option {
+  color: #111827;
+  background: #ffffff;
+}
+
+.form-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.form-message,
+.debt-payment-message {
+  padding: 12px 14px;
+  border-radius: 13px;
   font-size: 13px;
   font-weight: 750;
 }
 
-/* =========================================
-   ÖDEME LİSTESİ
-========================================= */
-
-.payment-list {
-  display: grid;
-  gap: 10px;
+.form-message.success,
+.debt-payment-message.success {
+  color: #50e9b4;
+  background: rgba(40, 212, 154, 0.12);
 }
 
-.payment-item {
-  display: flex;
-  align-items: center;
-
-  gap: 13px;
-
-  padding: 14px;
-
-  border: 1px solid var(--border);
-  border-radius: 18px;
-
-  background: var(--surface-light);
-}
-
-.bank-icon {
-  width: 43px;
-  height: 43px;
-
-  flex-shrink: 0;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  border-radius: 14px;
-
-  color: white;
-
-  font-size: 15px;
-  font-weight: 900;
-}
-
-.bank-icon.blue {
-  background: linear-gradient(145deg, #2563eb, #153d91);
-}
-
-.bank-icon.red {
-  background: linear-gradient(145deg, #d8314d, #811629);
-}
-
-.bank-icon.purple {
-  background: linear-gradient(145deg, #8b5cf6, #4c1d95);
-}
-
-.payment-info {
-  min-width: 0;
-  flex: 1;
-}
-
-.payment-info strong {
-  display: block;
-
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-
-  font-size: 14px;
-}
-
-.payment-info span {
-  display: block;
-
-  margin-top: 5px;
-
-  color: var(--muted);
-
-  font-size: 12px;
-}
-
-.payment-amount {
-  white-space: nowrap;
-
-  font-size: 14px;
-  font-weight: 800;
-}
-
-/* =========================================
-   HIZLI İŞLEMLER
-========================================= */
-
-.quick-actions {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-
-  gap: 10px;
-}
-
-.quick-actions button {
-  min-height: 90px;
-
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-
-  gap: 9px;
-
-  border: 1px solid var(--border);
-  border-radius: 18px;
-
-  background: var(--surface-light);
-
-  color: var(--text);
-
-  font-size: 11px;
-  font-weight: 700;
-
-  transition:
-    transform 0.18s ease,
-    background 0.18s ease;
-}
-
-.quick-actions button:active {
-  transform: scale(0.96);
-  background: var(--surface-soft);
-}
-
-.quick-actions button span {
-  font-size: 22px;
-}
-
-/* =========================================
-   ALT MENÜ
-========================================= */
-
-.bottom-nav {
-  position: fixed;
-
-  left: 50%;
-  bottom: max(12px, env(safe-area-inset-bottom));
-
-  z-index: 50;
-
-  width: min(calc(100% - 24px), 696px);
-
-  transform: translateX(-50%);
-
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-
-  gap: 4px;
-
-  padding: 8px;
-
-  border: 1px solid var(--border);
-  border-radius: 23px;
-
-  background:
-    rgba(15, 26, 45, 0.94);
-
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-
-  box-shadow:
-    0 18px 48px rgba(0, 0, 0, 0.42);
-}
-
-.nav-item {
-  min-height: 58px;
-
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-
-  gap: 5px;
-
-  border: 0;
-  border-radius: 16px;
-
-  background: transparent;
-  color: var(--muted);
-
-  font-size: 10px;
-  font-weight: 700;
-}
-
-.nav-item span {
-  font-size: 21px;
-}
-
-.nav-item.active {
-  background: var(--surface-soft);
-  color: #78aaff;
-}
-
-/* =========================================
-   MOBİL UYUMLULUK
-========================================= */
-
-@media (max-width: 430px) {
-  .app {
-    padding-left: 15px;
-    padding-right: 15px;
-  }
-
-  .top-header h1 {
-    font-size: 21px;
-  }
-
-  .balance-card strong {
-    font-size: 34px;
-  }
-
-  .quick-actions {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .quick-actions button {
-    min-height: 78px;
-  }
-}
-
-@media (max-width: 350px) {
-  .summary-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .balance-footer {
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  .payment-amount {
-    display: none;
-  }
-}
-/* =========================================
-   YF v0.2 — SAYFA GEÇİŞLERİ
-========================================= */
-
-.page {
-  display: none;
-}
-
-.page.active {
-  display: block;
-  animation: pageFade 0.25s ease;
-}
-
-@keyframes pageFade {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.hidden {
-  display: none !important;
-}
-
-/* =========================================
-   SAYFA BAŞLIĞI
-========================================= */
-
-.page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-
-  gap: 14px;
-  margin-bottom: 20px;
-}
-
-.page-header h1 {
-  font-size: 28px;
-  font-weight: 850;
-  letter-spacing: -0.8px;
-}
-
-.add-button {
-  min-height: 44px;
-
-  padding: 0 15px;
-
-  border: 0;
-  border-radius: 15px;
-
-  background: var(--blue);
-  color: white;
-
-  font-size: 13px;
-  font-weight: 800;
-
-  box-shadow:
-    0 12px 28px rgba(37, 99, 235, 0.32);
-}
-
-/* =========================================
-   KART ÖZETLERİ
-========================================= */
-
-.cards-summary {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.cards-summary article {
-  min-height: 105px;
-
-  padding: 16px;
-
-  border: 1px solid var(--border);
-  border-radius: 20px;
-
-  background: var(--surface);
-
-  box-shadow: var(--shadow);
-}
-
-.cards-summary span {
-  display: block;
-
-  color: var(--muted);
-
-  font-size: 12px;
-  line-height: 1.4;
-}
-
-.cards-summary strong {
-  display: block;
-
-  margin-top: 12px;
-
-  font-size: 17px;
-  font-weight: 850;
-}
-
-/* =========================================
-   KAYITLI KARTLAR
-========================================= */
-
-.bank-cards-list {
-  display: grid;
-  gap: 16px;
-}
-
-.bank-card {
-  position: relative;
-  overflow: hidden;
-
-  padding: 22px;
-
-  border-radius: 26px;
-
-  background:
-    linear-gradient(
-      145deg,
-      #2563eb,
-      #102654
-    );
-
-  color: white;
-
-  box-shadow: var(--shadow);
-}
-
-.bank-card::after {
-  content: "";
-
-  position: absolute;
-
-  width: 180px;
-  height: 180px;
-
-  top: -75px;
-  right: -65px;
-
-  border-radius: 50%;
-
-  background:
-    rgba(255, 255, 255, 0.08);
-}
-
-.bank-card-header {
-  position: relative;
-  z-index: 2;
-
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-
-  gap: 12px;
-}
-
-.bank-card-header span {
-  color: rgba(255, 255, 255, 0.7);
-
-  font-size: 12px;
-}
-
-.bank-card-header h3 {
-  margin-top: 5px;
-
-  font-size: 21px;
-}
-
-.bank-card-actions {
-  display: flex;
-  gap: 6px;
-}
-
-.bank-card-actions button {
-  padding: 7px 9px;
-
-  border:
-    1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 11px;
-
-  background:
-    rgba(255, 255, 255, 0.1);
-
-  color: white;
-
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.bank-card-debt {
-  position: relative;
-  z-index: 2;
-
-  display: block;
-
-  margin-top: 26px;
-
-  font-size: 30px;
-  font-weight: 900;
-}
-
-.bank-card-details {
-  position: relative;
-  z-index: 2;
-
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-
-  gap: 10px;
-  margin-top: 18px;
-}
-
-.bank-card-details span {
-  color: rgba(255, 255, 255, 0.65);
-
-  font-size: 11px;
-}
-
-.bank-card-details strong {
-  display: block;
-
-  margin-top: 5px;
-
-  font-size: 13px;
-}
-
-.bank-card-dates {
-  position: relative;
-  z-index: 2;
-
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-
-  gap: 12px;
-
-  margin-top: 18px;
-  padding-top: 16px;
-
-  border-top:
-    1px solid rgba(255, 255, 255, 0.15);
-}
-
-/* =========================================
-   BOŞ DURUM
-========================================= */
-
-.empty-state {
-  padding: 30px 16px;
-
-  border: 1px dashed var(--border);
-  border-radius: 19px;
-
-  color: var(--muted);
-
-  text-align: center;
-  line-height: 1.6;
+.form-message.error,
+.debt-payment-message.error {
+  color: #ff8294;
+  background: rgba(255, 100, 124, 0.12);
 }
 
 /* =========================================
@@ -917,353 +607,451 @@ button {
 
 .modal {
   position: fixed;
+  z-index: 1000;
   inset: 0;
-
-  z-index: 100;
 
   display: flex;
   align-items: flex-end;
   justify-content: center;
 
-  padding: 14px;
+  padding: 0;
 }
 
 .modal-backdrop {
   position: absolute;
   inset: 0;
 
-  border: 0;
-
-  background:
-    rgba(0, 0, 0, 0.68);
-
-  backdrop-filter: blur(5px);
-  -webkit-backdrop-filter: blur(5px);
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
 
 .modal-content {
   position: relative;
   z-index: 2;
 
-  width: min(100%, 720px);
+  width: min(100%, 560px);
   max-height: 90vh;
-
   overflow-y: auto;
 
-  padding: 21px;
+  padding:
+    20px
+    17px
+    calc(22px + env(safe-area-inset-bottom));
 
-  border: 1px solid var(--border);
-  border-radius: 28px 28px 20px 20px;
+  border: 1px solid var(--border-strong);
+  border-bottom: 0;
+  border-radius: 26px 26px 0 0;
 
-  background: var(--surface);
+  background:
+    linear-gradient(
+      180deg,
+      #10233a,
+      #081522
+    );
 
-  box-shadow:
-    0 30px 80px rgba(0, 0, 0, 0.5);
-
-  animation: modalOpen 0.25s ease;
-}
-
-@keyframes modalOpen {
-  from {
-    opacity: 0;
-    transform: translateY(35px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  box-shadow: 0 -20px 55px rgba(0, 0, 0, 0.42);
 }
 
 .modal-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-
-  gap: 14px;
-  margin-bottom: 20px;
+  gap: 15px;
+  margin-bottom: 18px;
 }
 
 .modal-header h2 {
+  margin: 4px 0 0;
   font-size: 22px;
 }
 
-.close-button {
-  width: 42px;
-  height: 42px;
+/* =========================================
+   KART LİSTESİ
+========================================= */
+
+#cardsList {
+  display: grid;
+  gap: 13px;
+}
+
+.card-item,
+.wallet-card {
+  overflow: hidden;
+  padding: 18px;
+
+  border: 1px solid var(--border-strong);
+  border-radius: 21px;
+
+  background:
+    linear-gradient(
+      145deg,
+      rgba(24, 53, 83, 0.96),
+      rgba(13, 31, 50, 0.96)
+    );
+
+  box-shadow: var(--shadow);
+}
+
+.card-item h3,
+.wallet-card h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.card-item p,
+.wallet-card p {
+  color: var(--muted);
+}
+
+/* app.js tarafından oluşturulan kartlar */
+
+.credit-card {
+  position: relative;
+  overflow: hidden;
+  padding: 18px;
+  border: 1px solid var(--border-strong);
+  border-radius: 22px;
+  background:
+    radial-gradient(
+      circle at 100% 0%,
+      rgba(61, 163, 255, 0.25),
+      transparent 34%
+    ),
+    linear-gradient(
+      140deg,
+      #153858,
+      #0b2137
+    );
+  box-shadow: var(--shadow);
+}
+
+.credit-card + .credit-card {
+  margin-top: 13px;
+}
+
+.card-header,
+.card-top,
+.wallet-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.card-actions,
+.actions {
+  display: flex;
+  gap: 7px;
+}
+
+.card-actions button,
+.actions button {
+  min-height: 33px;
+  padding: 0 10px;
 
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: 10px;
 
-  background: var(--surface-light);
+  color: var(--muted-light);
+  background: rgba(255, 255, 255, 0.055);
+
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.progress,
+.card-progress {
+  width: 100%;
+  height: 7px;
+  overflow: hidden;
+  margin-top: 14px;
+
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.progress > div,
+.card-progress > div {
+  height: 100%;
+  border-radius: inherit;
+  background:
+    linear-gradient(
+      90deg,
+      var(--primary),
+      #59c1ff
+    );
+}
+
+/* =========================================
+   İŞLEM LİSTESİ
+========================================= */
+
+#transactionsList,
+.payment-history-list {
+  display: grid;
+  gap: 10px;
+}
+
+.transaction-item,
+.payment-history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  padding: 14px;
+
+  border: 1px solid var(--border);
+  border-radius: 16px;
+
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.transaction-info,
+.payment-history-info {
+  min-width: 0;
+}
+
+.transaction-info strong,
+.payment-history-info strong {
+  display: block;
+  overflow: hidden;
+
   color: var(--text);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
+.transaction-info span,
+.payment-history-info span {
+  display: block;
+  margin-top: 5px;
+
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.payment-history-amount {
+  white-space: nowrap;
+  color: var(--success);
+  font-size: 13px;
+}
+
+/* =========================================
+   BORÇ ÖDEME
+========================================= */
+
+.debt-payment-box {
+  display: grid;
+  gap: 14px;
+}
+
+.debt-payment-summary {
+  padding: 16px;
+
+  border: 1px solid rgba(48, 158, 255, 0.17);
+  border-radius: 17px;
+
+  background: rgba(15, 140, 255, 0.08);
+}
+
+.debt-payment-summary span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.debt-payment-summary strong {
   font-size: 23px;
 }
 
 /* =========================================
-   FORM
+   ALT MENÜ
 ========================================= */
 
-#cardForm {
+.bottom-navigation {
+  position: fixed;
+  z-index: 900;
+
+  right: 0;
+  bottom: 0;
+  left: 0;
+
   display: grid;
-  gap: 14px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+
+  width: 100%;
+  min-height: calc(68px + env(safe-area-inset-bottom));
+  padding:
+    7px
+    max(8px, env(safe-area-inset-right))
+    calc(7px + env(safe-area-inset-bottom))
+    max(8px, env(safe-area-inset-left));
+
+  border-top: 1px solid var(--border);
+  background: rgba(5, 15, 26, 0.94);
+
+  box-shadow: 0 -12px 32px rgba(0, 0, 0, 0.28);
+
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
-#cardForm label {
-  display: grid;
-  gap: 8px;
+.bottom-navigation .nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
 
-  color: var(--muted);
+  min-width: 0;
+  min-height: 54px;
+  padding: 4px 2px;
 
-  font-size: 13px;
+  border: 0;
+  border-radius: 13px;
+
+  color: #65788f;
+  background: transparent;
+
   font-weight: 700;
 }
 
-#cardForm input,
-#cardForm select {
+.bottom-navigation .nav-item > span {
+  font-size: 21px;
+  line-height: 1;
+}
+
+.bottom-navigation .nav-item > small {
+  display: block;
+  overflow: hidden;
+
   width: 100%;
-  min-height: 51px;
 
-  padding: 0 14px;
-
-  border: 1px solid var(--border);
-  border-radius: 15px;
-
-  background: var(--surface-light);
-  color: var(--text);
-
-  font-size: 16px;
-  outline: none;
-}
-
-#cardForm input:focus,
-#cardForm select:focus {
-  border-color: var(--blue);
-
-  box-shadow:
-    0 0 0 3px rgba(59, 130, 246, 0.14);
-}
-
-.form-buttons {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-
-  gap: 10px;
-  margin-top: 5px;
-}
-
-.primary-button,
-.secondary-button {
-  min-height: 52px;
-
-  border-radius: 16px;
-
-  font-weight: 800;
-}
-
-.primary-button {
-  border: 0;
-
-  background: var(--blue);
-  color: white;
-}
-
-.secondary-button {
-  border: 1px solid var(--border);
-
-  background: var(--surface-light);
-  color: var(--text);
-}
-
-.form-message {
-  padding: 11px;
-
-  border-radius: 13px;
-
-  background:
-    rgba(52, 211, 153, 0.12);
-
-  color: var(--green);
-
+  font-size: 9.5px;
+  line-height: 1.1;
   text-align: center;
-  font-size: 13px;
-  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bottom-navigation .nav-item.active {
+  color: #5bb5ff;
+  background: rgba(15, 140, 255, 0.08);
+}
+
+/* Hızlı işlemlerde nav-item sınıfı varsa
+   alt menü şekline dönüşmesini engeller */
+
+.quick-actions .nav-item {
+  color: var(--text);
 }
 
 /* =========================================
-   MOBİL DÜZENLEMELER
+   YAKLAŞAN ÖDEMELER
 ========================================= */
 
-@media (max-width: 520px) {
-  .cards-summary {
-    grid-template-columns: 1fr;
-  }
-
-  .cards-summary article {
-    min-height: auto;
-  }
-}
-
-@media (max-width: 390px) {
-  .page-header {
-    align-items: flex-start;
-  }
-
-  .add-button {
-    padding: 0 12px;
-  }
-
-  .bank-card-details {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .bank-card-details > div:last-child {
-    grid-column: 1 / -1;
-  }
-}
-/* ===== İşlemler ===== */
-
-.cards-summary{
-    display:grid;
-    grid-template-columns:repeat(2,1fr);
-    gap:16px;
-    margin-bottom:20px;
-}
-
-.cards-summary article{
-    background:#131c2f;
-    border:1px solid rgba(255,255,255,.06);
-    border-radius:18px;
-    padding:18px;
-}
-
-.cards-summary span{
-    display:block;
-    color:#9ba7c5;
-    font-size:14px;
-    margin-bottom:8px;
-}
-
-.cards-summary strong{
-    color:#fff;
-    font-size:24px;
-}
-
-.payment-list{
-    display:flex;
-    flex-direction:column;
-    gap:14px;
-}
-
-.transaction-item{
-    background:#131c2f;
-    border-radius:18px;
-    padding:16px;
-    border:1px solid rgba(255,255,255,.06);
-}
-
-.transaction-item h3{
-    margin:0 0 6px;
-    color:#fff;
-}
-
-.transaction-item small{
-    color:#9ba7c5;
-}
-
-.transaction-income{
-    color:#42d392;
-    font-weight:700;
-}
-
-.transaction-expense{
-    color:#ff6b6b;
-    font-weight:700;
-}
-
-
-/* =========================
-   İŞLEM EKLEME PENCERESİ
-   ========================= */
-
-#transactionModal .modal-content {
-  width: min(92%, 760px);
-  max-height: calc(100vh - 70px);
-  overflow-y: auto;
-  padding: 28px;
-  border-radius: 28px;
-}
-
-#transactionForm {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-#transactionForm label {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  color: #9ba7c5;
-  font-size: 16px;
-  font-weight: 700;
-}
-
-#transactionForm input,
-#transactionForm select {
-  width: 100%;
-  min-height: 58px;
-  padding: 0 18px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 18px;
-  background: #182842;
-  color: #ffffff;
-  font-size: 17px;
-  box-sizing: border-box;
-}
-
-#transactionForm input::placeholder {
-  color: #9ba7c5;
-}
-
-#transactionForm input:focus,
-#transactionForm select:focus {
-  outline: none;
-  border-color: #4d8dff;
-  box-shadow: 0 0 0 3px rgba(77, 141, 255, 0.15);
-}
-
-#transactionCardField.hidden {
-  display: none;
-}
-
-#transactionModal .form-actions {
+#upcomingPayments {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-  margin-top: 8px;
+  gap: 10px;
 }
 
-#transactionModal .form-actions button {
-  min-height: 58px;
-  border-radius: 18px;
-  font-size: 16px;
-  font-weight: 700;
+.upcoming-payment,
+.upcoming-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 13px;
+  align-items: center;
+
+  padding: 14px;
+
+  border: 1px solid var(--border);
+  border-radius: 16px;
+
+  background: rgba(255, 255, 255, 0.035);
 }
 
-@media (max-width: 600px) {
-  #transactionModal .modal-content {
-    width: calc(100% - 32px);
-    padding: 24px 20px;
+.upcoming-payment strong,
+.upcoming-item strong {
+  font-size: 13px;
+}
+
+.upcoming-payment span,
+.upcoming-item span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+/* =========================================
+   KÜÇÜK TELEFONLAR
+========================================= */
+
+@media (max-width: 370px) {
+  .app-shell {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .hero-card {
+    padding: 17px;
+  }
+
+  .summary-grid,
+  .quick-actions {
+    gap: 8px !important;
+  }
+
+  .summary-card {
+    min-height: 97px;
+    padding: 13px;
+  }
+
+  .quick-action-button {
+    min-height: 116px;
+    padding: 13px;
+  }
+
+  .quick-action-button small {
+    font-size: 9.5px;
+  }
+
+  .bottom-navigation .nav-item > small {
+    font-size: 8.5px;
+  }
+}
+
+/* =========================================
+   BÜYÜK EKRANLAR
+========================================= */
+
+@media (min-width: 700px) {
+  .app-shell {
+    padding-top: 34px;
+  }
+
+  .modal {
+    align-items: center;
+    padding: 25px;
+  }
+
+  .modal-content {
+    max-height: 86vh;
+    border-bottom: 1px solid var(--border-strong);
     border-radius: 26px;
   }
 
-  #transactionForm {
-    gap: 17px;
-  }
+  .bottom-navigation {
+    right: 50%;
+    left: auto;
 
-  #transactionModal .form-actions {
-    grid-template-columns: 1fr 1fr;
+    width: min(100%, 560px);
+    transform: translateX(50%);
+
+    border-right: 1px solid var(--border);
+    border-left: 1px solid var(--border);
+    border-radius: 22px 22px 0 0;
   }
 }
