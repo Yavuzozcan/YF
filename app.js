@@ -3039,5 +3039,90 @@ document.addEventListener("DOMContentLoaded", () => {
     );
   }
 });
+// =========================================
+// YF v2.3.3 — Yenilemede Açık Sayfayı Hatırla
+// Bu kod app.js dosyasının EN ALTINA eklenir.
+// =========================================
 
+document.addEventListener("DOMContentLoaded", () => {
+  const PAGE_KEY = "yf_last_open_page_v1";
+
+  function savePage(pageId) {
+    if (!pageId) return;
+    localStorage.setItem(PAGE_KEY, pageId);
+  }
+
+  function openSavedPage() {
+    const savedPage = localStorage.getItem(PAGE_KEY);
+
+    if (!savedPage || savedPage === "dashboardPage") return;
+
+    const navigationButton = document.querySelector(
+      `[data-page="${savedPage}"]`
+    );
+
+    if (navigationButton) {
+      navigationButton.click();
+      return;
+    }
+
+    const page = document.getElementById(savedPage);
+
+    if (page) {
+      document
+        .querySelectorAll(".page")
+        .forEach(item => {
+          item.classList.toggle(
+            "active",
+            item.id === savedPage
+          );
+        });
+
+      document
+        .querySelectorAll(".bottom-navigation .nav-item")
+        .forEach(item => {
+          item.classList.toggle(
+            "active",
+            item.dataset.page === savedPage
+          );
+        });
+
+      window.scrollTo({ top: 0 });
+    }
+  }
+
+  document.addEventListener("click", event => {
+    const pageButton = event.target.closest("[data-page]");
+
+    if (pageButton?.dataset.page) {
+      savePage(pageButton.dataset.page);
+    }
+  });
+
+  document
+    .getElementById("openReportsButton")
+    ?.addEventListener("click", () => {
+      savePage("reportsPage");
+    });
+
+  document
+    .getElementById("openSettingsButton")
+    ?.addEventListener("click", () => {
+      savePage("settingsPage");
+    });
+
+  document
+    .getElementById("reportsBackButton")
+    ?.addEventListener("click", () => {
+      savePage("dashboardPage");
+    });
+
+  document
+    .getElementById("settingsBackButton")
+    ?.addEventListener("click", () => {
+      savePage("dashboardPage");
+    });
+
+  setTimeout(openSavedPage, 300);
+});
 
