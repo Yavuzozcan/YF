@@ -84,3 +84,92 @@ document.addEventListener("DOMContentLoaded", () => {
   function renderAll(){cards=load(CK);txs=load(TK);renderCards();renderTx();renderDashboard();renderUpcoming();fillTxCards();setTimeout(updateMinimumPanel,0)}
   renderAll();
 });
+// =========================================
+// YF v2.0.1 — Borç Öde kart listesini düzelt
+// Bu kod app.js dosyasının EN ALTINA eklenir.
+// =========================================
+
+document.addEventListener("DOMContentLoaded", () => {
+  const CARD_STORAGE_KEY = "yf_cards_v1";
+  const paymentCardSelect = document.getElementById("debtPaymentCard");
+  const selectedCardDebt = document.getElementById("selectedCardDebt");
+
+  if (!paymentCardSelect) return;
+
+  function loadCardsForPayment() {
+    try {
+      const savedCards = JSON.parse(
+        localStorage.getItem(CARD_STORAGE_KEY) || "[]"
+      );
+
+      const oldValue = paymentCardSelect.value;
+
+      paymentCardSelect.innerHTML =
+        '<option value="">Kart seç</option>';
+
+      savedCards
+        .filter(card => Number(card.debt || 0) > 0)
+        .forEach(card => {
+          const option = document.createElement("option");
+          option.value = card.id;
+          option.textContent =
+            `${card.bank} - ${card.name} (${formatTRY(card.debt)})`;
+
+          paymentCardSelect.appendChild(option);
+        });
+
+      if (savedCards.some(card => card.id === oldValue)) {
+        paymentCardSelect.value = oldValue;
+      }
+
+      updateSelectedPaymentCard();
+    } catch (error) {
+      console.error("Borç ödeme kartları yüklenemedi:", error);
+    }
+  }
+
+  function updateSelectedPaymentCard() {
+    const savedCards = JSON.parse(
+      localStorage.getItem(CARD_STORAGE_KEY) || "[]"
+    );
+
+    const selectedCard = savedCards.find(
+      card => card.id === paymentCardSelect.value
+    );
+
+    if (selectedCardDebt) {
+      selectedCardDebt.textContent = formatTRY(
+        selectedCard ? selectedCard.debt : 0
+      );
+    }
+
+    window.dispatchEvent(
+      new CustomEvent("yf-payment-card-changed")
+    );
+  }
+
+  function formatTRY(value) {
+    return new Intl.NumberFormat("tr-TR", {
+      style: "currency",
+      currency: "TRY"
+    }).format(Number(value) || 0);
+  }
+
+  paymentCardSelect.addEventListener(
+    "change",
+    updateSelectedPaymentCard
+  );
+
+  document
+    .querySelectorAll('[data-page="debtPaymentPage"]')
+    .forEach(button => {
+      button.addEventListener("click", () => {
+        setTimeout(loadCardsForPayment, 50);
+      });
+    });
+
+  window.addEventListener("storage", loadCardsForPayment);
+  window.addEventListener("yf-refresh-payment-cards", loadCardsForPayment);
+
+  loadCardsForPayment();
+});
