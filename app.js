@@ -1,631 +1,86 @@
-// =========================================
-// YF — Yavuz Finans
-// Kart Yönetimi, İşlemler ve Dashboard
-// =========================================
-
+// YF v2.0 — Akıllı Asgari Ödeme Sistemi
 document.addEventListener("DOMContentLoaded", () => {
-  const CARD_STORAGE_KEY = "yf_cards_v1";
-  const TRANSACTION_STORAGE_KEY = "yf_transactions_v1";
+  const CK="yf_cards_v1", TK="yf_transactions_v1", RATE=.20;
+  let cards=load(CK), txs=load(TK);
 
-  let cards = loadJson(CARD_STORAGE_KEY, []);
-  let transactions = loadJson(TRANSACTION_STORAGE_KEY, []);
+  const $=id=>document.getElementById(id);
+  const money=v=>new Intl.NumberFormat("tr-TR",{style:"currency",currency:"TRY"}).format(Number(v)||0);
+  const uid=()=>crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random());
+  const esc=v=>String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
+  const round=v=>Math.round((Number(v)+Number.EPSILON)*100)/100;
+  const save=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
+  function load(k){try{return JSON.parse(localStorage.getItem(k))||[]}catch{return[]}}
+  const cycleOf=v=>{const m=String(v||"").match(/^(\d{4})-(\d{2})/);return m?`${m[1]}-${m[2]}`:`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,"0")}`};
+  const dateText=v=>{if(!v)return"Belirtilmedi";const d=new Date(String(v).includes("T")?v:`${v}T12:00:00`);return Number.isNaN(d)? "Belirtilmedi":d.toLocaleDateString("tr-TR",{day:"numeric",month:"long",year:"numeric"})};
+  const currentMonth=v=>{const d=new Date(String(v).includes("T")?v:`${v}T12:00:00`),n=new Date();return d.getMonth()===n.getMonth()&&d.getFullYear()===n.getFullYear()};
+  const bankClass=b=>{b=String(b||"").toLocaleLowerCase("tr-TR");if(b.includes("ziraat"))return"bank-ziraat";if(b.includes("garanti"))return"bank-garanti";if(b.includes("akbank"))return"bank-akbank";if(b.includes("qnb"))return"bank-qnb";if(b.includes("iş"))return"bank-is";if(b.includes("tom"))return"bank-tom";return""};
+  const iconClass=b=>{b=String(b||"").toLocaleLowerCase("tr-TR");if(b.includes("ziraat")||b.includes("akbank"))return"red";if(b.includes("qnb"))return"purple";return""};
 
-  const pages = document.querySelectorAll(".page");
-  const navItems = document.querySelectorAll(".nav-item");
+  cards=cards.map(c=>({...c,id:c.id||uid(),bank:c.bank||c.bankName||"Diğer",name:c.name||c.cardName||"Kart",limit:Number(c.limit||0),debt:Number(c.debt||0),statementDebt:Number(c.statementDebt??c.debt??0),statementCycle:c.statementCycle||cycleOf(c.dueDate)}));
+  txs=txs.map(t=>({...t,id:t.id||uid(),amount:Number(t.amount||0)}));
+  save(CK,cards);save(TK,txs);
 
-  const cardModal = document.getElementById("cardModal");
-  const cardForm = document.getElementById("cardForm");
-  const cardFormTitle = document.getElementById("cardFormTitle");
-  const cardFormMessage = document.getElementById("cardFormMessage");
+  const pages=document.querySelectorAll(".page"), navs=document.querySelectorAll(".nav-item");
+  function showPage(id){pages.forEach(p=>p.classList.toggle("active",p.id===id));document.querySelectorAll(".bottom-navigation .nav-item").forEach(n=>n.classList.toggle("active",n.dataset.page===id));if(id==="debtPaymentPage")setTimeout(updateMinimumPanel,50);scrollTo({top:0,behavior:"smooth"})}
+  navs.forEach(n=>n.addEventListener("click",()=>n.dataset.page&&showPage(n.dataset.page)));
 
-  const cardId = document.getElementById("cardId");
-  const bankName = document.getElementById("bankName");
-  const cardName = document.getElementById("cardName");
-  const cardLimit = document.getElementById("cardLimit");
-  const cardDebt = document.getElementById("cardDebt");
-  const statementDate = document.getElementById("statementDate");
-  const dueDate = document.getElementById("dueDate");
+  const welcome=$("welcomeText");if(welcome){const h=new Date().getHours();welcome.textContent=h>=5&&h<11?"Günaydın Yavuz 👋":h<18?"İyi Günler Yavuz ☀️":h<22?"İyi Akşamlar Yavuz 🌙":"İyi Geceler Yavuz 🌙"}
 
-  const openCardFormButton = document.getElementById("openCardFormButton");
-  const quickAddCardButton = document.getElementById("quickAddCardButton");
-  const closeCardFormButton = document.getElementById("closeCardFormButton");
-  const cancelCardButton = document.getElementById("cancelCardButton");
-  const modalBackdrop = document.getElementById("modalBackdrop");
+  const cardModal=$("cardModal"),cardForm=$("cardForm"),cardId=$("cardId"),bankName=$("bankName"),cardName=$("cardName"),cardLimit=$("cardLimit"),cardDebt=$("cardDebt"),statementDate=$("statementDate"),dueDate=$("dueDate"),cardMsg=$("cardFormMessage");
+  function openCard(c=null){cardForm?.reset();cardId.value=c?.id||"";$("cardFormTitle").textContent=c?"Kartı Düzenle":"Yeni Kart Ekle";if(c){bankName.value=c.bank;cardName.value=c.name;cardLimit.value=c.limit;cardDebt.value=c.debt;statementDate.value=c.statementDate||"";dueDate.value=c.dueDate||""}cardModal.classList.remove("hidden");document.body.style.overflow="hidden"}
+  function closeCard(){cardModal.classList.add("hidden");document.body.style.overflow=""}
+  $("openCardFormButton")?.addEventListener("click",()=>openCard());
+  $("quickAddCardButton")?.addEventListener("click",()=>openCard());
+  $("closeCardFormButton")?.addEventListener("click",closeCard);
+  $("cancelCardButton")?.addEventListener("click",closeCard);
+  $("modalBackdrop")?.addEventListener("click",closeCard);
+  cardForm?.addEventListener("submit",e=>{e.preventDefault();const limit=Number(cardLimit.value),debt=Number(cardDebt.value);if(!bankName.value||!cardName.value.trim()||!Number.isFinite(limit)||limit<0||!Number.isFinite(debt)||debt<0){alert("Kart bilgilerini doğru gir.");return}const old=cards.find(c=>c.id===cardId.value);const c={id:cardId.value||uid(),bank:bankName.value,name:cardName.value.trim(),limit,debt,statementDebt:debt,statementCycle:cycleOf(dueDate.value),statementDate:statementDate.value||"",dueDate:dueDate.value||"",createdAt:old?.createdAt||new Date().toISOString()};const i=cards.findIndex(x=>x.id===c.id);i>=0?cards[i]=c:cards.unshift(c);save(CK,cards);renderAll();closeCard();showPage("cardsPage")});
 
-  const transactionModal = document.getElementById("transactionModal");
-  const transactionForm = document.getElementById("transactionForm");
-  const transactionType = document.getElementById("transactionType");
-  const transactionName = document.getElementById("transactionName");
-  const transactionAmount = document.getElementById("transactionAmount");
-  const transactionCategory = document.getElementById("transactionCategory");
-  const transactionDate = document.getElementById("transactionDate");
-  const transactionPaymentMethod = document.getElementById("transactionPaymentMethod");
-  const transactionCard = document.getElementById("transactionCard");
-  const transactionCardField = document.getElementById("transactionCardField");
+  const txModal=$("transactionModal"),txForm=$("transactionForm"),txType=$("transactionType"),txName=$("transactionName"),txAmount=$("transactionAmount"),txCat=$("transactionCategory"),txDate=$("transactionDate"),txMethod=$("transactionPaymentMethod"),txCard=$("transactionCard"),txCardField=$("transactionCardField");
+  function fillTxCards(){if(!txCard)return;txCard.innerHTML='<option value="">Kart seç</option>';cards.forEach(c=>{const o=document.createElement("option");o.value=c.id;o.textContent=`${c.bank} - ${c.name}`;txCard.appendChild(o)})}
+  function toggleTxCard(){const show=txType?.value==="expense"&&txMethod?.value==="card";txCardField?.classList.toggle("hidden",!show);if(!show&&txCard)txCard.value=""}
+  function openTx(){txForm?.reset();fillTxCards();txDate.value=new Date().toISOString().split("T")[0];toggleTxCard();txModal.classList.remove("hidden");document.body.style.overflow="hidden"}
+  function closeTx(){txModal.classList.add("hidden");document.body.style.overflow=""}
+  $("openTransactionFormButton")?.addEventListener("click",openTx);
+  $("closeTransactionFormButton")?.addEventListener("click",closeTx);
+  $("cancelTransactionButton")?.addEventListener("click",closeTx);
+  $("transactionModalBackdrop")?.addEventListener("click",closeTx);
+  txType?.addEventListener("change",toggleTxCard);txMethod?.addEventListener("change",toggleTxCard);
+  txForm?.addEventListener("submit",e=>{e.preventDefault();const type=txType.value,amount=Number(txAmount.value),method=txMethod.value,cardId=type==="expense"&&method==="card"?txCard.value:"";if(!txName.value.trim()||!txCat.value||!txDate.value||!Number.isFinite(amount)||amount<=0){alert("İşlem bilgilerini doğru gir.");return}const t={id:uid(),type,name:txName.value.trim(),amount,category:txCat.value,date:txDate.value,paymentMethod:method,cardId,cardDebtDelta:0,createdAt:new Date().toISOString()};if(cardId){const c=cards.find(x=>x.id===cardId);if(!c){alert("Kart bulunamadı.");return}if(c.limit>0&&c.debt+amount>c.limit){alert("Bu işlem kart limitini aşıyor.");return}c.debt+=amount;t.cardDebtDelta=amount;save(CK,cards)}txs.unshift(t);save(TK,txs);renderAll();closeTx()});
 
-  const openTransactionFormButton = document.getElementById("openTransactionFormButton");
-  const closeTransactionFormButton = document.getElementById("closeTransactionFormButton");
-  const cancelTransactionButton = document.getElementById("cancelTransactionButton");
-  const transactionModalBackdrop = document.getElementById("transactionModalBackdrop");
-
-  const cardsList = document.getElementById("cardsList");
-  const emptyCards = document.getElementById("emptyCards");
-  const upcomingPayments = document.getElementById("upcomingPayments");
-  const transactionsList = document.getElementById("transactionsList");
-
-  const totalDebt = document.getElementById("totalDebt");
-  const totalAssets = document.getElementById("totalAssets");
-  const monthlyPayment = document.getElementById("monthlyPayment");
-  const netBalance = document.getElementById("netBalance");
-  const balanceStatus = document.getElementById("balanceStatus");
-  const cardCount = document.getElementById("cardCount");
-
-  const cardsTotalDebt = document.getElementById("cardsTotalDebt");
-  const cardsTotalLimit = document.getElementById("cardsTotalLimit");
-  const cardsAvailableLimit = document.getElementById("cardsAvailableLimit");
-
-  const totalIncome = document.getElementById("totalIncome");
-  const totalExpense = document.getElementById("totalExpense");
-  const transactionBalance = document.getElementById("transactionBalance");
-
-  setupWelcomeText();
-  setupNavigation();
-  setupCardEvents();
-  setupTransactionEvents();
-  setDefaultTransactionDate();
-  renderEverything();
-
-  function setupWelcomeText() {
-    const welcomeText = document.getElementById("welcomeText");
-    if (!welcomeText) return;
-
-    const hour = new Date().getHours();
-    if (hour < 12) {
-      welcomeText.textContent = "Günaydın Yavuz 👋";
-    } else if (hour < 18) {
-      welcomeText.textContent = "İyi Günler Yavuz 👋";
-    } else {
-      welcomeText.textContent = "İyi Akşamlar Yavuz 👋";
-    }
+  function minimumInfo(card){
+    if(!card)return{minimum:0,paid:0,remaining:0,pct:0};
+    const minimum=round(Number(card.statementDebt??card.debt??0)*RATE),cycle=card.statementCycle||cycleOf(card.dueDate);
+    const paid=round(load(TK).filter(t=>t.type==="card-payment"&&t.cardId===card.id&&(t.statementCycle?t.statementCycle===cycle:currentMonth(t.createdAt||t.date))).reduce((s,t)=>s+Number(t.amount||0),0));
+    const remaining=round(Math.max(0,minimum-paid));return{minimum,paid,remaining,pct:minimum?Math.min(100,Math.round(paid/minimum*100)):100}
   }
 
-  function setupNavigation() {
-    navItems.forEach((button) => {
-      button.addEventListener("click", () => {
-        const targetPage = button.dataset.page;
-        showPage(targetPage);
-
-        navItems.forEach((item) => item.classList.remove("active"));
-        button.classList.add("active");
-
-        window.scrollTo({ top: 0, behavior: "smooth" });
-      });
-    });
+  function addSmartPanel(){
+    const form=$("debtPaymentForm"),box=document.querySelector(".debt-payment-summary"),amount=$("debtPaymentAmount");if(!form||!box||!amount||$("smartMinimumPanel"))return;
+    const p=document.createElement("section");p.id="smartMinimumPanel";p.className="smart-minimum-panel";p.innerHTML=`<div class="smart-minimum-head"><div><span>Otomatik Asgari (%20)</span><strong id="smartMinimumAmount">${money(0)}</strong></div><span id="smartMinimumBadge" class="smart-minimum-badge waiting">Kart seç</span></div><div class="smart-minimum-grid"><div><span>Bu dönem ödendi</span><strong id="smartPaidAmount">${money(0)}</strong></div><div><span>Kalan asgari</span><strong id="smartRemainingAmount">${money(0)}</strong></div></div><div class="smart-minimum-track"><div id="smartMinimumProgress"></div></div><small id="smartMinimumText">Kart seçildiğinde otomatik hesaplanır.</small><button id="payMinimumButton" class="smart-minimum-button" type="button" disabled>⚡ Kalan Asgariyi Öde</button>`;
+    box.insertAdjacentElement("afterend",p);$("debtPaymentCard")?.addEventListener("change",updateMinimumPanel);$("payMinimumButton").addEventListener("click",()=>{const c=selectedPaymentCard(),i=minimumInfo(c);if(!c||i.remaining<=0)return;amount.value=Math.min(i.remaining,c.debt).toFixed(2);form.requestSubmit()});updateMinimumPanel();
   }
+  function selectedPaymentCard(){const id=$("debtPaymentCard")?.value;return load(CK).find(c=>c.id===id)||null}
+  function updateMinimumPanel(){const c=selectedPaymentCard(),a=$("smartMinimumAmount"),p=$("smartPaidAmount"),r=$("smartRemainingAmount"),b=$("smartMinimumBadge"),f=$("smartMinimumProgress"),t=$("smartMinimumText"),btn=$("payMinimumButton");if(!a)return;if(!c){a.textContent=p.textContent=r.textContent=money(0);b.textContent="Kart seç";b.className="smart-minimum-badge waiting";f.style.width="0%";t.textContent="Kart seçildiğinde otomatik hesaplanır.";btn.disabled=true;return}const i=minimumInfo(c);a.textContent=money(i.minimum);p.textContent=money(i.paid);r.textContent=money(i.remaining);f.style.width=`${i.pct}%`;t.textContent=`${money(i.paid)} / ${money(i.minimum)} · %${i.pct}`;if(i.remaining<=0){b.textContent="Asgari ödendi ✓";b.className="smart-minimum-badge completed";btn.disabled=true}else if(i.paid>0){b.textContent="Kısmen ödendi";b.className="smart-minimum-badge partial";btn.disabled=false}else{b.textContent="Asgari bekliyor";b.className="smart-minimum-badge waiting";btn.disabled=false}}
+  addSmartPanel();
 
-  function showPage(pageId) {
-    pages.forEach((page) => page.classList.remove("active"));
-    document.getElementById(pageId)?.classList.add("active");
-  }
+  $("debtPaymentForm")?.addEventListener("submit",()=>{const id=$("debtPaymentCard").value,amount=Number($("debtPaymentAmount").value),stamp=Date.now();setTimeout(()=>{const list=load(TK),c=load(CK).find(x=>x.id===id),t=list.find(x=>x.type==="card-payment"&&x.cardId===id&&Math.abs(Number(x.amount)-amount)<.01&&Math.abs(new Date(x.createdAt||x.date).getTime()-stamp)<15000);if(t&&!t.statementCycle){t.statementCycle=c?.statementCycle||cycleOf(c?.dueDate);const info=minimumInfo(c);t.paymentKind=Math.abs(amount-info.remaining)<.01?"minimum":"custom";save(TK,list)}},100)},true);
 
-  function setupCardEvents() {
-    openCardFormButton?.addEventListener("click", openNewCardForm);
-    quickAddCardButton?.addEventListener("click", openNewCardForm);
-    closeCardFormButton?.addEventListener("click", closeCardModal);
-    cancelCardButton?.addEventListener("click", closeCardModal);
-    modalBackdrop?.addEventListener("click", closeCardModal);
-    cardForm?.addEventListener("submit", saveCard);
-  }
+  function deleteTx(id){if(!confirm("Bu işlem silinsin mi?"))return;const t=txs.find(x=>x.id===id);if(!t)return;const d=Number(t.cardDebtDelta??0);if(t.cardId&&d!==0){const c=cards.find(x=>x.id===t.cardId);if(c)c.debt=Math.max(0,c.debt-d);save(CK,cards)}txs=txs.filter(x=>x.id!==id);save(TK,txs);renderAll()}
 
-  function openNewCardForm() {
-    cardForm?.reset();
-    if (cardId) cardId.value = "";
-    if (cardFormTitle) cardFormTitle.textContent = "Yeni Kart Ekle";
-    hideCardFormMessage();
-    openCardModal();
-  }
+  function renderCards(){const list=$("cardsList");if(!list)return;list.innerHTML="";if(!cards.length){list.innerHTML='<div class="empty-state">Henüz kart eklenmedi.</div>';return}cards.forEach(c=>{const i=minimumInfo(c),available=Math.max(0,c.limit-c.debt),usage=c.limit?Math.min(100,Math.round(c.debt/c.limit*100)):0,el=document.createElement("article");el.className=`bank-card ${bankClass(c.bank)}`;el.innerHTML=`<div class="bank-card-header"><div><span>${esc(c.bank)}</span><h3>${esc(c.name)}</h3></div><div class="bank-card-actions"><button data-edit="${c.id}">Düzenle</button><button data-delete="${c.id}">Sil</button></div></div><strong class="bank-card-debt">${money(c.debt)}</strong><div class="card-minimum-status"><div class="card-minimum-status-head"><div><span>Otomatik asgari (%20)</span><strong>${money(i.minimum)}</strong></div><span class="card-minimum-status-badge ${i.remaining<=0?"completed":i.paid>0?"partial":"waiting"}">${i.remaining<=0?"Asgari ödendi ✓":i.paid>0?`${money(i.remaining)} kaldı`:"Asgari bekliyor"}</span></div><div class="card-minimum-status-track"><div style="width:${i.pct}%"></div></div><small>Bu dönem: ${money(i.paid)} / ${money(i.minimum)}</small></div><div class="bank-card-details"><div><span>Kart Limiti</span><strong>${money(c.limit)}</strong></div><div><span>Kalan Limit</span><strong>${money(available)}</strong></div><div><span>Kullanım</span><strong>%${usage}</strong></div></div><div class="bank-card-dates"><div><span>Hesap Kesim</span><strong>${dateText(c.statementDate)}</strong></div><div><span>Son Ödeme</span><strong>${dateText(c.dueDate)}</strong></div></div>`;
+    el.querySelector("[data-edit]").onclick=()=>openCard(c);el.querySelector("[data-delete]").onclick=()=>{if(confirm(`${c.bank} kartı silinsin mi?`)){cards=cards.filter(x=>x.id!==c.id);save(CK,cards);renderAll()}};list.appendChild(el)})}
 
-  function openCardModal() {
-    cardModal?.classList.remove("hidden");
-    document.body.style.overflow = "hidden";
-  }
+  function renderTx(){const list=$("transactionsList");if(!list)return;list.innerHTML="";if(!txs.length){list.innerHTML='<div class="empty-state">Henüz işlem eklenmedi.</div>';return}txs.forEach(t=>{const income=t.type==="income",c=cards.find(x=>x.id===t.cardId),el=document.createElement("article"),label=t.type==="card-payment"?(t.paymentKind==="minimum"?"Asgari Ödeme":"Kart Borcu Ödemesi"):(t.category||"İşlem");el.className="transaction-item";el.innerHTML=`<div><h3>${esc(t.name||label)}</h3><small>${esc(label)}${c?` · ${esc(c.bank)} - ${esc(c.name)}`:t.cardName?` · ${esc(t.cardName)}`:""} · ${dateText(t.date||t.createdAt)}</small></div><div><strong class="${income?"transaction-income":"transaction-expense"}">${income?"+":"-"}${money(t.amount)}</strong><button data-del="${t.id}">Sil</button></div>`;el.querySelector("[data-del]").onclick=()=>deleteTx(t.id);list.appendChild(el)})}
 
-  function closeCardModal() {
-    cardModal?.classList.add("hidden");
-    document.body.style.overflow = "";
-    hideCardFormMessage();
-  }
+  function renderDashboard(){const debt=cards.reduce((s,c)=>s+c.debt,0),limit=cards.reduce((s,c)=>s+c.limit,0),income=txs.filter(t=>t.type==="income").reduce((s,t)=>s+t.amount,0),expense=txs.filter(t=>t.type==="expense").reduce((s,t)=>s+t.amount,0),cashExpense=txs.filter(t=>t.type==="expense"&&t.paymentMethod!=="card").reduce((s,t)=>s+t.amount,0),payments=txs.filter(t=>t.type==="card-payment"&&currentMonth(t.createdAt||t.date)).reduce((s,t)=>s+t.amount,0),cash=income-cashExpense-payments,net=cash-debt;
+    [["totalDebt",money(debt)],["totalAssets",money(Math.max(0,cash))],["monthlyPayment",money(payments)],["netBalance",money(net)],["cardCount",String(cards.length)],["cardsTotalDebt",money(debt)],["cardsTotalLimit",money(limit)],["cardsAvailableLimit",money(Math.max(0,limit-debt))],["totalIncome",money(income)],["totalExpense",money(expense)],["transactionBalance",money(cash)]].forEach(([id,v])=>{if($(id))$(id).textContent=v});if($("balanceStatus"))$("balanceStatus").textContent=net<0?"Ekside":net>0?"Pozitif":"Dengeli"}
 
-  function saveCard(event) {
-    event.preventDefault();
+  function renderUpcoming(){const list=$("upcomingPayments");if(!list)return;list.innerHTML="";const arr=cards.filter(c=>c.dueDate&&c.debt>0).sort((a,b)=>new Date(a.dueDate)-new Date(b.dueDate));if(!arr.length){list.innerHTML='<div class="empty-state">Henüz kart veya ödeme kaydı bulunmuyor.</div>';return}arr.slice(0,4).forEach(c=>{const i=minimumInfo(c),el=document.createElement("article");el.className="payment-item";el.innerHTML=`<div class="bank-icon ${iconClass(c.bank)}">${esc(c.bank.charAt(0))}</div><div class="payment-info"><strong>${esc(c.bank)}</strong><span>Son ödeme: ${dateText(c.dueDate)} · Kalan asgari: ${money(i.remaining)}</span></div><strong class="payment-amount">${money(c.debt)}</strong>`;list.appendChild(el)})}
 
-    const limit = Number(cardLimit?.value);
-    const debt = Number(cardDebt?.value);
+  function addStyles(){const s=document.createElement("style");s.textContent=`.smart-minimum-panel,.card-minimum-status{display:grid;gap:12px;padding:15px;border:1px solid rgba(40,212,154,.2);border-radius:17px;background:rgba(24,72,69,.35)}.smart-minimum-head,.card-minimum-status-head{display:flex;justify-content:space-between;gap:12px}.smart-minimum-head span,.card-minimum-status-head span{display:block;color:#8fa2ba;font-size:10px}.smart-minimum-head strong,.card-minimum-status-head strong{display:block;color:#fff;font-size:20px;margin-top:4px}.smart-minimum-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.smart-minimum-grid>div{padding:10px;border-radius:12px;background:rgba(255,255,255,.04)}.smart-minimum-grid span{display:block;color:#8fa2ba;font-size:9px}.smart-minimum-grid strong{display:block;color:#fff;margin-top:4px}.smart-minimum-track,.card-minimum-status-track{height:8px;overflow:hidden;border-radius:99px;background:rgba(255,255,255,.08)}.smart-minimum-track>div,.card-minimum-status-track>div{height:100%;background:linear-gradient(90deg,#25c98d,#5ee8b7)}.smart-minimum-button{min-height:48px;border:0;border-radius:14px;background:linear-gradient(135deg,#52e6b2,#25c98d);color:#08271e;font-weight:900}.smart-minimum-button:disabled{opacity:.45}.smart-minimum-badge,.card-minimum-status-badge{height:26px;padding:0 8px;border-radius:99px;font-size:9px;font-weight:800;display:flex;align-items:center}.waiting{color:#ffc96d;background:rgba(255,184,71,.12)}.partial{color:#74c2ff;background:rgba(15,140,255,.12)}.completed{color:#4de0aa;background:rgba(40,212,154,.12)}.card-minimum-status{margin:14px 0}.card-minimum-status small,#smartMinimumText{color:#8fa2ba;font-size:10px}@media(max-width:370px){.smart-minimum-grid{grid-template-columns:1fr}.smart-minimum-head,.card-minimum-status-head{flex-direction:column}}`;document.head.appendChild(s)}
+  addStyles();
 
-    if (!bankName?.value) return showCardFormMessage("Lütfen banka seç.", true);
-    if (!cardName?.value.trim()) return showCardFormMessage("Lütfen kart adını yaz.", true);
-    if (!Number.isFinite(limit) || limit < 0) return showCardFormMessage("Kart limitini doğru gir.", true);
-    if (!Number.isFinite(debt) || debt < 0) return showCardFormMessage("Güncel borcu doğru gir.", true);
-
-    const existingId = cardId?.value || "";
-    const oldCard = cards.find((card) => card.id === existingId);
-
-    const newCard = {
-      id: existingId || createId(),
-      bank: bankName.value,
-      name: cardName.value.trim(),
-      limit,
-      debt,
-      statementDate: statementDate?.value || "",
-      dueDate: dueDate?.value || "",
-      createdAt: oldCard?.createdAt || new Date().toISOString()
-    };
-
-    const index = cards.findIndex((card) => card.id === newCard.id);
-    if (index >= 0) cards[index] = newCard;
-    else cards.push(newCard);
-
-    saveCards();
-    renderEverything();
-    showCardFormMessage("Kart başarıyla kaydedildi.", false);
-
-    setTimeout(() => {
-      closeCardModal();
-      showCardsPage();
-    }, 500);
-  }
-
-  function editCard(id) {
-    const card = cards.find((item) => item.id === id);
-    if (!card) return;
-
-    if (cardId) cardId.value = card.id;
-    if (bankName) bankName.value = card.bank;
-    if (cardName) cardName.value = card.name;
-    if (cardLimit) cardLimit.value = card.limit;
-    if (cardDebt) cardDebt.value = card.debt;
-    if (statementDate) statementDate.value = card.statementDate || "";
-    if (dueDate) dueDate.value = card.dueDate || "";
-    if (cardFormTitle) cardFormTitle.textContent = "Kartı Düzenle";
-
-    hideCardFormMessage();
-    openCardModal();
-  }
-
-  function deleteCard(id) {
-    const card = cards.find((item) => item.id === id);
-    if (!card) return;
-
-    if (!window.confirm(`${card.bank} kartı silinsin mi?`)) return;
-
-    cards = cards.filter((item) => item.id !== id);
-    saveCards();
-    renderEverything();
-  }
-
-  function showCardsPage() {
-    showPage("cardsPage");
-    navItems.forEach((item) => {
-      item.classList.toggle("active", item.dataset.page === "cardsPage");
-    });
-  }
-
-  function setupTransactionEvents() {
-    openTransactionFormButton?.addEventListener("click", openTransactionModal);
-    closeTransactionFormButton?.addEventListener("click", closeTransactionModal);
-    cancelTransactionButton?.addEventListener("click", closeTransactionModal);
-    transactionModalBackdrop?.addEventListener("click", closeTransactionModal);
-    transactionPaymentMethod?.addEventListener("change", updateTransactionCardField);
-    transactionForm?.addEventListener("submit", saveTransaction);
-  }
-
-  function openTransactionModal() {
-    populateTransactionCards();
-    updateTransactionCardField();
-    setDefaultTransactionDate();
-    transactionModal?.classList.remove("hidden");
-    document.body.style.overflow = "hidden";
-  }
-
-  function closeTransactionModal() {
-    transactionModal?.classList.add("hidden");
-    document.body.style.overflow = "";
-  }
-
-  function populateTransactionCards() {
-    if (!transactionCard) return;
-
-    const selectedValue = transactionCard.value;
-    transactionCard.innerHTML = '<option value="">Kart seç</option>';
-
-    cards.forEach((card) => {
-      const option = document.createElement("option");
-      option.value = card.id;
-      option.textContent = `${card.bank} - ${card.name}`;
-      transactionCard.appendChild(option);
-    });
-
-    if (cards.some((card) => card.id === selectedValue)) {
-      transactionCard.value = selectedValue;
-    }
-  }
-
-  function updateTransactionCardField() {
-    const isCardPayment = transactionPaymentMethod?.value === "card";
-    transactionCardField?.classList.toggle("hidden", !isCardPayment);
-    if (!isCardPayment && transactionCard) transactionCard.value = "";
-  }
-
-  function setDefaultTransactionDate() {
-    if (transactionDate && !transactionDate.value) {
-      transactionDate.value = new Date().toISOString().split("T")[0];
-    }
-  }
-
-  function saveTransaction(event) {
-    event.preventDefault();
-
-    const type = transactionType?.value || "expense";
-    const amount = Number(transactionAmount?.value);
-    const paymentMethod = transactionPaymentMethod?.value || "cash";
-    const selectedCardId = paymentMethod === "card" ? transactionCard?.value || "" : "";
-
-    if (!transactionName?.value.trim()) {
-      window.alert("Lütfen işlem açıklamasını yaz.");
-      return;
-    }
-
-    if (!Number.isFinite(amount) || amount <= 0) {
-      window.alert("Lütfen geçerli bir tutar gir.");
-      return;
-    }
-
-    if (!transactionCategory?.value) {
-      window.alert("Lütfen kategori seç.");
-      return;
-    }
-
-    if (!transactionDate?.value) {
-      window.alert("Lütfen tarih seç.");
-      return;
-    }
-
-    if (type === "expense" && paymentMethod === "card" && !selectedCardId) {
-      window.alert("Lütfen kredi kartını seç.");
-      return;
-    }
-
-    const transaction = {
-      id: createId(),
-      type,
-      name: transactionName.value.trim(),
-      amount,
-      category: transactionCategory.value,
-      date: transactionDate.value,
-      paymentMethod,
-      cardId: selectedCardId,
-      cardDebtDelta: 0,
-      createdAt: new Date().toISOString()
-    };
-
-    if (type === "expense" && paymentMethod === "card") {
-      const selectedCard = cards.find((card) => card.id === selectedCardId);
-
-      if (!selectedCard) {
-        window.alert("Seçilen kart bulunamadı.");
-        return;
-      }
-
-      selectedCard.debt = Number(selectedCard.debt || 0) + amount;
-      transaction.cardDebtDelta = amount;
-      saveCards();
-    }
-
-    transactions.unshift(transaction);
-    saveTransactions();
-    renderEverything();
-
-    transactionForm?.reset();
-    if (transactionType) transactionType.value = "income";
-    if (transactionDate) transactionDate.value = new Date().toISOString().split("T")[0];
-    if (transactionCard) transactionCard.value = "";
-    transactionCardField?.classList.add("hidden");
-    closeTransactionModal();
-  }
-
-  function deleteTransaction(id) {
-    if (!window.confirm("Bu işlem silinsin mi?")) return;
-
-    const transaction = transactions.find((item) => item.id === id);
-    if (!transaction) return;
-
-    const debtDelta = Number(
-      transaction.cardDebtDelta ??
-      (transaction.type === "expense" && transaction.paymentMethod === "card" ? transaction.amount : 0)
-    );
-
-    if (transaction.cardId && debtDelta !== 0) {
-      const selectedCard = cards.find((card) => card.id === transaction.cardId);
-
-      if (selectedCard) {
-        selectedCard.debt = Math.max(0, Number(selectedCard.debt || 0) - debtDelta);
-        saveCards();
-      }
-    }
-
-    transactions = transactions.filter((item) => item.id !== id);
-    saveTransactions();
-    renderEverything();
-  }
-
-  function renderEverything() {
-    renderCards();
-    renderTransactions();
-    renderDashboard();
-    renderUpcomingPayments();
-  }
-
-  function renderCards() {
-    if (!cardsList) return;
-    cardsList.innerHTML = "";
-
-    if (cards.length === 0) {
-      const empty = emptyCards || document.createElement("div");
-      empty.className = "empty-state";
-      empty.textContent = "Henüz kart eklenmedi.";
-      empty.style.display = "block";
-      cardsList.appendChild(empty);
-      return;
-    }
-
-    cards.forEach((card) => {
-      const availableLimit = Number(card.limit || 0) - Number(card.debt || 0);
-      const usageRate = Number(card.limit || 0) > 0
-        ? Math.round((Number(card.debt || 0) / Number(card.limit || 0)) * 100)
-        : 0;
-
-      const element = document.createElement("article");
-      element.className = `bank-card ${getBankClass(card.bank)}`;
-      element.innerHTML = `
-        <div class="bank-card-header">
-          <div>
-            <span>${escapeHtml(card.bank)}</span>
-            <h3>${escapeHtml(card.name)}</h3>
-          </div>
-          <div class="bank-card-actions">
-            <button type="button" data-edit="${card.id}">Düzenle</button>
-            <button type="button" data-delete="${card.id}">Sil</button>
-          </div>
-        </div>
-
-        <strong class="bank-card-debt">${formatMoney(card.debt)}</strong>
-
-        <div class="bank-card-details">
-          <div><span>Kart Limiti</span><strong>${formatMoney(card.limit)}</strong></div>
-          <div><span>Kalan Limit</span><strong>${formatMoney(availableLimit)}</strong></div>
-          <div><span>Kullanım</span><strong>%${usageRate}</strong></div>
-        </div>
-
-        <div class="bank-card-dates">
-          <div><span>Hesap Kesim</span><strong>${formatDate(card.statementDate)}</strong></div>
-          <div><span>Son Ödeme</span><strong>${formatDate(card.dueDate)}</strong></div>
-        </div>
-      `;
-
-      element.querySelector("[data-edit]")?.addEventListener("click", () => editCard(card.id));
-      element.querySelector("[data-delete]")?.addEventListener("click", () => deleteCard(card.id));
-      cardsList.appendChild(element);
-    });
-  }
-
-  function renderTransactions() {
-    if (!transactionsList) return;
-    transactionsList.innerHTML = "";
-
-    if (transactions.length === 0) {
-      transactionsList.innerHTML = '<div class="empty-state">Henüz işlem eklenmedi.</div>';
-    } else {
-      transactions.forEach((transaction) => {
-        const item = document.createElement("article");
-        item.className = "transaction-item";
-
-        const isIncome = transaction.type === "income";
-        const amountClass = isIncome ? "transaction-income" : "transaction-expense";
-        const prefix = isIncome ? "+" : "-";
-        const card = transaction.cardId
-          ? cards.find((item) => item.id === transaction.cardId)
-          : null;
-        const cardText = card ? ` · ${escapeHtml(card.bank)} - ${escapeHtml(card.name)}` : "";
-
-        item.innerHTML = `
-          <div>
-            <h3>${escapeHtml(transaction.name)}</h3>
-            <small>${escapeHtml(transaction.category)}${cardText} · ${formatDate(transaction.date)}</small>
-          </div>
-          <div>
-            <strong class="${amountClass}">${prefix}${formatMoney(transaction.amount)}</strong>
-            <button type="button" data-delete-transaction="${transaction.id}">Sil</button>
-          </div>
-        `;
-
-        item.querySelector("[data-delete-transaction]")?.addEventListener("click", () => {
-          deleteTransaction(transaction.id);
-        });
-
-        transactionsList.appendChild(item);
-      });
-    }
-  }
-
-  function renderDashboard() {
-    const totalCardDebt = cards.reduce((sum, card) => sum + Number(card.debt || 0), 0);
-    const totalCardLimit = cards.reduce((sum, card) => sum + Number(card.limit || 0), 0);
-    const availableLimit = totalCardLimit - totalCardDebt;
-
-    const income = transactions
-      .filter((transaction) => transaction.type === "income")
-      .reduce((sum, transaction) => sum + Number(transaction.amount || 0), 0);
-
-    const expense = transactions
-      .filter((transaction) => transaction.type === "expense")
-      .reduce((sum, transaction) => sum + Number(transaction.amount || 0), 0);
-
-    const nonCardExpense = transactions
-      .filter((transaction) => transaction.type === "expense" && transaction.paymentMethod !== "card")
-      .reduce((sum, transaction) => sum + Number(transaction.amount || 0), 0);
-
-    const cashBalance = income - nonCardExpense;
-    const net = cashBalance - totalCardDebt;
-
-    setText(totalDebt, formatMoney(totalCardDebt));
-    setText(totalAssets, formatMoney(Math.max(0, cashBalance)));
-    setText(netBalance, formatMoney(net));
-    setText(cardCount, String(cards.length));
-
-    setText(cardsTotalDebt, formatMoney(totalCardDebt));
-    setText(cardsTotalLimit, formatMoney(totalCardLimit));
-    setText(cardsAvailableLimit, formatMoney(availableLimit));
-
-    setText(totalIncome, formatMoney(income));
-    setText(totalExpense, formatMoney(expense));
-    setText(transactionBalance, formatMoney(cashBalance));
-
-    const now = new Date();
-    const monthlyExpense = transactions
-      .filter((transaction) => {
-        if (transaction.type !== "expense" || !transaction.date) return false;
-        const date = new Date(`${transaction.date}T12:00:00`);
-        return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
-      })
-      .reduce((sum, transaction) => sum + Number(transaction.amount || 0), 0);
-
-    setText(monthlyPayment, formatMoney(monthlyExpense));
-
-    if (balanceStatus) {
-      balanceStatus.textContent = net < 0 ? "Ekside" : net > 0 ? "Pozitif" : "Dengeli";
-    }
-  }
-
-  function renderUpcomingPayments() {
-    if (!upcomingPayments) return;
-    upcomingPayments.innerHTML = "";
-
-    const list = cards
-      .filter((card) => card.dueDate)
-      .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
-
-    if (list.length === 0) {
-      upcomingPayments.innerHTML = '<div class="empty-state">Henüz kart veya ödeme kaydı bulunmuyor.</div>';
-      return;
-    }
-
-    list.slice(0, 3).forEach((card) => {
-      const item = document.createElement("article");
-      item.className = "payment-item";
-      item.innerHTML = `
-        <div class="bank-icon ${getPaymentIconClass(card.bank)}">${escapeHtml(card.bank.charAt(0))}</div>
-        <div class="payment-info">
-          <strong>${escapeHtml(card.bank)}</strong>
-          <span>Son ödeme: ${formatDate(card.dueDate)}</span>
-        </div>
-        <strong class="payment-amount">${formatMoney(card.debt)}</strong>
-      `;
-      upcomingPayments.appendChild(item);
-    });
-  }
-
-  function showCardFormMessage(text, isError) {
-    if (!cardFormMessage) return;
-    cardFormMessage.textContent = text;
-    cardFormMessage.classList.remove("hidden");
-    cardFormMessage.style.background = isError
-      ? "rgba(251, 113, 133, 0.12)"
-      : "rgba(52, 211, 153, 0.12)";
-    cardFormMessage.style.color = isError ? "#fb7185" : "#34d399";
-  }
-
-  function hideCardFormMessage() {
-    cardFormMessage?.classList.add("hidden");
-  }
-
-  function loadJson(key, fallback) {
-    try {
-      const saved = localStorage.getItem(key);
-      return saved ? JSON.parse(saved) : fallback;
-    } catch (error) {
-      console.error(`${key} okunamadı:`, error);
-      return fallback;
-    }
-  }
-
-  function saveCards() {
-    saveJson(CARD_STORAGE_KEY, cards);
-  }
-
-  function saveTransactions() {
-    saveJson(TRANSACTION_STORAGE_KEY, transactions);
-  }
-
-  function saveJson(key, value) {
-    try {
-      localStorage.setItem(key, JSON.stringify(value));
-    } catch (error) {
-      console.error(`${key} kaydedilemedi:`, error);
-      window.alert("Veriler tarayıcıya kaydedilemedi.");
-    }
-  }
-
-  function setText(element, text) {
-    if (element) element.textContent = text;
-  }
-
-  function formatMoney(value) {
-    return new Intl.NumberFormat("tr-TR", {
-      style: "currency",
-      currency: "TRY"
-    }).format(Number(value) || 0);
-  }
-
-  function formatDate(value) {
-    if (!value) return "Belirtilmedi";
-    const date = new Date(`${value}T12:00:00`);
-    return date.toLocaleDateString("tr-TR", {
-      day: "numeric",
-      month: "long",
-      year: "numeric"
-    });
-  }
-
-  function getBankClass(bank = "") {
-    const name = bank.toLocaleLowerCase("tr-TR");
-    if (name.includes("garanti")) return "bank-garanti";
-    if (name.includes("ziraat")) return "bank-ziraat";
-    if (name.includes("akbank")) return "bank-akbank";
-    if (name.includes("qnb")) return "bank-qnb";
-    if (name.includes("tom")) return "bank-tom";
-    if (name.includes("iş")) return "bank-is";
-    return "bank-default";
-  }
-
-  function getPaymentIconClass(bank = "") {
-    const name = bank.toLocaleLowerCase("tr-TR");
-    if (name.includes("ziraat") || name.includes("akbank")) return "red";
-    if (name.includes("qnb")) return "purple";
-    return "blue";
-  }
-
-  function createId() {
-    if (window.crypto?.randomUUID) return window.crypto.randomUUID();
-    return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  }
-
-  function escapeHtml(value) {
-    return String(value ?? "").replace(/[&<>"']/g, (character) => ({
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      '"': "&quot;",
-      "'": "&#039;"
-    })[character]);
-  }
+  function renderAll(){cards=load(CK);txs=load(TK);renderCards();renderTx();renderDashboard();renderUpcoming();fillTxCards();setTimeout(updateMinimumPanel,0)}
+  renderAll();
 });
