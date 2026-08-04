@@ -2793,5 +2793,251 @@ document.addEventListener("DOMContentLoaded", () => {
     if (element) element.textContent = value;
   }
 });
+// =========================================
+// YF v2.3.2 — Silinen Kredi Taksitini Geri Alma
+// Bu kod app.js dosyasının EN ALTINA eklenir.
+// =========================================
+
+document.addEventListener("DOMContentLoaded", () => {
+  const DEBT_KEY = "yf_cards_v1";
+  const TRANSACTION_KEY = "yf_transactions_v1";
+  const REPAIR_KEY = "yf_loan_repair_v232";
+
+  repairPreviouslyDeletedLoanPayments();
+  installLoanPaymentDeleteFix();
+
+  function installLoanPaymentDeleteFix() {
+    const transactionsList = document.getElementById("transactionsList");
+    if (!transactionsList) return;
+
+    transactionsList.addEventListener(
+      "click",
+      event => {
+        const deleteButton = event.target.closest("[data-del]");
+        if (!deleteButton) return;
+
+        const transactionId = deleteButton.dataset.del;
+        const transactions = loadJson(TRANSACTION_KEY);
+        const transaction = transactions.find(
+          item => item.id === transactionId
+        );
+
+        if (!transaction || transaction.type !== "loan-payment") {
+          return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+
+        const approved = confirm(
+          "Bu kredi taksiti silinsin ve kredi bilgileri eski haline getirilsin mi?"
+        );
+
+        if (!approved) return;
+
+        const debts = loadJson(DEBT_KEY);
+        const loan = debts.find(
+          item =>
+            item.id === transaction.cardId &&
+            item.type === "personal-loan"
+        );
+
+        if (!loan) {
+          alert("İhtiyaç kredisi kaydı bulunamadı.");
+          return;
+        }
+
+        const amount = Number(transaction.amount || 0);
+
+        loan.debt = roundMoney(
+          Number(loan.debt || 0) + amount
+        );
+
+        loan.remainingInstallments =
+          Number(loan.remainingInstallments || 0) + 1;
+
+        loan.nextPaymentDate = subtractOneMonth(
+          loan.nextPaymentDate || loan.dueDate
+        );
+
+        loan.dueDate = loan.nextPaymentDate;
+        loan.updatedAt = new Date().toISOString();
+
+        const updatedTransactions = transactions.filter(
+          item => item.id !== transactionId
+        );
+
+        saveJson(DEBT_KEY, debts);
+        saveJson(TRANSACTION_KEY, updatedTransactions);
+
+        sessionStorage.setItem(
+          "yf_open_transactions_after_loan_delete",
+          "1"
+        );
+
+        window.location.reload();
+      },
+      true
+    );
+  }
+
+  /*
+    Önceden silinmiş kredi ödeme işlemlerini onarır.
+    Kredi borcunu, kayıtlı kredi ödeme geçmişine göre yeniden kurar.
+  */
+  function repairPreviouslyDeletedLoanPayments() {
+    if (localStorage.getItem(REPAIR_KEY) === "done") return;
+
+    const debts = loadJson(DEBT_KEY);
+    const transactions = loadJson(TRANSACTION_KEY);
+
+    let changed = false;
+
+    debts.forEach(loan => {
+      if (loan.type !== "personal-loan") return;
+      if (!Number(loan.originalDebt || 0)) return;
+
+      const totalRecordedPayments = transactions
+        .filter(
+          transaction =>
+            transaction.type === "loan-payment" &&
+            transaction.cardId === loan.id
+        )
+        .reduce(
+          (sum, transaction) =>
+            sum + Number(transaction.amount || 0),
+          0
+        );
+
+      const expectedDebt = roundMoney(
+        Math.max(
+          0,
+          Number(loan.originalDebt || 0) -
+          totalRecordedPayments
+        )
+      );
+
+      const currentDebt = roundMoney(
+        Number(loan.debt || 0)
+      );
+
+      if (expectedDebt > currentDebt + 0.01) {
+        const restoredAmount = roundMoney(
+          expectedDebt - currentDebt
+        );
+
+        const installment = Number(
+          loan.monthlyInstallment || 0
+        );
+
+        const restoredInstallmentCount =
+          installment > 0
+            ? Math.max(
+                1,
+                Math.round(restoredAmount / installment)
+              )
+            : 1;
+
+        loan.debt = expectedDebt;
+
+        loan.remainingInstallments =
+          installment > 0
+            ? Math.ceil(expectedDebt / installment)
+            : Number(loan.remainingInstallments || 0) +
+              restoredInstallmentCount;
+
+        for (
+          let i = 0;
+          i < restoredInstallmentCount;
+          i++
+        ) {
+          loan.nextPaymentDate = subtractOneMonth(
+            loan.nextPaymentDate || loan.dueDate
+          );
+        }
+
+        loan.dueDate = loan.nextPaymentDate;
+        loan.updatedAt = new Date().toISOString();
+
+        changed = true;
+      }
+    });
+
+    if (changed) {
+      saveJson(DEBT_KEY, debts);
+    }
+
+    localStorage.setItem(REPAIR_KEY, "done");
+  }
+
+  if (
+    sessionStorage.getItem(
+      "yf_open_transactions_after_loan_delete"
+    ) === "1"
+  ) {
+    sessionStorage.removeItem(
+      "yf_open_transactions_after_loan_delete"
+    );
+
+    setTimeout(() => {
+      document
+        .querySelector('[data-page="transactionsPage"]')
+        ?.click();
+    }, 250);
+  }
+
+  function subtractOneMonth(value) {
+    if (!value) return "";
+
+    const date = new Date(`${value}T12:00:00`);
+
+    if (Number.isNaN(date.getTime())) return value;
+
+    const originalDay = date.getDate();
+
+    date.setDate(1);
+    date.setMonth(date.getMonth() - 1);
+
+    const lastDay = new Date(
+      date.getFullYear(),
+      date.getMonth() + 1,
+      0
+    ).getDate();
+
+    date.setDate(
+      Math.min(originalDay, lastDay)
+    );
+
+    return [
+      date.getFullYear(),
+      String(date.getMonth() + 1).padStart(2, "0"),
+      String(date.getDate()).padStart(2, "0")
+    ].join("-");
+  }
+
+  function roundMoney(value) {
+    return Math.round(
+      (Number(value) + Number.EPSILON) * 100
+    ) / 100;
+  }
+
+  function loadJson(key) {
+    try {
+      return JSON.parse(
+        localStorage.getItem(key) || "[]"
+      );
+    } catch {
+      return [];
+    }
+  }
+
+  function saveJson(key, value) {
+    localStorage.setItem(
+      key,
+      JSON.stringify(value)
+    );
+  }
+});
 
 
