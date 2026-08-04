@@ -9,17 +9,11 @@
     content="width=device-width, initial-scale=1.0, viewport-fit=cover"
   >
 
-  <meta
-    name="theme-color"
-    content="#07111f"
-  >
+  <meta name="theme-color" content="#07111f">
 
   <title>YF — Yavuz Finans</title>
 
-  <link
-    rel="stylesheet"
-    href="style.css"
-  >
+  <link rel="stylesheet" href="style.css">
 
   <style>
     .hidden {
@@ -141,20 +135,12 @@
 
   <main class="app-shell">
 
-    <!-- =====================================
-         ANA SAYFA
-    ====================================== -->
-
-    <section
-      id="dashboardPage"
-      class="page active"
-    >
+    <!-- ANA SAYFA -->
+    <section id="dashboardPage" class="page active">
 
       <header class="top-header">
         <div>
-          <p class="eyebrow">
-            Yavuz Finans
-          </p>
+          <p class="eyebrow">Yavuz Finans</p>
 
           <h1 id="welcomeText">
             Merhaba Yavuz 👋
@@ -166,10 +152,7 @@
         <div class="hero-card-top">
           <span>Net Durum</span>
 
-          <span
-            id="balanceStatus"
-            class="status-badge"
-          >
+          <span id="balanceStatus" class="status-badge">
             Dengeli
           </span>
         </div>
@@ -187,49 +170,33 @@
 
         <article class="summary-card">
           <span>Toplam Kalan Borç</span>
-
-          <strong id="totalDebt">
-            ₺0,00
-          </strong>
+          <strong id="totalDebt">₺0,00</strong>
         </article>
 
         <article class="summary-card">
           <span>Toplam Varlık</span>
-
-          <strong id="totalAssets">
-            ₺0,00
-          </strong>
+          <strong id="totalAssets">₺0,00</strong>
         </article>
 
         <article class="summary-card">
           <span>Bu Ay Ödenen</span>
-
-          <strong id="monthlyPayment">
-            ₺0,00
-          </strong>
+          <strong id="monthlyPayment">₺0,00</strong>
         </article>
 
         <article class="summary-card">
           <span>Kart Sayısı</span>
-
-          <strong id="cardCount">
-            0
-          </strong>
+          <strong id="cardCount">0</strong>
         </article>
 
       </section>
 
+      <!-- HIZLI İŞLEMLER -->
       <section class="content-card">
 
         <div class="section-heading">
           <div>
-            <p class="eyebrow">
-              Hızlı İşlemler
-            </p>
-
-            <h2>
-              Ne yapmak istiyorsun?
-            </h2>
+            <p class="eyebrow">Hızlı İşlemler</p>
+            <h2>Ne yapmak istiyorsun?</h2>
           </div>
         </div>
 
@@ -274,21 +241,30 @@
             </div>
           </button>
 
+          <button
+            class="quick-action-button nav-item"
+            data-page="transactionsPage"
+            type="button"
+          >
+            <span>☷</span>
+
+            <div>
+              <strong>Son İşlemler</strong>
+              <small>Gelir ve gider geçmişini gör</small>
+            </div>
+          </button>
+
         </div>
 
       </section>
 
+      <!-- YAKLAŞAN ÖDEMELER -->
       <section class="content-card">
 
         <div class="section-heading">
           <div>
-            <p class="eyebrow">
-              Yaklaşan Ödemeler
-            </p>
-
-            <h2>
-              Son ödeme tarihleri
-            </h2>
+            <p class="eyebrow">Yaklaşan Ödemeler</p>
+            <h2>Son ödeme tarihleri</h2>
           </div>
         </div>
 
@@ -303,24 +279,13 @@
     </section>
 
 
-    <!-- =====================================
-         KARTLAR SAYFASI
-    ====================================== -->
-
-    <section
-      id="cardsPage"
-      class="page"
-    >
+    <!-- KARTLAR SAYFASI -->
+    <section id="cardsPage" class="page">
 
       <header class="top-header">
         <div>
-          <p class="eyebrow">
-            Kart Yönetimi
-          </p>
-
-          <h1>
-            Kartlarım
-          </h1>
+          <p class="eyebrow">Kart Yönetimi</p>
+          <h1>Kartlarım</h1>
         </div>
 
         <button
@@ -336,26 +301,17 @@
 
         <article class="summary-card">
           <span>Toplam Kart Borcu</span>
-
-          <strong id="cardsTotalDebt">
-            ₺0,00
-          </strong>
+          <strong id="cardsTotalDebt">₺0,00</strong>
         </article>
 
         <article class="summary-card">
           <span>Toplam Kart Limiti</span>
-
-          <strong id="cardsTotalLimit">
-            ₺0,00
-          </strong>
+          <strong id="cardsTotalLimit">₺0,00</strong>
         </article>
 
         <article class="summary-card">
           <span>Kullanılabilir Limit</span>
-
-          <strong id="cardsAvailableLimit">
-            ₺0,00
-          </strong>
+          <strong id="cardsAvailableLimit">₺0,00</strong>
         </article>
 
       </section>
@@ -364,22 +320,14 @@
 
         <div class="section-heading">
           <div>
-            <p class="eyebrow">
-              Kayıtlı Kartlar
-            </p>
-
-            <h2>
-              Kart listesi
-            </h2>
+            <p class="eyebrow">Kayıtlı Kartlar</p>
+            <h2>Kart listesi</h2>
           </div>
         </div>
 
         <div id="cardsList">
 
-          <div
-            id="emptyCards"
-            class="empty-state"
-          >
+          <div id="emptyCards" class="empty-state">
             Henüz kart eklenmedi.
             İlk kartını ekleyerek başlayabilirsin.
           </div>
@@ -391,24 +339,13 @@
     </section>
 
 
-    <!-- =====================================
-         İŞLEMLER SAYFASI
-    ====================================== -->
-
-    <section
-      id="transactionsPage"
-      class="page"
-    >
+    <!-- İŞLEMLER SAYFASI -->
+    <section id="transactionsPage" class="page">
 
       <header class="top-header">
         <div>
-          <p class="eyebrow">
-            Gelir ve Gider
-          </p>
-
-          <h1>
-            İşlemler
-          </h1>
+          <p class="eyebrow">Gelir ve Gider</p>
+          <h1>İşlemler</h1>
         </div>
 
         <button
@@ -424,26 +361,17 @@
 
         <article class="summary-card">
           <span>Toplam Gelir</span>
-
-          <strong id="totalIncome">
-            ₺0,00
-          </strong>
+          <strong id="totalIncome">₺0,00</strong>
         </article>
 
         <article class="summary-card">
           <span>Toplam Gider</span>
-
-          <strong id="totalExpense">
-            ₺0,00
-          </strong>
+          <strong id="totalExpense">₺0,00</strong>
         </article>
 
         <article class="summary-card">
           <span>İşlem Bakiyesi</span>
-
-          <strong id="transactionBalance">
-            ₺0,00
-          </strong>
+          <strong id="transactionBalance">₺0,00</strong>
         </article>
 
       </section>
@@ -452,22 +380,15 @@
 
         <div class="section-heading">
           <div>
-            <p class="eyebrow">
-              İşlem Geçmişi
-            </p>
-
-            <h2>
-              Son işlemler
-            </h2>
+            <p class="eyebrow">İşlem Geçmişi</p>
+            <h2>Son işlemler</h2>
           </div>
         </div>
 
         <div id="transactionsList">
-
           <div class="empty-state">
             Henüz gelir veya gider işlemi bulunmuyor.
           </div>
-
         </div>
 
       </section>
@@ -475,24 +396,13 @@
     </section>
 
 
-    <!-- =====================================
-         BORÇ ÖDEME SAYFASI
-    ====================================== -->
-
-    <section
-      id="debtPaymentPage"
-      class="page"
-    >
+    <!-- BORÇ ÖDEME SAYFASI -->
+    <section id="debtPaymentPage" class="page">
 
       <header class="top-header">
         <div>
-          <p class="eyebrow">
-            Borç Yönetimi
-          </p>
-
-          <h1>
-            Borç Öde
-          </h1>
+          <p class="eyebrow">Borç Yönetimi</p>
+          <h1>Borç Öde</h1>
         </div>
       </header>
 
@@ -500,42 +410,24 @@
 
         <div class="section-heading">
           <div>
-            <p class="eyebrow">
-              Yeni Ödeme
-            </p>
-
-            <h2>
-              Kart borcu öde
-            </h2>
+            <p class="eyebrow">Yeni Ödeme</p>
+            <h2>Kart borcu öde</h2>
           </div>
         </div>
 
-        <form
-          id="debtPaymentForm"
-          class="debt-payment-box"
-        >
+        <form id="debtPaymentForm" class="debt-payment-box">
 
           <label>
             Ödeme yapılacak kart
 
-            <select
-              id="debtPaymentCard"
-              required
-            >
-              <option value="">
-                Kart seç
-              </option>
+            <select id="debtPaymentCard" required>
+              <option value="">Kart seç</option>
             </select>
           </label>
 
           <div class="debt-payment-summary">
-            <span>
-              Seçilen kartın güncel borcu
-            </span>
-
-            <strong id="selectedCardDebt">
-              ₺0,00
-            </strong>
+            <span>Seçilen kartın güncel borcu</span>
+            <strong id="selectedCardDebt">₺0,00</strong>
           </div>
 
           <label>
@@ -557,10 +449,7 @@
             class="debt-payment-message hidden"
           ></div>
 
-          <button
-            class="primary-button"
-            type="submit"
-          >
+          <button class="primary-button" type="submit">
             Borcu Öde
           </button>
 
@@ -572,13 +461,8 @@
 
         <div class="section-heading">
           <div>
-            <p class="eyebrow">
-              Geçmiş
-            </p>
-
-            <h2>
-              Borç ödeme geçmişi
-            </h2>
+            <p class="eyebrow">Geçmiş</p>
+            <h2>Borç ödeme geçmişi</h2>
           </div>
         </div>
 
@@ -586,11 +470,9 @@
           id="debtPaymentHistory"
           class="payment-history-list"
         >
-
           <div class="empty-state">
             Henüz borç ödeme işlemi bulunmuyor.
           </div>
-
         </div>
 
       </section>
@@ -600,10 +482,7 @@
   </main>
 
 
-  <!-- =====================================
-       ALT MENÜ
-  ====================================== -->
-
+  <!-- ALT MENÜ -->
   <nav class="bottom-navigation">
 
     <button
@@ -645,32 +524,17 @@
   </nav>
 
 
-  <!-- =====================================
-       KART EKLEME MODALI
-  ====================================== -->
+  <!-- KART EKLEME MODALI -->
+  <div id="cardModal" class="modal hidden">
 
-  <div
-    id="cardModal"
-    class="modal hidden"
-  >
-
-    <div
-      id="modalBackdrop"
-      class="modal-backdrop"
-    ></div>
+    <div id="modalBackdrop" class="modal-backdrop"></div>
 
     <div class="modal-content">
 
       <div class="modal-header">
-
         <div>
-          <p class="eyebrow">
-            Kart Yönetimi
-          </p>
-
-          <h2 id="cardFormTitle">
-            Yeni Kart Ekle
-          </h2>
+          <p class="eyebrow">Kart Yönetimi</p>
+          <h2 id="cardFormTitle">Yeni Kart Ekle</h2>
         </div>
 
         <button
@@ -680,54 +544,24 @@
         >
           ×
         </button>
-
       </div>
 
       <form id="cardForm">
 
-        <input
-          id="cardId"
-          type="hidden"
-        >
+        <input id="cardId" type="hidden">
 
         <label>
           Banka
 
-          <select
-            id="bankName"
-            required
-          >
-            <option value="">
-              Banka seç
-            </option>
-
-            <option>
-              Ziraat Bankası
-            </option>
-
-            <option>
-              Garanti BBVA
-            </option>
-
-            <option>
-              TOM Bankası
-            </option>
-
-            <option>
-              Akbank
-            </option>
-
-            <option>
-              QNB
-            </option>
-
-            <option>
-              İş Bankası
-            </option>
-
-            <option>
-              Diğer
-            </option>
+          <select id="bankName" required>
+            <option value="">Banka seç</option>
+            <option>Ziraat Bankası</option>
+            <option>Garanti BBVA</option>
+            <option>TOM Bankası</option>
+            <option>Akbank</option>
+            <option>QNB</option>
+            <option>İş Bankası</option>
+            <option>Diğer</option>
           </select>
         </label>
 
@@ -801,10 +635,7 @@
             Vazgeç
           </button>
 
-          <button
-            class="primary-button"
-            type="submit"
-          >
+          <button class="primary-button" type="submit">
             Kartı Kaydet
           </button>
 
@@ -817,14 +648,8 @@
   </div>
 
 
-  <!-- =====================================
-       İŞLEM EKLEME MODALI
-  ====================================== -->
-
-  <div
-    id="transactionModal"
-    class="modal hidden"
-  >
+  <!-- İŞLEM EKLEME MODALI -->
+  <div id="transactionModal" class="modal hidden">
 
     <div
       id="transactionModalBackdrop"
@@ -834,15 +659,9 @@
     <div class="modal-content">
 
       <div class="modal-header">
-
         <div>
-          <p class="eyebrow">
-            Gelir ve Gider
-          </p>
-
-          <h2>
-            Yeni İşlem
-          </h2>
+          <p class="eyebrow">Gelir ve Gider</p>
+          <h2>Yeni İşlem</h2>
         </div>
 
         <button
@@ -852,7 +671,6 @@
         >
           ×
         </button>
-
       </div>
 
       <form id="transactionForm">
@@ -860,17 +678,9 @@
         <label>
           İşlem türü
 
-          <select
-            id="transactionType"
-            required
-          >
-            <option value="income">
-              Gelir
-            </option>
-
-            <option value="expense">
-              Gider
-            </option>
+          <select id="transactionType" required>
+            <option value="income">Gelir</option>
+            <option value="expense">Gider</option>
           </select>
         </label>
 
@@ -901,37 +711,14 @@
         <label>
           Kategori
 
-          <select
-            id="transactionCategory"
-            required
-          >
-            <option value="">
-              Kategori seç
-            </option>
-
-            <option value="salary">
-              Maaş
-            </option>
-
-            <option value="food">
-              Market / Yemek
-            </option>
-
-            <option value="transport">
-              Ulaşım
-            </option>
-
-            <option value="bill">
-              Fatura
-            </option>
-
-            <option value="shopping">
-              Alışveriş
-            </option>
-
-            <option value="other">
-              Diğer
-            </option>
+          <select id="transactionCategory" required>
+            <option value="">Kategori seç</option>
+            <option value="salary">Maaş</option>
+            <option value="food">Market / Yemek</option>
+            <option value="transport">Ulaşım</option>
+            <option value="bill">Fatura</option>
+            <option value="shopping">Alışveriş</option>
+            <option value="other">Diğer</option>
           </select>
         </label>
 
@@ -949,13 +736,8 @@
           Ödeme yöntemi
 
           <select id="transactionPaymentMethod">
-            <option value="cash">
-              Nakit / Hesap
-            </option>
-
-            <option value="card">
-              Kredi Kartı
-            </option>
+            <option value="cash">Nakit / Hesap</option>
+            <option value="card">Kredi Kartı</option>
           </select>
         </label>
 
@@ -966,9 +748,7 @@
           Kredi kartı
 
           <select id="transactionCard">
-            <option value="">
-              Kart seç
-            </option>
+            <option value="">Kart seç</option>
           </select>
         </label>
 
@@ -982,10 +762,7 @@
             Vazgeç
           </button>
 
-          <button
-            class="primary-button"
-            type="submit"
-          >
+          <button class="primary-button" type="submit">
             İşlemi Kaydet
           </button>
 
@@ -998,7 +775,7 @@
   </div>
 
 
-  <!-- MEVCUT ANA UYGULAMA KODU -->
+  <!-- ANA UYGULAMA KODU -->
   <script src="app.js"></script>
 
 
@@ -1028,18 +805,13 @@
 
       function loadData(key) {
         try {
-          const saved =
-            localStorage.getItem(key);
+          const saved = localStorage.getItem(key);
 
           return saved
             ? JSON.parse(saved)
             : [];
         } catch (error) {
-          console.error(
-            "Veriler okunamadı:",
-            error
-          );
-
+          console.error("Veriler okunamadı:", error);
           return [];
         }
       }
@@ -1060,8 +832,7 @@
         }
 
         return String(
-          Date.now() +
-          Math.random()
+          Date.now() + Math.random()
         );
       }
 
@@ -1072,14 +843,11 @@
             style: "currency",
             currency: "TRY"
           }
-        ).format(
-          Number(value) || 0
-        );
+        ).format(Number(value) || 0);
       }
 
       function formatDateTime(value) {
-        const date =
-          new Date(value);
+        const date = new Date(value);
 
         return date.toLocaleString(
           "tr-TR",
@@ -1102,12 +870,8 @@
           .replaceAll("'", "&#039;");
       }
 
-      function showMessage(
-        text,
-        isError
-      ) {
-        paymentMessage.textContent =
-          text;
+      function showMessage(text, isError) {
+        paymentMessage.textContent = text;
 
         paymentMessage.classList.remove(
           "hidden",
@@ -1116,24 +880,17 @@
         );
 
         paymentMessage.classList.add(
-          isError
-            ? "error"
-            : "success"
+          isError ? "error" : "success"
         );
       }
 
       function hideMessage() {
-        paymentMessage.classList.add(
-          "hidden"
-        );
+        paymentMessage.classList.add("hidden");
       }
 
       function populateCards() {
-        const cards =
-          loadData(CARD_KEY);
-
-        const oldValue =
-          paymentCard.value;
+        const cards = loadData(CARD_KEY);
+        const oldValue = paymentCard.value;
 
         paymentCard.innerHTML = `
           <option value="">
@@ -1143,48 +900,38 @@
 
         cards
           .filter(
-            card =>
-              Number(card.debt || 0) > 0
+            card => Number(card.debt || 0) > 0
           )
           .forEach(card => {
             const option =
-              document.createElement(
-                "option"
-              );
+              document.createElement("option");
 
-            option.value =
-              card.id;
+            option.value = card.id;
 
             option.textContent =
               `${card.bank} - ${card.name} (${formatMoney(card.debt)})`;
 
-            paymentCard.appendChild(
-              option
-            );
+            paymentCard.appendChild(option);
           });
 
         if (
           cards.some(
-            card =>
-              card.id === oldValue
+            card => card.id === oldValue
           )
         ) {
-          paymentCard.value =
-            oldValue;
+          paymentCard.value = oldValue;
         }
 
         updateSelectedDebt();
       }
 
       function updateSelectedDebt() {
-        const cards =
-          loadData(CARD_KEY);
+        const cards = loadData(CARD_KEY);
 
         const selectedCard =
           cards.find(
             card =>
-              card.id ===
-              paymentCard.value
+              card.id === paymentCard.value
           );
 
         selectedCardDebt.textContent =
@@ -1196,13 +943,9 @@
 
         if (selectedCard) {
           paymentAmount.max =
-            Number(
-              selectedCard.debt || 0
-            );
+            Number(selectedCard.debt || 0);
         } else {
-          paymentAmount.removeAttribute(
-            "max"
-          );
+          paymentAmount.removeAttribute("max");
         }
       }
 
@@ -1217,8 +960,7 @@
               "card-payment"
           );
 
-        paymentHistory.innerHTML =
-          "";
+        paymentHistory.innerHTML = "";
 
         if (payments.length === 0) {
           paymentHistory.innerHTML = `
@@ -1232,9 +974,7 @@
 
         payments.forEach(payment => {
           const item =
-            document.createElement(
-              "article"
-            );
+            document.createElement("article");
 
           item.className =
             "payment-history-item";
@@ -1258,15 +998,11 @@
             </div>
 
             <strong class="payment-history-amount">
-              ${formatMoney(
-                payment.amount
-              )}
+              ${formatMoney(payment.amount)}
             </strong>
           `;
 
-          paymentHistory.appendChild(
-            item
-          );
+          paymentHistory.appendChild(item);
         });
       }
 
@@ -1285,8 +1021,7 @@
 
           hideMessage();
 
-          const cards =
-            loadData(CARD_KEY);
+          const cards = loadData(CARD_KEY);
 
           const transactions =
             loadData(TRANSACTION_KEY);
@@ -1294,14 +1029,11 @@
           const selectedCard =
             cards.find(
               card =>
-                card.id ===
-                paymentCard.value
+                card.id === paymentCard.value
             );
 
           const amount =
-            Number(
-              paymentAmount.value
-            );
+            Number(paymentAmount.value);
 
           if (!selectedCard) {
             showMessage(
@@ -1325,9 +1057,7 @@
           }
 
           const currentDebt =
-            Number(
-              selectedCard.debt || 0
-            );
+            Number(selectedCard.debt || 0);
 
           if (amount > currentDebt) {
             showMessage(
@@ -1344,8 +1074,7 @@
               currentDebt - amount
             );
 
-          const now =
-            new Date();
+          const now = new Date();
 
           const transaction = {
             id: createId(),
@@ -1360,20 +1089,13 @@
             cardId: selectedCard.id,
             cardName:
               `${selectedCard.bank} - ${selectedCard.name}`,
-            cardDebtDelta:
-              -amount,
-            createdAt:
-              now.toISOString()
+            cardDebtDelta: -amount,
+            createdAt: now.toISOString()
           };
 
-          transactions.unshift(
-            transaction
-          );
+          transactions.unshift(transaction);
 
-          saveData(
-            CARD_KEY,
-            cards
-          );
+          saveData(CARD_KEY, cards);
 
           saveData(
             TRANSACTION_KEY,
