@@ -43,6 +43,37 @@
     .report-last-amount{white-space:nowrap;font-size:12px}.report-last-amount.positive{color:#45dca6}.report-last-amount.negative{color:#ff8395}
     .reports-back-button{min-height:42px;padding:0 13px;border:1px solid rgba(255,255,255,.10);border-radius:13px;color:#dceeff;background:rgba(255,255,255,.05);font-weight:800}
     @media(max-width:370px){.reports-grid{gap:8px}.report-card{padding:13px}.report-card strong{font-size:18px}}
+
+    /* AYARLAR */
+    .settings-list{display:grid;gap:12px}
+    .settings-card{padding:16px;border:1px solid rgba(255,255,255,.08);border-radius:18px;background:linear-gradient(145deg,rgba(24,49,76,.92),rgba(13,29,47,.94))}
+    .settings-card-head{display:flex;align-items:center;justify-content:space-between;gap:14px}
+    .settings-card-info{min-width:0}.settings-card-info strong{display:block;font-size:15px}.settings-card-info span{display:block;margin-top:5px;color:#8fa2ba;font-size:11px;line-height:1.45}
+    .settings-action{min-height:42px;padding:0 14px;border:1px solid rgba(80,174,255,.22);border-radius:13px;color:#72bfff;background:rgba(15,140,255,.10);font-weight:800;white-space:nowrap}
+    .settings-action.danger{border-color:rgba(255,95,118,.28);color:#ff8295;background:rgba(255,95,118,.10)}
+    .settings-switch{position:relative;width:50px;height:29px;flex:0 0 50px}
+    .settings-switch input{position:absolute;opacity:0;pointer-events:none}
+    .settings-switch-track{position:absolute;inset:0;border-radius:999px;background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.09);transition:.2s ease}
+    .settings-switch-track::after{content:"";position:absolute;top:3px;left:3px;width:21px;height:21px;border-radius:50%;background:#dce9f6;transition:.2s ease}
+    .settings-switch input:checked + .settings-switch-track{background:rgba(15,140,255,.35);border-color:rgba(83,178,255,.42)}
+    .settings-switch input:checked + .settings-switch-track::after{transform:translateX(21px);background:#6fc0ff}
+    .settings-version{text-align:center;color:#8195aa;font-size:11px;padding:8px 0 2px}
+    .settings-message{padding:12px 14px;border-radius:13px;font-size:12px;font-weight:750;text-align:center}
+    .settings-message.success{color:#4be1ac;background:rgba(40,212,154,.11)}
+    .settings-message.error{color:#ff8799;background:rgba(255,100,124,.11)}
+    body.light-theme{color:#102033;background:linear-gradient(180deg,#edf5fc 0%,#e7f0f8 100%)}
+    body.light-theme .content-card,body.light-theme .summary-card,body.light-theme .report-card,body.light-theme .settings-card{background:linear-gradient(145deg,rgba(255,255,255,.98),rgba(238,246,253,.98));border-color:rgba(25,74,112,.10);box-shadow:0 12px 30px rgba(25,64,95,.10)}
+    body.light-theme .content-card h2,body.light-theme .summary-card strong,body.light-theme .report-card strong,body.light-theme .settings-card-info strong{color:#102033}
+    body.light-theme .summary-card span,body.light-theme .report-card span,body.light-theme .settings-card-info span{color:#60758a}
+    body.light-theme .bottom-navigation{background:rgba(245,250,255,.96);border-color:rgba(25,74,112,.10)}
+    body.light-theme .bottom-navigation .nav-item{color:#65788f}
+    body.light-theme .bottom-navigation .nav-item.active{color:#087fdc;background:rgba(15,140,255,.09)}
+    body.light-theme .side-menu-panel{background:linear-gradient(180deg,#f6fbff,#e9f3fb);color:#102033}
+    body.light-theme .side-menu-item{color:#102033;background:rgba(20,73,112,.04);border-color:rgba(20,73,112,.10)}
+    body.light-theme .side-menu-close,body.light-theme .menu-open-button{color:#102033;background:rgba(246,251,255,.95);border-color:rgba(20,73,112,.12)}
+    body.light-theme .report-progress-card,body.light-theme .report-last-item{background:rgba(255,255,255,.75);border-color:rgba(20,73,112,.10)}
+    body.light-theme .report-last-info strong,body.light-theme .report-progress-head strong{color:#102033}
+    @media(max-width:390px){.settings-card-head{align-items:flex-start}.settings-action{padding:0 11px;font-size:12px}}
   </style>
 </head>
 <body>
@@ -56,7 +87,7 @@
         <button class="side-menu-item future-menu-item" data-feature="Hedefler" type="button"><span class="side-menu-item-icon">🎯</span><strong>Hedefler</strong></button>
         <button class="side-menu-item future-menu-item" data-feature="Hatırlatmalar" type="button"><span class="side-menu-item-icon">🔔</span><strong>Hatırlatmalar</strong></button>
         <div class="side-menu-divider"></div>
-        <button class="side-menu-item future-menu-item" data-feature="Ayarlar" type="button"><span class="side-menu-item-icon">⚙️</span><strong>Ayarlar</strong></button>
+        <button id="openSettingsButton" class="side-menu-item" type="button"><span class="side-menu-item-icon">⚙️</span><strong>Ayarlar</strong></button>
         <button class="side-menu-item future-menu-item" data-feature="Hakkında" type="button"><span class="side-menu-item-icon">ℹ️</span><strong>Hakkında</strong></button>
       </div>
       <div class="side-menu-note">Diğer özellikler sırayla aktif edilecek.</div>
@@ -145,6 +176,48 @@
       <section class="content-card">
         <div class="section-heading"><div><p class="eyebrow">Son Hareketler</p><h2>Son 5 işlem</h2></div></div>
         <div id="reportLastTransactions" class="report-last-list"><div class="empty-state">Henüz işlem bulunmuyor.</div></div>
+      </section>
+    </section>
+
+
+    <section id="settingsPage" class="page">
+      <header class="top-header">
+        <div><p class="eyebrow">Uygulama</p><h1>Ayarlar</h1></div>
+        <button id="settingsBackButton" class="reports-back-button" type="button">Ana Sayfa</button>
+      </header>
+
+      <section class="content-card">
+        <div class="section-heading"><div><p class="eyebrow">Görünüm</p><h2>Tema</h2></div></div>
+        <div class="settings-list">
+          <article class="settings-card">
+            <div class="settings-card-head">
+              <div class="settings-card-info"><strong>Açık tema</strong><span>Koyu ve açık görünüm arasında geçiş yap.</span></div>
+              <label class="settings-switch" aria-label="Açık temayı aç veya kapat">
+                <input id="lightThemeToggle" type="checkbox">
+                <span class="settings-switch-track"></span>
+              </label>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="content-card">
+        <div class="section-heading"><div><p class="eyebrow">Veriler</p><h2>Yedekleme</h2></div></div>
+        <div class="settings-list">
+          <article class="settings-card"><div class="settings-card-head"><div class="settings-card-info"><strong>Yedeği indir</strong><span>Kartlar ve işlemleri tek dosyada telefona kaydet.</span></div><button id="exportDataButton" class="settings-action" type="button">İndir</button></div></article>
+          <article class="settings-card"><div class="settings-card-head"><div class="settings-card-info"><strong>Yedeği geri yükle</strong><span>Daha önce indirdiğin YF yedeğini seç.</span></div><button id="importDataButton" class="settings-action" type="button">Dosya Seç</button></div></article>
+          <input id="importDataInput" class="hidden" type="file" accept="application/json,.json">
+          <article class="settings-card"><div class="settings-card-head"><div class="settings-card-info"><strong>Tüm verileri temizle</strong><span>Kartları ve işlem geçmişini kalıcı olarak siler.</span></div><button id="clearDataButton" class="settings-action danger" type="button">Temizle</button></div></article>
+        </div>
+        <div id="settingsMessage" class="settings-message hidden"></div>
+      </section>
+
+      <section class="content-card">
+        <div class="section-heading"><div><p class="eyebrow">Bilgi</p><h2>Uygulama</h2></div></div>
+        <div class="settings-list">
+          <article class="settings-card"><div class="settings-card-info"><strong>YF — Kişisel Finans</strong><span>Kart, gelir-gider ve borç yönetim paneli.</span></div></article>
+        </div>
+        <div class="settings-version">YF sürüm 1.4</div>
       </section>
     </section>
   </main>
@@ -333,6 +406,124 @@
 
       reportsBackButton?.addEventListener("click", function () {
         showPage("dashboardPage");
+      });
+    });
+  </script>
+
+
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      const CARD_KEY = "yf_cards_v1";
+      const TRANSACTION_KEY = "yf_transactions_v1";
+      const THEME_KEY = "yf_theme_v1";
+      const openSettingsButton = document.getElementById("openSettingsButton");
+      const settingsBackButton = document.getElementById("settingsBackButton");
+      const sideMenuLayer = document.getElementById("sideMenuLayer");
+      const lightThemeToggle = document.getElementById("lightThemeToggle");
+      const exportDataButton = document.getElementById("exportDataButton");
+      const importDataButton = document.getElementById("importDataButton");
+      const importDataInput = document.getElementById("importDataInput");
+      const clearDataButton = document.getElementById("clearDataButton");
+      const settingsMessage = document.getElementById("settingsMessage");
+
+      function showPage(pageId) {
+        document.querySelectorAll(".page").forEach(page => page.classList.toggle("active", page.id === pageId));
+        document.querySelectorAll(".bottom-navigation .nav-item").forEach(item => item.classList.toggle("active", item.dataset.page === pageId));
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+
+      function showSettingsMessage(text, isError) {
+        settingsMessage.textContent = text;
+        settingsMessage.classList.remove("hidden", "success", "error");
+        settingsMessage.classList.add(isError ? "error" : "success");
+      }
+
+      function applyTheme(theme) {
+        const isLight = theme === "light";
+        document.body.classList.toggle("light-theme", isLight);
+        if (lightThemeToggle) lightThemeToggle.checked = isLight;
+        localStorage.setItem(THEME_KEY, isLight ? "light" : "dark");
+      }
+
+      applyTheme(localStorage.getItem(THEME_KEY) || "dark");
+
+      lightThemeToggle?.addEventListener("change", function () {
+        applyTheme(lightThemeToggle.checked ? "light" : "dark");
+      });
+
+      openSettingsButton?.addEventListener("click", function () {
+        sideMenuLayer?.classList.remove("open");
+        sideMenuLayer?.setAttribute("aria-hidden", "true");
+        document.body.style.overflow = "";
+        showPage("settingsPage");
+      });
+
+      settingsBackButton?.addEventListener("click", function () {
+        showPage("dashboardPage");
+      });
+
+      exportDataButton?.addEventListener("click", function () {
+        const backup = {
+          app: "YF",
+          version: 1,
+          exportedAt: new Date().toISOString(),
+          cards: JSON.parse(localStorage.getItem(CARD_KEY) || "[]"),
+          transactions: JSON.parse(localStorage.getItem(TRANSACTION_KEY) || "[]")
+        };
+        const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        const date = new Date().toISOString().slice(0, 10);
+        link.href = url;
+        link.download = `YF_yedek_${date}.json`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        showSettingsMessage("Yedek dosyası hazırlandı.", false);
+      });
+
+      importDataButton?.addEventListener("click", function () {
+        importDataInput?.click();
+      });
+
+      importDataInput?.addEventListener("change", function () {
+        const file = importDataInput.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function () {
+          try {
+            const backup = JSON.parse(String(reader.result || ""));
+            if (!Array.isArray(backup.cards) || !Array.isArray(backup.transactions)) {
+              throw new Error("Geçersiz yedek");
+            }
+            const approved = confirm("Seçilen yedek mevcut verilerin üzerine yazılsın mı?");
+            if (!approved) return;
+            localStorage.setItem(CARD_KEY, JSON.stringify(backup.cards));
+            localStorage.setItem(TRANSACTION_KEY, JSON.stringify(backup.transactions));
+            showSettingsMessage("Yedek geri yüklendi. Uygulama yenileniyor.", false);
+            setTimeout(() => window.location.reload(), 700);
+          } catch (error) {
+            showSettingsMessage("Bu dosya geçerli bir YF yedeği değil.", true);
+          } finally {
+            importDataInput.value = "";
+          }
+        };
+        reader.onerror = function () {
+          showSettingsMessage("Dosya okunamadı.", true);
+        };
+        reader.readAsText(file);
+      });
+
+      clearDataButton?.addEventListener("click", function () {
+        const first = confirm("Tüm kartlar ve işlemler silinecek. Devam edilsin mi?");
+        if (!first) return;
+        const second = confirm("Bu işlem geri alınamaz. Verileri gerçekten temizlemek istiyor musun?");
+        if (!second) return;
+        localStorage.removeItem(CARD_KEY);
+        localStorage.removeItem(TRANSACTION_KEY);
+        showSettingsMessage("Tüm veriler temizlendi. Uygulama yenileniyor.", false);
+        setTimeout(() => window.location.reload(), 700);
       });
     });
   </script>
