@@ -1,1144 +1,125 @@
-<!-- BU DOSYA: index.html -->
 <!DOCTYPE html>
 <html lang="tr">
 <head>
   <meta charset="UTF-8">
-
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0, viewport-fit=cover"
-  >
-
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#07111f">
-
   <title>YF — Yavuz Finans</title>
-
   <link rel="stylesheet" href="style.css">
-
   <style>
-    .hidden {
-      display: none !important;
-    }
-
-    .debt-payment-box {
-      display: grid;
-      gap: 16px;
-    }
-
-    .debt-payment-box label {
-      display: grid;
-      gap: 8px;
-      font-weight: 700;
-    }
-
-    .debt-payment-box select,
-    .debt-payment-box input {
-      width: 100%;
-      min-height: 50px;
-      border-radius: 14px;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      background: rgba(255, 255, 255, 0.06);
-      color: inherit;
-      padding: 0 14px;
-      font: inherit;
-      box-sizing: border-box;
-    }
-
-    .debt-payment-box option {
-      color: #111827;
-    }
-
-    .debt-payment-summary {
-      padding: 16px;
-      border-radius: 18px;
-      background: rgba(59, 130, 246, 0.1);
-      border: 1px solid rgba(96, 165, 250, 0.2);
-    }
-
-    .debt-payment-summary span {
-      display: block;
-      opacity: 0.7;
-      margin-bottom: 6px;
-    }
-
-    .debt-payment-summary strong {
-      font-size: 24px;
-    }
-
-    .debt-payment-message {
-      padding: 13px 15px;
-      border-radius: 14px;
-      font-weight: 700;
-    }
-
-    .debt-payment-message.success {
-      color: #34d399;
-      background: rgba(52, 211, 153, 0.12);
-    }
-
-    .debt-payment-message.error {
-      color: #fb7185;
-      background: rgba(251, 113, 133, 0.12);
-    }
-
-    .payment-history-list {
-      display: grid;
-      gap: 12px;
-    }
-
-    .payment-history-item {
-      display: flex;
-      justify-content: space-between;
-      gap: 14px;
-      align-items: center;
-      padding: 15px;
-      border-radius: 16px;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-    }
-
-    .payment-history-info {
-      min-width: 0;
-    }
-
-    .payment-history-info strong,
-    .payment-history-info span {
-      display: block;
-    }
-
-    .payment-history-info span {
-      margin-top: 5px;
-      font-size: 13px;
-      opacity: 0.65;
-    }
-
-    .payment-history-amount {
-      white-space: nowrap;
-      color: #34d399;
-    }
-
-    .quick-action-button {
-      border: 0;
-      color: inherit;
-      cursor: pointer;
-      text-align: left;
-      font: inherit;
-    }
-
-    body {
-      padding-bottom: 90px;
-    }
+    .hidden{display:none!important}
+    .menu-open-button{position:fixed;z-index:1200;top:calc(14px + env(safe-area-inset-top));left:14px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.10);border-radius:14px;color:#f7fbff;background:rgba(13,31,50,.92);box-shadow:0 10px 25px rgba(0,0,0,.22);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);font-size:23px;line-height:1;cursor:pointer}
+    .side-menu-layer{position:fixed;z-index:1500;inset:0;visibility:hidden;pointer-events:none}.side-menu-layer.open{visibility:visible;pointer-events:auto}
+    .side-menu-backdrop{position:absolute;inset:0;opacity:0;background:rgba(0,0,0,.68);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);transition:opacity .25s ease}.side-menu-layer.open .side-menu-backdrop{opacity:1}
+    .side-menu-panel{position:absolute;top:0;bottom:0;left:0;width:min(82vw,330px);overflow-y:auto;padding:calc(24px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));border-right:1px solid rgba(255,255,255,.09);background:radial-gradient(circle at 10% 0%,rgba(15,140,255,.18),transparent 32%),linear-gradient(180deg,#102239 0%,#081522 100%);box-shadow:22px 0 55px rgba(0,0,0,.42);transform:translateX(-105%);transition:transform .28s cubic-bezier(.2,.8,.2,1)}.side-menu-layer.open .side-menu-panel{transform:translateX(0)}
+    .side-menu-top{display:flex;align-items:center;justify-content:flex-end;margin-bottom:8px}.side-menu-close{width:40px;height:40px;border:1px solid rgba(255,255,255,.10);border-radius:13px;color:#f7fbff;background:rgba(255,255,255,.055);font-size:24px;cursor:pointer}
+    .side-menu-list{display:grid;gap:9px;margin-top:8px}.side-menu-item{width:100%;min-height:56px;display:flex;align-items:center;gap:13px;padding:0 15px;border:1px solid rgba(255,255,255,.075);border-radius:16px;color:#f7fbff;background:rgba(255,255,255,.035);text-align:left;font:inherit;cursor:pointer}.side-menu-item:active{transform:scale(.98);background:rgba(15,140,255,.11);border-color:rgba(84,178,255,.24)}
+    .side-menu-item-icon{width:34px;height:34px;flex:0 0 34px;display:flex;align-items:center;justify-content:center;border-radius:11px;color:#72bfff;background:rgba(15,140,255,.11);font-size:17px}.side-menu-item strong{display:block;font-size:14px}.side-menu-divider{height:1px;margin:8px 3px;background:rgba(255,255,255,.08)}.side-menu-note{margin:18px 4px 0;padding:12px;border-radius:14px;color:#8fa2ba;background:rgba(255,255,255,.025);font-size:11px;line-height:1.45;text-align:center}
+    .menu-toast{position:fixed;z-index:1700;right:16px;bottom:calc(90px + env(safe-area-inset-bottom));left:16px;max-width:520px;margin:auto;padding:13px 15px;border:1px solid rgba(90,180,255,.22);border-radius:14px;color:#d9edff;background:rgba(12,35,57,.96);box-shadow:0 16px 36px rgba(0,0,0,.28);text-align:center;font-size:13px;font-weight:750;opacity:0;transform:translateY(12px);pointer-events:none;transition:.22s ease}.menu-toast.show{opacity:1;transform:translateY(0)}
+    #dashboardPage .top-header{padding-left:54px}
+    .debt-payment-box{display:grid;gap:16px}.debt-payment-box label{display:grid;gap:8px;font-weight:700}.debt-payment-box select,.debt-payment-box input{width:100%;min-height:50px;border-radius:14px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:inherit;padding:0 14px;font:inherit;box-sizing:border-box}.debt-payment-box option{color:#111827}.debt-payment-summary{padding:16px;border-radius:18px;background:rgba(59,130,246,.1);border:1px solid rgba(96,165,250,.2)}.debt-payment-summary span{display:block;opacity:.7;margin-bottom:6px}.debt-payment-summary strong{font-size:24px}.debt-payment-message{padding:13px 15px;border-radius:14px;font-weight:700}.debt-payment-message.success{color:#34d399;background:rgba(52,211,153,.12)}.debt-payment-message.error{color:#fb7185;background:rgba(251,113,133,.12)}.payment-history-list{display:grid;gap:12px}.payment-history-item{display:flex;justify-content:space-between;gap:14px;align-items:center;padding:15px;border-radius:16px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08)}.payment-history-info{min-width:0}.payment-history-info strong,.payment-history-info span{display:block}.payment-history-info span{margin-top:5px;font-size:13px;opacity:.65}.payment-history-amount{white-space:nowrap;color:#34d399}.quick-action-button{border:0;color:inherit;cursor:pointer;text-align:left;font:inherit}body{padding-bottom:90px}
+    @media(max-width:370px){.menu-open-button{top:calc(10px + env(safe-area-inset-top));left:10px;width:40px;height:40px}#dashboardPage .top-header{padding-left:48px}}
   </style>
 </head>
-
 <body>
+  <button id="openSideMenu" class="menu-open-button" type="button" aria-label="Menüyü aç">☰</button>
+  <div id="sideMenuLayer" class="side-menu-layer" aria-hidden="true">
+    <div id="sideMenuBackdrop" class="side-menu-backdrop"></div>
+    <aside class="side-menu-panel" aria-label="Ek özellikler menüsü">
+      <div class="side-menu-top"><button id="closeSideMenu" class="side-menu-close" type="button" aria-label="Menüyü kapat">×</button></div>
+      <div class="side-menu-list">
+        <button class="side-menu-item future-menu-item" data-feature="Raporlar" type="button"><span class="side-menu-item-icon">📊</span><strong>Raporlar</strong></button>
+        <button class="side-menu-item future-menu-item" data-feature="Hedefler" type="button"><span class="side-menu-item-icon">🎯</span><strong>Hedefler</strong></button>
+        <button class="side-menu-item future-menu-item" data-feature="Hatırlatmalar" type="button"><span class="side-menu-item-icon">🔔</span><strong>Hatırlatmalar</strong></button>
+        <div class="side-menu-divider"></div>
+        <button class="side-menu-item future-menu-item" data-feature="Ayarlar" type="button"><span class="side-menu-item-icon">⚙️</span><strong>Ayarlar</strong></button>
+        <button class="side-menu-item future-menu-item" data-feature="Hakkında" type="button"><span class="side-menu-item-icon">ℹ️</span><strong>Hakkında</strong></button>
+      </div>
+      <div class="side-menu-note">Yeni özellikler sırayla aktif edilecek.</div>
+    </aside>
+  </div>
+  <div id="menuToast" class="menu-toast"></div>
 
   <main class="app-shell">
-
-    <!-- ANA SAYFA -->
     <section id="dashboardPage" class="page active">
-
-      <header class="top-header">
-        <div>
-          <p class="eyebrow">Yavuz Finans</p>
-
-          <h1 id="welcomeText">
-            Merhaba Yavuz 👋
-          </h1>
-        </div>
-      </header>
-
-      <section class="hero-card">
-        <div class="hero-card-top">
-          <span>Net Durum</span>
-
-          <span id="balanceStatus" class="status-badge">
-            Dengeli
-          </span>
-        </div>
-
-        <strong id="netBalance">
-          ₺0,00
-        </strong>
-
-        <p>
-          Toplam gelir ve giderlerin güncel sonucu
-        </p>
-      </section>
-
+      <header class="top-header"><div><p class="eyebrow">Yavuz Finans</p><h1 id="welcomeText">Merhaba Yavuz 👋</h1></div></header>
+      <section class="hero-card"><div class="hero-card-top"><span>Net Durum</span><span id="balanceStatus" class="status-badge">Dengeli</span></div><strong id="netBalance">₺0,00</strong><p>Toplam gelir ve giderlerin güncel sonucu</p></section>
       <section class="summary-grid">
-
-        <article class="summary-card">
-          <span>Toplam Kalan Borç</span>
-          <strong id="totalDebt">₺0,00</strong>
-        </article>
-
-        <article class="summary-card">
-          <span>Toplam Varlık</span>
-          <strong id="totalAssets">₺0,00</strong>
-        </article>
-
-        <article class="summary-card">
-          <span>Bu Ay Ödenen</span>
-          <strong id="monthlyPayment">₺0,00</strong>
-        </article>
-
-        <article class="summary-card">
-          <span>Kart Sayısı</span>
-          <strong id="cardCount">0</strong>
-        </article>
-
+        <article class="summary-card"><span>Toplam Kalan Borç</span><strong id="totalDebt">₺0,00</strong></article>
+        <article class="summary-card"><span>Toplam Varlık</span><strong id="totalAssets">₺0,00</strong></article>
+        <article class="summary-card"><span>Bu Ay Ödenen</span><strong id="monthlyPayment">₺0,00</strong></article>
+        <article class="summary-card"><span>Kart Sayısı</span><strong id="cardCount">0</strong></article>
       </section>
-
-      <!-- HIZLI İŞLEMLER -->
-      <section class="content-card">
-
-        <div class="section-heading">
-          <div>
-            <p class="eyebrow">Hızlı İşlemler</p>
-            <h2>Ne yapmak istiyorsun?</h2>
-          </div>
-        </div>
-
-        <div class="quick-actions">
-
-          <button
-            id="quickAddCardButton"
-            class="quick-action-button"
-            type="button"
-          >
-            <span>💳</span>
-
-            <div>
-              <strong>Kart Ekle</strong>
-              <small>Yeni kredi kartı kaydet</small>
-            </div>
-          </button>
-
-          <button
-            id="openTransactionFormButton"
-            class="quick-action-button"
-            type="button"
-          >
-            <span>＋</span>
-
-            <div>
-              <strong>İşlem Ekle</strong>
-              <small>Gelir veya gider kaydet</small>
-            </div>
-          </button>
-
-          <button
-            class="quick-action-button nav-item"
-            data-page="debtPaymentPage"
-            type="button"
-          >
-            <span>✓</span>
-
-            <div>
-              <strong>Borç Öde</strong>
-              <small>Kart borcundan ödeme düş</small>
-            </div>
-          </button>
-
-          <button
-            class="quick-action-button nav-item"
-            data-page="transactionsPage"
-            type="button"
-          >
-            <span>☷</span>
-
-            <div>
-              <strong>Son İşlemler</strong>
-              <small>Gelir ve gider geçmişini gör</small>
-            </div>
-          </button>
-
-        </div>
-
-      </section>
-
-      <!-- YAKLAŞAN ÖDEMELER -->
-      <section class="content-card">
-
-        <div class="section-heading">
-          <div>
-            <p class="eyebrow">Yaklaşan Ödemeler</p>
-            <h2>Son ödeme tarihleri</h2>
-          </div>
-        </div>
-
-        <div id="upcomingPayments">
-          <div class="empty-state">
-            Henüz kart veya ödeme kaydı bulunmuyor.
-          </div>
-        </div>
-
-      </section>
-
+      <section class="content-card"><div class="section-heading"><div><p class="eyebrow">Hızlı İşlemler</p><h2>Ne yapmak istiyorsun?</h2></div></div><div class="quick-actions">
+        <button id="quickAddCardButton" class="quick-action-button" type="button"><span>💳</span><div><strong>Kart Ekle</strong><small>Yeni kredi kartı kaydet</small></div></button>
+        <button id="openTransactionFormButton" class="quick-action-button" type="button"><span>＋</span><div><strong>İşlem Ekle</strong><small>Gelir veya gider kaydet</small></div></button>
+        <button class="quick-action-button nav-item" data-page="debtPaymentPage" type="button"><span>✓</span><div><strong>Borç Öde</strong><small>Kart borcundan ödeme düş</small></div></button>
+        <button class="quick-action-button nav-item" data-page="transactionsPage" type="button"><span>☷</span><div><strong>Son İşlemler</strong><small>Gelir ve gider geçmişini gör</small></div></button>
+      </div></section>
+      <section class="content-card"><div class="section-heading"><div><p class="eyebrow">Yaklaşan Ödemeler</p><h2>Son ödeme tarihleri</h2></div></div><div id="upcomingPayments"><div class="empty-state">Henüz kart veya ödeme kaydı bulunmuyor.</div></div></section>
     </section>
 
-
-    <!-- KARTLAR SAYFASI -->
     <section id="cardsPage" class="page">
-
-      <header class="top-header">
-        <div>
-          <p class="eyebrow">Kart Yönetimi</p>
-          <h1>Kartlarım</h1>
-        </div>
-
-        <button
-          id="openCardFormButton"
-          class="primary-button"
-          type="button"
-        >
-          + Kart Ekle
-        </button>
-      </header>
-
-      <section class="summary-grid">
-
-        <article class="summary-card">
-          <span>Toplam Kart Borcu</span>
-          <strong id="cardsTotalDebt">₺0,00</strong>
-        </article>
-
-        <article class="summary-card">
-          <span>Toplam Kart Limiti</span>
-          <strong id="cardsTotalLimit">₺0,00</strong>
-        </article>
-
-        <article class="summary-card">
-          <span>Kullanılabilir Limit</span>
-          <strong id="cardsAvailableLimit">₺0,00</strong>
-        </article>
-
-      </section>
-
-      <section class="content-card">
-
-        <div class="section-heading">
-          <div>
-            <p class="eyebrow">Kayıtlı Kartlar</p>
-            <h2>Kart listesi</h2>
-          </div>
-        </div>
-
-        <div id="cardsList">
-
-          <div id="emptyCards" class="empty-state">
-            Henüz kart eklenmedi.
-            İlk kartını ekleyerek başlayabilirsin.
-          </div>
-
-        </div>
-
-      </section>
-
+      <header class="top-header"><div><p class="eyebrow">Kart Yönetimi</p><h1>Kartlarım</h1></div><button id="openCardFormButton" class="primary-button" type="button">+ Kart Ekle</button></header>
+      <section class="summary-grid"><article class="summary-card"><span>Toplam Kart Borcu</span><strong id="cardsTotalDebt">₺0,00</strong></article><article class="summary-card"><span>Toplam Kart Limiti</span><strong id="cardsTotalLimit">₺0,00</strong></article><article class="summary-card"><span>Kullanılabilir Limit</span><strong id="cardsAvailableLimit">₺0,00</strong></article></section>
+      <section class="content-card"><div class="section-heading"><div><p class="eyebrow">Kayıtlı Kartlar</p><h2>Kart listesi</h2></div></div><div id="cardsList"><div id="emptyCards" class="empty-state">Henüz kart eklenmedi. İlk kartını ekleyerek başlayabilirsin.</div></div></section>
     </section>
 
-
-    <!-- İŞLEMLER SAYFASI -->
     <section id="transactionsPage" class="page">
-
-      <header class="top-header">
-        <div>
-          <p class="eyebrow">Gelir ve Gider</p>
-          <h1>İşlemler</h1>
-        </div>
-
-        <button
-          class="primary-button"
-          type="button"
-          onclick="document.getElementById('openTransactionFormButton').click()"
-        >
-          + İşlem Ekle
-        </button>
-      </header>
-
-      <section class="summary-grid">
-
-        <article class="summary-card">
-          <span>Toplam Gelir</span>
-          <strong id="totalIncome">₺0,00</strong>
-        </article>
-
-        <article class="summary-card">
-          <span>Toplam Gider</span>
-          <strong id="totalExpense">₺0,00</strong>
-        </article>
-
-        <article class="summary-card">
-          <span>İşlem Bakiyesi</span>
-          <strong id="transactionBalance">₺0,00</strong>
-        </article>
-
-      </section>
-
-      <section class="content-card">
-
-        <div class="section-heading">
-          <div>
-            <p class="eyebrow">İşlem Geçmişi</p>
-            <h2>Son işlemler</h2>
-          </div>
-        </div>
-
-        <div id="transactionsList">
-          <div class="empty-state">
-            Henüz gelir veya gider işlemi bulunmuyor.
-          </div>
-        </div>
-
-      </section>
-
+      <header class="top-header"><div><p class="eyebrow">Gelir ve Gider</p><h1>İşlemler</h1></div><button class="primary-button" type="button" onclick="document.getElementById('openTransactionFormButton').click()">+ İşlem Ekle</button></header>
+      <section class="summary-grid"><article class="summary-card"><span>Toplam Gelir</span><strong id="totalIncome">₺0,00</strong></article><article class="summary-card"><span>Toplam Gider</span><strong id="totalExpense">₺0,00</strong></article><article class="summary-card"><span>İşlem Bakiyesi</span><strong id="transactionBalance">₺0,00</strong></article></section>
+      <section class="content-card"><div class="section-heading"><div><p class="eyebrow">İşlem Geçmişi</p><h2>Son işlemler</h2></div></div><div id="transactionsList"><div class="empty-state">Henüz gelir veya gider işlemi bulunmuyor.</div></div></section>
     </section>
 
-
-    <!-- BORÇ ÖDEME SAYFASI -->
     <section id="debtPaymentPage" class="page">
-
-      <header class="top-header">
-        <div>
-          <p class="eyebrow">Borç Yönetimi</p>
-          <h1>Borç Öde</h1>
-        </div>
-      </header>
-
-      <section class="content-card">
-
-        <div class="section-heading">
-          <div>
-            <p class="eyebrow">Yeni Ödeme</p>
-            <h2>Kart borcu öde</h2>
-          </div>
-        </div>
-
-        <form id="debtPaymentForm" class="debt-payment-box">
-
-          <label>
-            Ödeme yapılacak kart
-
-            <select id="debtPaymentCard" required>
-              <option value="">Kart seç</option>
-            </select>
-          </label>
-
-          <div class="debt-payment-summary">
-            <span>Seçilen kartın güncel borcu</span>
-            <strong id="selectedCardDebt">₺0,00</strong>
-          </div>
-
-          <label>
-            Ödeme tutarı
-
-            <input
-              id="debtPaymentAmount"
-              type="number"
-              min="0.01"
-              step="0.01"
-              inputmode="decimal"
-              placeholder="0,00"
-              required
-            >
-          </label>
-
-          <div
-            id="debtPaymentMessage"
-            class="debt-payment-message hidden"
-          ></div>
-
-          <button class="primary-button" type="submit">
-            Borcu Öde
-          </button>
-
-        </form>
-
-      </section>
-
-      <section class="content-card">
-
-        <div class="section-heading">
-          <div>
-            <p class="eyebrow">Geçmiş</p>
-            <h2>Borç ödeme geçmişi</h2>
-          </div>
-        </div>
-
-        <div
-          id="debtPaymentHistory"
-          class="payment-history-list"
-        >
-          <div class="empty-state">
-            Henüz borç ödeme işlemi bulunmuyor.
-          </div>
-        </div>
-
-      </section>
-
+      <header class="top-header"><div><p class="eyebrow">Borç Yönetimi</p><h1>Borç Öde</h1></div></header>
+      <section class="content-card"><div class="section-heading"><div><p class="eyebrow">Yeni Ödeme</p><h2>Kart borcu öde</h2></div></div><form id="debtPaymentForm" class="debt-payment-box">
+        <label>Ödeme yapılacak kart<select id="debtPaymentCard" required><option value="">Kart seç</option></select></label>
+        <div class="debt-payment-summary"><span>Seçilen kartın güncel borcu</span><strong id="selectedCardDebt">₺0,00</strong></div>
+        <label>Ödeme tutarı<input id="debtPaymentAmount" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="0,00" required></label>
+        <div id="debtPaymentMessage" class="debt-payment-message hidden"></div><button class="primary-button" type="submit">Borcu Öde</button>
+      </form></section>
+      <section class="content-card"><div class="section-heading"><div><p class="eyebrow">Geçmiş</p><h2>Borç ödeme geçmişi</h2></div></div><div id="debtPaymentHistory" class="payment-history-list"><div class="empty-state">Henüz borç ödeme işlemi bulunmuyor.</div></div></section>
     </section>
-
   </main>
 
-
-  <!-- ALT MENÜ -->
   <nav class="bottom-navigation">
-
-    <button
-      class="nav-item active"
-      data-page="dashboardPage"
-      type="button"
-    >
-      <span>⌂</span>
-      <small>Ana Sayfa</small>
-    </button>
-
-    <button
-      class="nav-item"
-      data-page="cardsPage"
-      type="button"
-    >
-      <span>▣</span>
-      <small>Kartlar</small>
-    </button>
-
-    <button
-      class="nav-item"
-      data-page="transactionsPage"
-      type="button"
-    >
-      <span>＋</span>
-      <small>İşlemler</small>
-    </button>
-
-    <button
-      class="nav-item"
-      data-page="debtPaymentPage"
-      type="button"
-    >
-      <span>✓</span>
-      <small>Borç Öde</small>
-    </button>
-
+    <button class="nav-item active" data-page="dashboardPage" type="button"><span>⌂</span><small>Ana Sayfa</small></button>
+    <button class="nav-item" data-page="cardsPage" type="button"><span>▣</span><small>Kartlar</small></button>
+    <button class="nav-item" data-page="transactionsPage" type="button"><span>＋</span><small>İşlemler</small></button>
+    <button class="nav-item" data-page="debtPaymentPage" type="button"><span>✓</span><small>Borç Öde</small></button>
   </nav>
 
+  <div id="cardModal" class="modal hidden"><div id="modalBackdrop" class="modal-backdrop"></div><div class="modal-content"><div class="modal-header"><div><p class="eyebrow">Kart Yönetimi</p><h2 id="cardFormTitle">Yeni Kart Ekle</h2></div><button id="closeCardFormButton" class="close-button" type="button">×</button></div><form id="cardForm">
+    <input id="cardId" type="hidden"><label>Banka<select id="bankName" required><option value="">Banka seç</option><option>Ziraat Bankası</option><option>Garanti BBVA</option><option>TOM Bankası</option><option>Akbank</option><option>QNB</option><option>İş Bankası</option><option>Diğer</option></select></label>
+    <label>Kart adı<input id="cardName" type="text" placeholder="Örn. Bonus Kart" required></label><label>Kart limiti<input id="cardLimit" type="number" min="0" step="0.01" placeholder="0,00" required></label><label>Güncel borç<input id="cardDebt" type="number" min="0" step="0.01" placeholder="0,00" required></label><label>Hesap kesim tarihi<input id="statementDate" type="date"></label><label>Son ödeme tarihi<input id="dueDate" type="date"></label><div id="cardFormMessage" class="form-message hidden"></div><div class="form-actions"><button id="cancelCardButton" class="secondary-button" type="button">Vazgeç</button><button class="primary-button" type="submit">Kartı Kaydet</button></div>
+  </form></div></div>
 
-  <!-- KART EKLEME MODALI -->
-  <div id="cardModal" class="modal hidden">
+  <div id="transactionModal" class="modal hidden"><div id="transactionModalBackdrop" class="modal-backdrop"></div><div class="modal-content"><div class="modal-header"><div><p class="eyebrow">Gelir ve Gider</p><h2>Yeni İşlem</h2></div><button id="closeTransactionFormButton" class="close-button" type="button">×</button></div><form id="transactionForm">
+    <label>İşlem türü<select id="transactionType" required><option value="income">Gelir</option><option value="expense">Gider</option></select></label><label>Açıklama<input id="transactionName" type="text" placeholder="Örn. Maaş veya market" required></label><label>Tutar<input id="transactionAmount" type="number" min="0.01" step="0.01" placeholder="0,00" required></label><label>Kategori<select id="transactionCategory" required><option value="">Kategori seç</option><option value="salary">Maaş</option><option value="food">Market / Yemek</option><option value="transport">Ulaşım</option><option value="bill">Fatura</option><option value="shopping">Alışveriş</option><option value="other">Diğer</option></select></label><label>Tarih<input id="transactionDate" type="date" required></label><label>Ödeme yöntemi<select id="transactionPaymentMethod"><option value="cash">Nakit / Hesap</option><option value="card">Kredi Kartı</option></select></label><label id="transactionCardField" class="hidden">Kredi kartı<select id="transactionCard"><option value="">Kart seç</option></select></label><div class="form-actions"><button id="cancelTransactionButton" class="secondary-button" type="button">Vazgeç</button><button class="primary-button" type="submit">İşlemi Kaydet</button></div>
+  </form></div></div>
 
-    <div id="modalBackdrop" class="modal-backdrop"></div>
-
-    <div class="modal-content">
-
-      <div class="modal-header">
-        <div>
-          <p class="eyebrow">Kart Yönetimi</p>
-          <h2 id="cardFormTitle">Yeni Kart Ekle</h2>
-        </div>
-
-        <button
-          id="closeCardFormButton"
-          class="close-button"
-          type="button"
-        >
-          ×
-        </button>
-      </div>
-
-      <form id="cardForm">
-
-        <input id="cardId" type="hidden">
-
-        <label>
-          Banka
-
-          <select id="bankName" required>
-            <option value="">Banka seç</option>
-            <option>Ziraat Bankası</option>
-            <option>Garanti BBVA</option>
-            <option>TOM Bankası</option>
-            <option>Akbank</option>
-            <option>QNB</option>
-            <option>İş Bankası</option>
-            <option>Diğer</option>
-          </select>
-        </label>
-
-        <label>
-          Kart adı
-
-          <input
-            id="cardName"
-            type="text"
-            placeholder="Örn. Bonus Kart"
-            required
-          >
-        </label>
-
-        <label>
-          Kart limiti
-
-          <input
-            id="cardLimit"
-            type="number"
-            min="0"
-            step="0.01"
-            placeholder="0,00"
-            required
-          >
-        </label>
-
-        <label>
-          Güncel borç
-
-          <input
-            id="cardDebt"
-            type="number"
-            min="0"
-            step="0.01"
-            placeholder="0,00"
-            required
-          >
-        </label>
-
-        <label>
-          Hesap kesim tarihi
-
-          <input
-            id="statementDate"
-            type="date"
-          >
-        </label>
-
-        <label>
-          Son ödeme tarihi
-
-          <input
-            id="dueDate"
-            type="date"
-          >
-        </label>
-
-        <div
-          id="cardFormMessage"
-          class="form-message hidden"
-        ></div>
-
-        <div class="form-actions">
-
-          <button
-            id="cancelCardButton"
-            class="secondary-button"
-            type="button"
-          >
-            Vazgeç
-          </button>
-
-          <button class="primary-button" type="submit">
-            Kartı Kaydet
-          </button>
-
-        </div>
-
-      </form>
-
-    </div>
-
-  </div>
-
-
-  <!-- İŞLEM EKLEME MODALI -->
-  <div id="transactionModal" class="modal hidden">
-
-    <div
-      id="transactionModalBackdrop"
-      class="modal-backdrop"
-    ></div>
-
-    <div class="modal-content">
-
-      <div class="modal-header">
-        <div>
-          <p class="eyebrow">Gelir ve Gider</p>
-          <h2>Yeni İşlem</h2>
-        </div>
-
-        <button
-          id="closeTransactionFormButton"
-          class="close-button"
-          type="button"
-        >
-          ×
-        </button>
-      </div>
-
-      <form id="transactionForm">
-
-        <label>
-          İşlem türü
-
-          <select id="transactionType" required>
-            <option value="income">Gelir</option>
-            <option value="expense">Gider</option>
-          </select>
-        </label>
-
-        <label>
-          Açıklama
-
-          <input
-            id="transactionName"
-            type="text"
-            placeholder="Örn. Maaş veya market"
-            required
-          >
-        </label>
-
-        <label>
-          Tutar
-
-          <input
-            id="transactionAmount"
-            type="number"
-            min="0.01"
-            step="0.01"
-            placeholder="0,00"
-            required
-          >
-        </label>
-
-        <label>
-          Kategori
-
-          <select id="transactionCategory" required>
-            <option value="">Kategori seç</option>
-            <option value="salary">Maaş</option>
-            <option value="food">Market / Yemek</option>
-            <option value="transport">Ulaşım</option>
-            <option value="bill">Fatura</option>
-            <option value="shopping">Alışveriş</option>
-            <option value="other">Diğer</option>
-          </select>
-        </label>
-
-        <label>
-          Tarih
-
-          <input
-            id="transactionDate"
-            type="date"
-            required
-          >
-        </label>
-
-        <label>
-          Ödeme yöntemi
-
-          <select id="transactionPaymentMethod">
-            <option value="cash">Nakit / Hesap</option>
-            <option value="card">Kredi Kartı</option>
-          </select>
-        </label>
-
-        <label
-          id="transactionCardField"
-          class="hidden"
-        >
-          Kredi kartı
-
-          <select id="transactionCard">
-            <option value="">Kart seç</option>
-          </select>
-        </label>
-
-        <div class="form-actions">
-
-          <button
-            id="cancelTransactionButton"
-            class="secondary-button"
-            type="button"
-          >
-            Vazgeç
-          </button>
-
-          <button class="primary-button" type="submit">
-            İşlemi Kaydet
-          </button>
-
-        </div>
-
-      </form>
-
-    </div>
-
-  </div>
-
-
-  <!-- ANA UYGULAMA KODU -->
   <script src="app.js"></script>
-
-
-  <!-- BORÇ ÖDEME KODU -->
   <script>
-    document.addEventListener("DOMContentLoaded", function () {
-      const CARD_KEY = "yf_cards_v1";
-      const TRANSACTION_KEY = "yf_transactions_v1";
-
-      const paymentForm =
-        document.getElementById("debtPaymentForm");
-
-      const paymentCard =
-        document.getElementById("debtPaymentCard");
-
-      const paymentAmount =
-        document.getElementById("debtPaymentAmount");
-
-      const selectedCardDebt =
-        document.getElementById("selectedCardDebt");
-
-      const paymentMessage =
-        document.getElementById("debtPaymentMessage");
-
-      const paymentHistory =
-        document.getElementById("debtPaymentHistory");
-
-      function loadData(key) {
-        try {
-          const saved = localStorage.getItem(key);
-
-          return saved
-            ? JSON.parse(saved)
-            : [];
-        } catch (error) {
-          console.error("Veriler okunamadı:", error);
-          return [];
-        }
-      }
-
-      function saveData(key, data) {
-        localStorage.setItem(
-          key,
-          JSON.stringify(data)
-        );
-      }
-
-      function createId() {
-        if (
-          window.crypto &&
-          crypto.randomUUID
-        ) {
-          return crypto.randomUUID();
-        }
-
-        return String(
-          Date.now() + Math.random()
-        );
-      }
-
-      function formatMoney(value) {
-        return new Intl.NumberFormat(
-          "tr-TR",
-          {
-            style: "currency",
-            currency: "TRY"
-          }
-        ).format(Number(value) || 0);
-      }
-
-      function formatDateTime(value) {
-        const date = new Date(value);
-
-        return date.toLocaleString(
-          "tr-TR",
-          {
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit"
-          }
-        );
-      }
-
-      function escapeHtml(value) {
-        return String(value || "")
-          .replaceAll("&", "&amp;")
-          .replaceAll("<", "&lt;")
-          .replaceAll(">", "&gt;")
-          .replaceAll('"', "&quot;")
-          .replaceAll("'", "&#039;");
-      }
-
-      function showMessage(text, isError) {
-        paymentMessage.textContent = text;
-
-        paymentMessage.classList.remove(
-          "hidden",
-          "success",
-          "error"
-        );
-
-        paymentMessage.classList.add(
-          isError ? "error" : "success"
-        );
-      }
-
-      function hideMessage() {
-        paymentMessage.classList.add("hidden");
-      }
-
-      function populateCards() {
-        const cards = loadData(CARD_KEY);
-        const oldValue = paymentCard.value;
-
-        paymentCard.innerHTML = `
-          <option value="">
-            Kart seç
-          </option>
-        `;
-
-        cards
-          .filter(
-            card => Number(card.debt || 0) > 0
-          )
-          .forEach(card => {
-            const option =
-              document.createElement("option");
-
-            option.value = card.id;
-
-            option.textContent =
-              `${card.bank} - ${card.name} (${formatMoney(card.debt)})`;
-
-            paymentCard.appendChild(option);
-          });
-
-        if (
-          cards.some(
-            card => card.id === oldValue
-          )
-        ) {
-          paymentCard.value = oldValue;
-        }
-
-        updateSelectedDebt();
-      }
-
-      function updateSelectedDebt() {
-        const cards = loadData(CARD_KEY);
-
-        const selectedCard =
-          cards.find(
-            card =>
-              card.id === paymentCard.value
-          );
-
-        selectedCardDebt.textContent =
-          formatMoney(
-            selectedCard
-              ? selectedCard.debt
-              : 0
-          );
-
-        if (selectedCard) {
-          paymentAmount.max =
-            Number(selectedCard.debt || 0);
-        } else {
-          paymentAmount.removeAttribute("max");
-        }
-      }
-
-      function renderPaymentHistory() {
-        const transactions =
-          loadData(TRANSACTION_KEY);
-
-        const payments =
-          transactions.filter(
-            transaction =>
-              transaction.type ===
-              "card-payment"
-          );
-
-        paymentHistory.innerHTML = "";
-
-        if (payments.length === 0) {
-          paymentHistory.innerHTML = `
-            <div class="empty-state">
-              Henüz borç ödeme işlemi bulunmuyor.
-            </div>
-          `;
-
-          return;
-        }
-
-        payments.forEach(payment => {
-          const item =
-            document.createElement("article");
-
-          item.className =
-            "payment-history-item";
-
-          item.innerHTML = `
-            <div class="payment-history-info">
-              <strong>
-                ${escapeHtml(
-                  payment.cardName ||
-                  payment.name ||
-                  "Kart Borcu Ödemesi"
-                )}
-              </strong>
-
-              <span>
-                ${formatDateTime(
-                  payment.createdAt ||
-                  payment.date
-                )}
-              </span>
-            </div>
-
-            <strong class="payment-history-amount">
-              ${formatMoney(payment.amount)}
-            </strong>
-          `;
-
-          paymentHistory.appendChild(item);
-        });
-      }
-
-      paymentCard.addEventListener(
-        "change",
-        function () {
-          hideMessage();
-          updateSelectedDebt();
-        }
-      );
-
-      paymentForm.addEventListener(
-        "submit",
-        function (event) {
-          event.preventDefault();
-
-          hideMessage();
-
-          const cards = loadData(CARD_KEY);
-
-          const transactions =
-            loadData(TRANSACTION_KEY);
-
-          const selectedCard =
-            cards.find(
-              card =>
-                card.id === paymentCard.value
-            );
-
-          const amount =
-            Number(paymentAmount.value);
-
-          if (!selectedCard) {
-            showMessage(
-              "Lütfen ödeme yapılacak kartı seç.",
-              true
-            );
-
-            return;
-          }
-
-          if (
-            !Number.isFinite(amount) ||
-            amount <= 0
-          ) {
-            showMessage(
-              "Lütfen geçerli bir ödeme tutarı gir.",
-              true
-            );
-
-            return;
-          }
-
-          const currentDebt =
-            Number(selectedCard.debt || 0);
-
-          if (amount > currentDebt) {
-            showMessage(
-              "Ödeme tutarı kartın güncel borcundan büyük olamaz.",
-              true
-            );
-
-            return;
-          }
-
-          selectedCard.debt =
-            Math.max(
-              0,
-              currentDebt - amount
-            );
-
-          const now = new Date();
-
-          const transaction = {
-            id: createId(),
-            type: "card-payment",
-            name: "Kart Borcu Ödemesi",
-            amount: amount,
-            category: "debt-payment",
-            date: now
-              .toISOString()
-              .split("T")[0],
-            paymentMethod: "cash",
-            cardId: selectedCard.id,
-            cardName:
-              `${selectedCard.bank} - ${selectedCard.name}`,
-            cardDebtDelta: -amount,
-            createdAt: now.toISOString()
-          };
-
-          transactions.unshift(transaction);
-
-          saveData(CARD_KEY, cards);
-
-          saveData(
-            TRANSACTION_KEY,
-            transactions
-          );
-
-          paymentForm.reset();
-
-          selectedCardDebt.textContent =
-            formatMoney(0);
-
-          showMessage(
-            "Borç ödemesi başarıyla kaydedildi. Tarih ve saat otomatik eklendi.",
-            false
-          );
-
-          populateCards();
-          renderPaymentHistory();
-
-          setTimeout(function () {
-            window.location.reload();
-          }, 700);
-        }
-      );
-
-      document
-        .querySelectorAll(
-          '[data-page="debtPaymentPage"]'
-        )
-        .forEach(button => {
-          button.addEventListener(
-            "click",
-            function () {
-              populateCards();
-              renderPaymentHistory();
-            }
-          );
-        });
-
-      populateCards();
-      renderPaymentHistory();
+    document.addEventListener("DOMContentLoaded",function(){
+      const CARD_KEY="yf_cards_v1",TRANSACTION_KEY="yf_transactions_v1";
+      const paymentForm=document.getElementById("debtPaymentForm"),paymentCard=document.getElementById("debtPaymentCard"),paymentAmount=document.getElementById("debtPaymentAmount"),selectedCardDebt=document.getElementById("selectedCardDebt"),paymentMessage=document.getElementById("debtPaymentMessage"),paymentHistory=document.getElementById("debtPaymentHistory");
+      function loadData(key){try{const saved=localStorage.getItem(key);return saved?JSON.parse(saved):[]}catch(error){console.error("Veriler okunamadı:",error);return[]}}
+      function saveData(key,data){localStorage.setItem(key,JSON.stringify(data))}
+      function createId(){if(window.crypto&&crypto.randomUUID)return crypto.randomUUID();return String(Date.now()+Math.random())}
+      function formatMoney(value){return new Intl.NumberFormat("tr-TR",{style:"currency",currency:"TRY"}).format(Number(value)||0)}
+      function formatDateTime(value){const date=new Date(value);return date.toLocaleString("tr-TR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"})}
+      function escapeHtml(value){return String(value||"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;")}
+      function showMessage(text,isError){paymentMessage.textContent=text;paymentMessage.classList.remove("hidden","success","error");paymentMessage.classList.add(isError?"error":"success")}
+      function hideMessage(){paymentMessage.classList.add("hidden")}
+      function populateCards(){const cards=loadData(CARD_KEY),oldValue=paymentCard.value;paymentCard.innerHTML='<option value="">Kart seç</option>';cards.filter(card=>Number(card.debt||0)>0).forEach(card=>{const option=document.createElement("option");option.value=card.id;option.textContent=`${card.bank} - ${card.name} (${formatMoney(card.debt)})`;paymentCard.appendChild(option)});if(cards.some(card=>card.id===oldValue))paymentCard.value=oldValue;updateSelectedDebt()}
+      function updateSelectedDebt(){const cards=loadData(CARD_KEY),selectedCard=cards.find(card=>card.id===paymentCard.value);selectedCardDebt.textContent=formatMoney(selectedCard?selectedCard.debt:0);if(selectedCard)paymentAmount.max=Number(selectedCard.debt||0);else paymentAmount.removeAttribute("max")}
+      function renderPaymentHistory(){const payments=loadData(TRANSACTION_KEY).filter(transaction=>transaction.type==="card-payment");paymentHistory.innerHTML="";if(payments.length===0){paymentHistory.innerHTML='<div class="empty-state">Henüz borç ödeme işlemi bulunmuyor.</div>';return}payments.forEach(payment=>{const item=document.createElement("article");item.className="payment-history-item";item.innerHTML=`<div class="payment-history-info"><strong>${escapeHtml(payment.cardName||payment.name||"Kart Borcu Ödemesi")}</strong><span>${formatDateTime(payment.createdAt||payment.date)}</span></div><strong class="payment-history-amount">${formatMoney(payment.amount)}</strong>`;paymentHistory.appendChild(item)})}
+      paymentCard.addEventListener("change",()=>{hideMessage();updateSelectedDebt()});paymentForm.addEventListener("submit",function(event){event.preventDefault();hideMessage();const cards=loadData(CARD_KEY),transactions=loadData(TRANSACTION_KEY),selectedCard=cards.find(card=>card.id===paymentCard.value),amount=Number(paymentAmount.value);if(!selectedCard){showMessage("Lütfen ödeme yapılacak kartı seç.",true);return}if(!Number.isFinite(amount)||amount<=0){showMessage("Lütfen geçerli bir ödeme tutarı gir.",true);return}const currentDebt=Number(selectedCard.debt||0);if(amount>currentDebt){showMessage("Ödeme tutarı kartın güncel borcundan büyük olamaz.",true);return}selectedCard.debt=Math.max(0,currentDebt-amount);const now=new Date();transactions.unshift({id:createId(),type:"card-payment",name:"Kart Borcu Ödemesi",amount,category:"debt-payment",date:now.toISOString().split("T")[0],paymentMethod:"cash",cardId:selectedCard.id,cardName:`${selectedCard.bank} - ${selectedCard.name}`,cardDebtDelta:-amount,createdAt:now.toISOString()});saveData(CARD_KEY,cards);saveData(TRANSACTION_KEY,transactions);paymentForm.reset();selectedCardDebt.textContent=formatMoney(0);showMessage("Borç ödemesi başarıyla kaydedildi. Tarih ve saat otomatik eklendi.",false);populateCards();renderPaymentHistory();setTimeout(()=>window.location.reload(),700)});document.querySelectorAll('[data-page="debtPaymentPage"]').forEach(button=>button.addEventListener("click",()=>{populateCards();renderPaymentHistory()}));populateCards();renderPaymentHistory();
     });
   </script>
-
+  <script>
+    document.addEventListener("DOMContentLoaded",function(){const openButton=document.getElementById("openSideMenu"),closeButton=document.getElementById("closeSideMenu"),layer=document.getElementById("sideMenuLayer"),backdrop=document.getElementById("sideMenuBackdrop"),toast=document.getElementById("menuToast");let toastTimer;function openMenu(){layer.classList.add("open");layer.setAttribute("aria-hidden","false");document.body.style.overflow="hidden"}function closeMenu(){layer.classList.remove("open");layer.setAttribute("aria-hidden","true");document.body.style.overflow=""}function showToast(text){toast.textContent=text;toast.classList.add("show");clearTimeout(toastTimer);toastTimer=setTimeout(()=>toast.classList.remove("show"),1800)}openButton.addEventListener("click",openMenu);closeButton.addEventListener("click",closeMenu);backdrop.addEventListener("click",closeMenu);document.querySelectorAll(".future-menu-item").forEach(button=>button.addEventListener("click",function(){const feature=button.dataset.feature||"Bu özellik";closeMenu();setTimeout(()=>showToast(`${feature} yakında aktif edilecek.`),180)}));document.addEventListener("keydown",event=>{if(event.key==="Escape")closeMenu()})});
+  </script>
 </body>
 </html>
