@@ -307,3 +307,140 @@ document.addEventListener("DOMContentLoaded", () => {
 
   refreshDashboardFromStorage();
 });
+// =========================================
+// YF v2.0.3 — Net Durum hesaplama düzeltmesi
+// Bu kod app.js dosyasının EN ALTINA eklenir.
+// Kart ödemesi ikinci kez gider sayılmaz.
+// =========================================
+
+document.addEventListener("DOMContentLoaded", () => {
+  const CARD_KEY = "yf_cards_v1";
+  const TRANSACTION_KEY = "yf_transactions_v1";
+
+  function loadJson(key) {
+    try {
+      return JSON.parse(localStorage.getItem(key) || "[]");
+    } catch {
+      return [];
+    }
+  }
+
+  function formatMoney(value) {
+    return new Intl.NumberFormat("tr-TR", {
+      style: "currency",
+      currency: "TRY"
+    }).format(Number(value) || 0);
+  }
+
+  function isCurrentMonth(value) {
+    if (!value) return false;
+
+    const date = new Date(
+      String(value).includes("T")
+        ? value
+        : `${value}T12:00:00`
+    );
+
+    if (Number.isNaN(date.getTime())) return false;
+
+    const now = new Date();
+
+    return (
+      date.getMonth() === now.getMonth() &&
+      date.getFullYear() === now.getFullYear()
+    );
+  }
+
+  function refreshCorrectDashboard() {
+    const cards = loadJson(CARD_KEY);
+    const transactions = loadJson(TRANSACTION_KEY);
+
+    const totalCardDebt = cards.reduce(
+      (sum, card) => sum + Number(card.debt || 0),
+      0
+    );
+
+    const income = transactions
+      .filter(item => item.type === "income")
+      .reduce(
+        (sum, item) => sum + Number(item.amount || 0),
+        0
+      );
+
+    const normalExpenses = transactions
+      .filter(item => item.type === "expense")
+      .reduce(
+        (sum, item) => sum + Number(item.amount || 0),
+        0
+      );
+
+    const monthlyCardPayments = transactions
+      .filter(
+        item =>
+          item.type === "card-payment" &&
+          isCurrentMonth(item.createdAt || item.date)
+      )
+      .reduce(
+        (sum, item) => sum + Number(item.amount || 0),
+        0
+      );
+
+    /*
+      Doğru mantık:
+      Kart ödemesi borcu azaltır.
+      Aynı ödeme Net Durumdan tekrar gider olarak düşülmez.
+    */
+    const net = income - normalExpenses - totalCardDebt;
+
+    const totalDebtEl = document.getElementById("totalDebt");
+    const monthlyPaymentEl = document.getElementById("monthlyPayment");
+    const netBalanceEl = document.getElementById("netBalance");
+    const cardCountEl = document.getElementById("cardCount");
+    const balanceStatusEl = document.getElementById("balanceStatus");
+
+    if (totalDebtEl) {
+      totalDebtEl.textContent = formatMoney(totalCardDebt);
+    }
+
+    if (monthlyPaymentEl) {
+      monthlyPaymentEl.textContent = formatMoney(monthlyCardPayments);
+    }
+
+    if (netBalanceEl) {
+      netBalanceEl.textContent = formatMoney(net);
+    }
+
+    if (cardCountEl) {
+      cardCountEl.textContent = String(cards.length);
+    }
+
+    if (balanceStatusEl) {
+      balanceStatusEl.textContent =
+        net < 0
+          ? "Ekside"
+          : net > 0
+            ? "Pozitif"
+            : "Dengeli";
+    }
+  }
+
+  document
+    .querySelectorAll('[data-page="dashboardPage"]')
+    .forEach(button => {
+      button.addEventListener("click", () => {
+        setTimeout(refreshCorrectDashboard, 100);
+      });
+    });
+
+  window.addEventListener(
+    "yf-refresh-dashboard",
+    refreshCorrectDashboard
+  );
+
+  window.addEventListener(
+    "storage",
+    refreshCorrectDashboard
+  );
+
+  refreshCorrectDashboard();
+});
