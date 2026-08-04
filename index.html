@@ -74,7 +74,83 @@
     body.light-theme .report-progress-card,body.light-theme .report-last-item{background:rgba(255,255,255,.75);border-color:rgba(20,73,112,.10)}
     body.light-theme .report-last-info strong,body.light-theme .report-progress-head strong{color:#102033}
     @media(max-width:390px){.settings-card-head{align-items:flex-start}.settings-action{padding:0 11px;font-size:12px}}
-  </style>
+  
+
+/* BORÇ TÜRÜ SEÇİMİ */
+.debt-type-selector{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:10px;
+  margin-bottom:2px;
+}
+.debt-type-option{
+  position:relative;
+  display:block;
+  cursor:pointer;
+}
+.debt-type-option input{
+  position:absolute;
+  opacity:0;
+  pointer-events:none;
+}
+.debt-type-option-content{
+  min-height:78px;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  justify-content:center;
+  gap:6px;
+  padding:13px;
+  border:1px solid rgba(255,255,255,.10);
+  border-radius:15px;
+  background:rgba(255,255,255,.045);
+  transition:.18s ease;
+}
+.debt-type-option-content span{
+  font-size:22px;
+  line-height:1;
+}
+.debt-type-option-content strong{
+  color:#f6f9ff;
+  font-size:12px;
+  line-height:1.25;
+}
+.debt-type-option input:checked + .debt-type-option-content{
+  border-color:rgba(79,177,255,.48);
+  background:rgba(15,140,255,.14);
+  box-shadow:0 0 0 3px rgba(15,140,255,.08);
+}
+.form-subsection{
+  display:grid;
+  gap:14px;
+  padding-top:2px;
+}
+.form-subsection-title{
+  margin:2px 0 -2px;
+  color:#70bdff;
+  font-size:11px;
+  font-weight:850;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+}
+body.light-theme .debt-type-option-content{
+  color:#102033;
+  background:rgba(20,73,112,.04);
+  border-color:rgba(20,73,112,.11);
+}
+body.light-theme .debt-type-option-content strong{
+  color:#102033;
+}
+body.light-theme .debt-type-option input:checked + .debt-type-option-content{
+  background:rgba(15,140,255,.10);
+  border-color:rgba(15,140,255,.34);
+}
+@media(max-width:370px){
+  .debt-type-selector{grid-template-columns:1fr}
+  .debt-type-option-content{min-height:64px}
+}
+
+</style>
 </head>
 <body>
   <button id="openSideMenu" class="menu-open-button" type="button" aria-label="Menüyü aç">☰</button>
@@ -229,10 +305,127 @@
     <button class="nav-item" data-page="debtPaymentPage" type="button"><span>✓</span><small>Borç Öde</small></button>
   </nav>
 
-  <div id="cardModal" class="modal hidden"><div id="modalBackdrop" class="modal-backdrop"></div><div class="modal-content"><div class="modal-header"><div><p class="eyebrow">Kart Yönetimi</p><h2 id="cardFormTitle">Yeni Kart Ekle</h2></div><button id="closeCardFormButton" class="close-button" type="button">×</button></div><form id="cardForm">
-    <input id="cardId" type="hidden"><label>Banka<select id="bankName" required><option value="">Banka seç</option><option>Ziraat Bankası</option><option>Garanti BBVA</option><option>TOM Bankası</option><option>Akbank</option><option>QNB</option><option>İş Bankası</option><option>Diğer</option></select></label>
-    <label>Kart adı<input id="cardName" type="text" placeholder="Örn. Bonus Kart" required></label><label>Kart limiti<input id="cardLimit" type="number" min="0" step="0.01" placeholder="0,00" required></label><label>Güncel borç<input id="cardDebt" type="number" min="0" step="0.01" placeholder="0,00" required></label><label>Hesap kesim tarihi<input id="statementDate" type="date"></label><label>Son ödeme tarihi<input id="dueDate" type="date"></label><div id="cardFormMessage" class="form-message hidden"></div><div class="form-actions"><button id="cancelCardButton" class="secondary-button" type="button">Vazgeç</button><button class="primary-button" type="submit">Kartı Kaydet</button></div>
-  </form></div></div>
+  <div id="cardModal" class="modal hidden">
+    <div id="modalBackdrop" class="modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <p class="eyebrow">Kart Yönetimi</p>
+          <h2 id="cardFormTitle">Yeni Kart Ekle</h2>
+        </div>
+        <button id="closeCardFormButton" class="close-button" type="button">×</button>
+      </div>
+
+      <form id="cardForm">
+        <input id="cardId" type="hidden">
+
+        <label>
+          Borç türü
+          <div class="debt-type-selector" role="radiogroup" aria-label="Borç türü">
+            <label class="debt-type-option">
+              <input id="debtTypeCreditCard" type="radio" name="debtType" value="credit-card" checked>
+              <span class="debt-type-option-content">
+                <span>💳</span>
+                <strong>Kredi Kartı</strong>
+              </span>
+            </label>
+
+            <label class="debt-type-option">
+              <input id="debtTypePersonalLoan" type="radio" name="debtType" value="personal-loan">
+              <span class="debt-type-option-content">
+                <span>🏦</span>
+                <strong>İhtiyaç Kredisi</strong>
+              </span>
+            </label>
+          </div>
+        </label>
+
+        <label>
+          Banka
+          <select id="bankName" required>
+            <option value="">Banka seç</option>
+            <option>Ziraat Bankası</option>
+            <option>Garanti BBVA</option>
+            <option>TOM Bankası</option>
+            <option>Akbank</option>
+            <option>QNB</option>
+            <option>İş Bankası</option>
+            <option>Diğer</option>
+          </select>
+        </label>
+
+        <div id="creditCardFields" class="form-subsection">
+          <p class="form-subsection-title">Kredi Kartı Bilgileri</p>
+
+          <label>
+            Kart adı
+            <input id="cardName" type="text" placeholder="Örn. Bonus Kart" required>
+          </label>
+
+          <label>
+            Kart limiti
+            <input id="cardLimit" type="number" min="0" step="0.01" placeholder="0,00" required>
+          </label>
+
+          <label>
+            Güncel borç
+            <input id="cardDebt" type="number" min="0" step="0.01" placeholder="0,00" required>
+          </label>
+
+          <label>
+            Hesap kesim tarihi
+            <input id="statementDate" type="date">
+          </label>
+
+          <label>
+            Son ödeme tarihi
+            <input id="dueDate" type="date">
+          </label>
+        </div>
+
+        <div id="personalLoanFields" class="form-subsection hidden">
+          <p class="form-subsection-title">İhtiyaç Kredisi Bilgileri</p>
+
+          <label>
+            Kredi adı
+            <input id="loanName" type="text" placeholder="Örn. İhtiyaç Kredisi">
+          </label>
+
+          <label>
+            Kalan borç
+            <input id="loanRemainingDebt" type="number" min="0" step="0.01" placeholder="0,00">
+          </label>
+
+          <label>
+            Aylık taksit
+            <input id="loanMonthlyInstallment" type="number" min="0" step="0.01" placeholder="0,00">
+          </label>
+
+          <label>
+            Kalan taksit sayısı
+            <input id="loanRemainingInstallments" type="number" min="1" step="1" inputmode="numeric" placeholder="Örn. 4">
+          </label>
+
+          <label>
+            Her ay ödeme günü
+            <input id="loanPaymentDay" type="number" min="1" max="31" step="1" inputmode="numeric" placeholder="Örn. 5">
+          </label>
+
+          <label>
+            Sonraki ödeme tarihi
+            <input id="loanNextPaymentDate" type="date">
+          </label>
+        </div>
+
+        <div id="cardFormMessage" class="form-message hidden"></div>
+
+        <div class="form-actions">
+          <button id="cancelCardButton" class="secondary-button" type="button">Vazgeç</button>
+          <button class="primary-button" type="submit">Kaydet</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <div id="transactionModal" class="modal hidden"><div id="transactionModalBackdrop" class="modal-backdrop"></div><div class="modal-content"><div class="modal-header"><div><p class="eyebrow">Gelir ve Gider</p><h2>Yeni İşlem</h2></div><button id="closeTransactionFormButton" class="close-button" type="button">×</button></div><form id="transactionForm">
     <label>İşlem türü<select id="transactionType" required><option value="income">Gelir</option><option value="expense">Gider</option></select></label><label>Açıklama<input id="transactionName" type="text" placeholder="Örn. Maaş veya market" required></label><label>Tutar<input id="transactionAmount" type="number" min="0.01" step="0.01" placeholder="0,00" required></label><label>Kategori<select id="transactionCategory" required><option value="">Kategori seç</option><option value="salary">Maaş</option><option value="food">Market / Yemek</option><option value="transport">Ulaşım</option><option value="bill">Fatura</option><option value="shopping">Alışveriş</option><option value="other">Diğer</option></select></label><label>Tarih<input id="transactionDate" type="date" required></label><label>Ödeme yöntemi<select id="transactionPaymentMethod"><option value="cash">Nakit / Hesap</option><option value="card">Kredi Kartı</option></select></label><label id="transactionCardField" class="hidden">Kredi kartı<select id="transactionCard"><option value="">Kart seç</option></select></label><div class="form-actions"><button id="cancelTransactionButton" class="secondary-button" type="button">Vazgeç</button><button class="primary-button" type="submit">İşlemi Kaydet</button></div>
