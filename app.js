@@ -3767,4 +3767,610 @@ document.addEventListener("DOMContentLoaded", () => {
 
   setTimeout(unlockPageScroll, 150);
 });
+// =========================================
+// YF v2.5 — Hedefler Ekranı Arayüzü
+// Bu kod app.js dosyasının EN ALTINA eklenir.
+// =========================================
+
+document.addEventListener("DOMContentLoaded", () => {
+  const DEBT_KEY = "yf_cards_v1";
+  const TRANSACTION_KEY = "yf_transactions_v1";
+
+  const menuButton = document.querySelector(
+    '.side-menu-item[data-feature="Hedefler"]'
+  );
+
+  if (!menuButton) return;
+
+  menuButton.classList.remove("future-menu-item");
+  menuButton.removeAttribute("data-feature");
+  menuButton.dataset.page = "goalsPage";
+
+  installGoalStyles();
+  createGoalsPage();
+  setupGoalEvents();
+  renderGoals();
+
+  function createGoalsPage() {
+    if (document.getElementById("goalsPage")) return;
+
+    const main = document.querySelector("main.app-shell");
+    if (!main) return;
+
+    const page = document.createElement("section");
+    page.id = "goalsPage";
+    page.className = "page";
+
+    page.innerHTML = `
+      <header class="top-header">
+        <div>
+          <p class="eyebrow">Finans Planı</p>
+          <h1>Hedefler</h1>
+        </div>
+
+        <button
+          id="goalsBackButton"
+          class="reports-back-button"
+          type="button"
+        >
+          Ana Sayfa
+        </button>
+      </header>
+
+      <section class="goal-summary-grid">
+        <article class="goal-summary-card">
+          <span>Aktif Hedef</span>
+          <strong id="activeGoalCount">0</strong>
+        </article>
+
+        <article class="goal-summary-card">
+          <span>Tamamlanan</span>
+          <strong id="completedGoalCount">0</strong>
+        </article>
+
+        <article class="goal-summary-card wide">
+          <span>Toplam Borç İlerlemesi</span>
+          <strong id="totalGoalProgress">%0</strong>
+        </article>
+      </section>
+
+      <section class="content-card">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Ana Hedef</p>
+            <h2>Toplam borcu bitir</h2>
+          </div>
+        </div>
+
+        <div class="main-goal-card">
+          <div class="main-goal-head">
+            <div>
+              <span>Başlangıç Borcu</span>
+              <strong id="goalOriginalDebt">₺0,00</strong>
+            </div>
+
+            <div>
+              <span>Kalan Borç</span>
+              <strong id="goalRemainingDebt">₺0,00</strong>
+            </div>
+          </div>
+
+          <div class="goal-progress-track">
+            <div id="goalMainProgress" class="goal-progress-fill"></div>
+          </div>
+
+          <div class="goal-progress-footer">
+            <span id="goalPaidAmount">₺0,00 ödendi</span>
+            <strong id="goalPercentText">%0</strong>
+          </div>
+
+          <p id="goalMotivationText" class="goal-motivation">
+            Borçların azaldıkça ilerleme burada görünecek.
+          </p>
+        </div>
+      </section>
+
+      <section class="content-card">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Borç Hedefleri</p>
+            <h2>Kart ve krediler</h2>
+          </div>
+        </div>
+
+        <div id="goalDebtList" class="goal-list">
+          <div class="empty-state">Henüz borç hedefi bulunmuyor.</div>
+        </div>
+      </section>
+
+      <section class="content-card">
+        <button id="addGoalButton" class="goal-add-button" type="button">
+          <span>＋</span>
+
+          <div>
+            <strong>Yeni Hedef Ekle</strong>
+            <small>Borç kapatma veya birikim hedefi oluştur</small>
+          </div>
+        </button>
+      </section>
+    `;
+
+    main.appendChild(page);
+  }
+
+  function setupGoalEvents() {
+    menuButton.addEventListener("click", () => {
+      closeSideMenu();
+      showPage("goalsPage");
+      renderGoals();
+      localStorage.setItem("yf_last_open_page_v1", "goalsPage");
+    });
+
+    document
+      .getElementById("goalsBackButton")
+      ?.addEventListener("click", () => {
+        showPage("dashboardPage");
+        localStorage.setItem("yf_last_open_page_v1", "dashboardPage");
+      });
+
+    document
+      .getElementById("addGoalButton")
+      ?.addEventListener("click", () => {
+        showToast("Yeni hedef ekleme formu sonraki aşamada aktif edilecek.");
+      });
+
+    window.addEventListener("storage", renderGoals);
+  }
+
+  function renderGoals() {
+    const debts = loadJson(DEBT_KEY);
+    const transactions = loadJson(TRANSACTION_KEY);
+
+    const activeDebts = debts.filter(
+      item => Number(item.debt || 0) > 0
+    );
+
+    const completedDebts = debts.filter(
+      item => Number(item.debt || 0) <= 0
+    );
+
+    const remainingDebt = roundMoney(
+      activeDebts.reduce(
+        (sum, item) => sum + Number(item.debt || 0),
+        0
+      )
+    );
+
+    const totalPaid = roundMoney(
+      transactions
+        .filter(transaction =>
+          transaction.type === "card-payment" ||
+          transaction.type === "loan-payment"
+        )
+        .reduce(
+          (sum, transaction) =>
+            sum + Number(transaction.amount || 0),
+          0
+        )
+    );
+
+    const originalDebt = roundMoney(
+      remainingDebt + totalPaid
+    );
+
+    const percent =
+      originalDebt > 0
+        ? Math.min(
+            100,
+            Math.round((totalPaid / originalDebt) * 100)
+          )
+        : 0;
+
+    setText("activeGoalCount", activeDebts.length);
+    setText("completedGoalCount", completedDebts.length);
+    setText("totalGoalProgress", `%${percent}`);
+    setText("goalOriginalDebt", formatMoney(originalDebt));
+    setText("goalRemainingDebt", formatMoney(remainingDebt));
+    setText("goalPaidAmount", `${formatMoney(totalPaid)} ödendi`);
+    setText("goalPercentText", `%${percent}`);
+
+    const progress = document.getElementById("goalMainProgress");
+    if (progress) progress.style.width = `${percent}%`;
+
+    const motivation = document.getElementById("goalMotivationText");
+    if (motivation) {
+      motivation.textContent =
+        percent >= 100
+          ? "Tebrikler! Tüm borç hedefin tamamlandı. 🎉"
+          : percent >= 75
+            ? "Hedefe çok yaklaştın. Son bölümdesin!"
+            : percent >= 50
+              ? "Borçlarının yarısından fazlasını tamamladın."
+              : percent > 0
+                ? "İlerleme başladı. Düzenli devam et."
+                : "İlk ödemenle hedef ilerlemen başlayacak.";
+    }
+
+    renderDebtGoals(activeDebts, transactions);
+  }
+
+  function renderDebtGoals(debts, transactions) {
+    const list = document.getElementById("goalDebtList");
+    if (!list) return;
+
+    list.innerHTML = "";
+
+    if (!debts.length) {
+      list.innerHTML = `
+        <div class="empty-state">
+          Aktif borç kalmadı. Tebrikler! 🎉
+        </div>
+      `;
+      return;
+    }
+
+    debts.forEach(item => {
+      const isLoan = item.type === "personal-loan";
+
+      const paid = roundMoney(
+        transactions
+          .filter(transaction =>
+            transaction.cardId === item.id &&
+            (
+              transaction.type === "card-payment" ||
+              transaction.type === "loan-payment"
+            )
+          )
+          .reduce(
+            (sum, transaction) =>
+              sum + Number(transaction.amount || 0),
+            0
+          )
+      );
+
+      const original = roundMoney(
+        Number(item.debt || 0) + paid
+      );
+
+      const percent =
+        original > 0
+          ? Math.min(
+              100,
+              Math.round((paid / original) * 100)
+            )
+          : 0;
+
+      const card = document.createElement("article");
+      card.className = "goal-item";
+
+      card.innerHTML = `
+        <div class="goal-item-head">
+          <div class="goal-item-icon">
+            ${isLoan ? "🏦" : "💳"}
+          </div>
+
+          <div class="goal-item-info">
+            <strong>${escapeHtml(item.bank || "Banka")}</strong>
+            <span>${escapeHtml(item.name || "")}</span>
+          </div>
+
+          <strong class="goal-item-percent">%${percent}</strong>
+        </div>
+
+        <div class="goal-progress-track">
+          <div class="goal-progress-fill" style="width:${percent}%"></div>
+        </div>
+
+        <div class="goal-item-footer">
+          <span>Kalan: ${formatMoney(item.debt)}</span>
+          <span>Ödenen: ${formatMoney(paid)}</span>
+        </div>
+      `;
+
+      list.appendChild(card);
+    });
+  }
+
+  function showPage(pageId) {
+    document.querySelectorAll(".page").forEach(page => {
+      page.classList.toggle("active", page.id === pageId);
+    });
+
+    document
+      .querySelectorAll(".bottom-navigation .nav-item")
+      .forEach(item => {
+        item.classList.toggle("active", item.dataset.page === pageId);
+      });
+
+    document.body.style.overflow = "";
+    document.documentElement.style.overflow = "";
+
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function closeSideMenu() {
+    const layer = document.getElementById("sideMenuLayer");
+
+    layer?.classList.remove("open");
+    layer?.setAttribute("aria-hidden", "true");
+
+    document.body.style.overflow = "";
+    document.documentElement.style.overflow = "";
+  }
+
+  function showToast(text) {
+    const toast = document.getElementById("menuToast");
+
+    if (!toast) {
+      alert(text);
+      return;
+    }
+
+    toast.textContent = text;
+    toast.classList.add("show");
+
+    setTimeout(() => {
+      toast.classList.remove("show");
+    }, 1900);
+  }
+
+  function loadJson(key) {
+    try {
+      return JSON.parse(localStorage.getItem(key) || "[]");
+    } catch {
+      return [];
+    }
+  }
+
+  function formatMoney(value) {
+    return new Intl.NumberFormat("tr-TR", {
+      style: "currency",
+      currency: "TRY"
+    }).format(Number(value) || 0);
+  }
+
+  function roundMoney(value) {
+    return Math.round(
+      (Number(value) + Number.EPSILON) * 100
+    ) / 100;
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function setText(id, value) {
+    const element = document.getElementById(id);
+    if (element) element.textContent = String(value);
+  }
+
+  function installGoalStyles() {
+    if (document.getElementById("yfGoalStyles")) return;
+
+    const style = document.createElement("style");
+    style.id = "yfGoalStyles";
+
+    style.textContent = `
+      .goal-summary-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 11px;
+        margin-bottom: 14px;
+      }
+
+      .goal-summary-card {
+        padding: 16px;
+        border: 1px solid rgba(255,255,255,.08);
+        border-radius: 18px;
+        background: rgba(255,255,255,.04);
+      }
+
+      .goal-summary-card.wide {
+        grid-column: 1 / -1;
+      }
+
+      .goal-summary-card span,
+      .goal-summary-card strong {
+        display: block;
+      }
+
+      .goal-summary-card span {
+        margin-bottom: 7px;
+        color: #8fa2ba;
+        font-size: 11px;
+      }
+
+      .goal-summary-card strong {
+        font-size: 24px;
+      }
+
+      .main-goal-card {
+        padding: 17px;
+        border: 1px solid rgba(72,171,255,.18);
+        border-radius: 19px;
+        background: rgba(15,140,255,.06);
+      }
+
+      .main-goal-head {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0,1fr));
+        gap: 12px;
+        margin-bottom: 15px;
+      }
+
+      .main-goal-head span,
+      .main-goal-head strong {
+        display: block;
+      }
+
+      .main-goal-head span {
+        margin-bottom: 5px;
+        color: #8fa2ba;
+        font-size: 10px;
+      }
+
+      .main-goal-head strong {
+        font-size: 15px;
+      }
+
+      .goal-progress-track {
+        height: 10px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: rgba(255,255,255,.08);
+      }
+
+      .goal-progress-fill {
+        height: 100%;
+        width: 0;
+        border-radius: inherit;
+        background: linear-gradient(90deg,#0f8cff,#52e6b2);
+        transition: width .45s ease;
+      }
+
+      .goal-progress-footer {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 9px;
+        color: #8fa2ba;
+        font-size: 10px;
+      }
+
+      .goal-progress-footer strong {
+        color: #66c3ff;
+      }
+
+      .goal-motivation {
+        margin: 14px 0 0;
+        color: #b9c8d8;
+        font-size: 11px;
+        line-height: 1.5;
+      }
+
+      .goal-list {
+        display: grid;
+        gap: 11px;
+      }
+
+      .goal-item {
+        padding: 14px;
+        border: 1px solid rgba(255,255,255,.07);
+        border-radius: 17px;
+        background: rgba(255,255,255,.035);
+      }
+
+      .goal-item-head {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        margin-bottom: 12px;
+      }
+
+      .goal-item-icon {
+        width: 40px;
+        height: 40px;
+        flex: 0 0 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 13px;
+        background: rgba(15,140,255,.10);
+      }
+
+      .goal-item-info {
+        min-width: 0;
+        flex: 1;
+      }
+
+      .goal-item-info strong,
+      .goal-item-info span {
+        display: block;
+      }
+
+      .goal-item-info span {
+        margin-top: 4px;
+        color: #8fa2ba;
+        font-size: 10px;
+      }
+
+      .goal-item-percent {
+        color: #64c1ff;
+        font-size: 13px;
+      }
+
+      .goal-item-footer {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 9px;
+        color: #8fa2ba;
+        font-size: 9.5px;
+      }
+
+      .goal-add-button {
+        width: 100%;
+        min-height: 62px;
+        display: flex;
+        align-items: center;
+        gap: 13px;
+        padding: 13px;
+        border: 1px dashed rgba(72,171,255,.24);
+        border-radius: 17px;
+        color: inherit;
+        background: rgba(15,140,255,.055);
+        text-align: left;
+        font: inherit;
+      }
+
+      .goal-add-button > span {
+        width: 38px;
+        height: 38px;
+        flex: 0 0 38px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 12px;
+        color: #72c2ff;
+        background: rgba(15,140,255,.11);
+        font-size: 21px;
+      }
+
+      .goal-add-button strong,
+      .goal-add-button small {
+        display: block;
+      }
+
+      .goal-add-button small {
+        margin-top: 4px;
+        color: #8093a8;
+        font-size: 10px;
+      }
+
+      body.light-theme .goal-summary-card,
+      body.light-theme .goal-item,
+      body.light-theme .main-goal-card {
+        background: rgba(255,255,255,.82);
+        border-color: rgba(20,73,112,.09);
+      }
+
+      body.light-theme .goal-motivation {
+        color: #536b82;
+      }
+
+      @media(max-width:370px) {
+        .main-goal-head {
+          grid-template-columns: 1fr;
+        }
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+});
 
