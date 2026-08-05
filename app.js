@@ -5697,4 +5697,401 @@ document.addEventListener("DOMContentLoaded", () => {
     document.head.appendChild(style);
   }
 });
+// =========================================
+// YF v2.7 — Profesyonel Kart Görünümü
+// Bu kod app.js dosyasının EN ALTINA eklenir.
+// Mevcut hesaplama ve ödeme sistemine dokunmaz.
+// =========================================
+
+document.addEventListener("DOMContentLoaded", () => {
+  installProfessionalCardStyles();
+  decorateCards();
+
+  document
+    .querySelectorAll('[data-page="cardsPage"]')
+    .forEach(button => {
+      button.addEventListener("click", () => {
+        setTimeout(decorateCards, 220);
+      });
+    });
+
+  const cardsList = document.getElementById("cardsList");
+
+  if (cardsList) {
+    const observer = new MutationObserver(() => {
+      decorateCards();
+    });
+
+    observer.observe(cardsList, {
+      childList: true,
+      subtree: true
+    });
+  }
+
+  function decorateCards() {
+    document
+      .querySelectorAll("#cardsList .bank-card")
+      .forEach(card => {
+        const bankText =
+          card.querySelector(".bank-card-header span")
+            ?.textContent
+            ?.trim() || "";
+
+        const debtText =
+          card.querySelector(".bank-card-debt")
+            ?.textContent || "";
+
+        const debt = parseMoney(debtText);
+        const lower = bankText.toLocaleLowerCase("tr-TR");
+
+        card.classList.remove(
+          "pro-bank-ziraat",
+          "pro-bank-garanti",
+          "pro-bank-akbank",
+          "pro-bank-qnb",
+          "pro-bank-is",
+          "pro-bank-tom",
+          "pro-bank-other",
+          "pro-card-completed"
+        );
+
+        if (lower.includes("ziraat")) {
+          card.classList.add("pro-bank-ziraat");
+        } else if (lower.includes("garanti")) {
+          card.classList.add("pro-bank-garanti");
+        } else if (lower.includes("akbank")) {
+          card.classList.add("pro-bank-akbank");
+        } else if (lower.includes("qnb")) {
+          card.classList.add("pro-bank-qnb");
+        } else if (lower.includes("iş")) {
+          card.classList.add("pro-bank-is");
+        } else if (lower.includes("tom")) {
+          card.classList.add("pro-bank-tom");
+        } else {
+          card.classList.add("pro-bank-other");
+        }
+
+        if (debt <= 0) {
+          card.classList.add("pro-card-completed");
+        }
+
+        addBankLogo(card, bankText);
+        addCardStatus(card, debt);
+      });
+  }
+
+  function addBankLogo(card, bankName) {
+    const header = card.querySelector(".bank-card-header");
+    const titleBox = header?.querySelector("div");
+
+    if (!header || !titleBox) return;
+    if (header.querySelector(".pro-bank-logo")) return;
+
+    const logo = document.createElement("div");
+    logo.className = "pro-bank-logo";
+    logo.textContent =
+      bankName?.trim()?.charAt(0)?.toLocaleUpperCase("tr-TR") || "B";
+
+    header.insertBefore(logo, titleBox);
+  }
+
+  function addCardStatus(card, debt) {
+    if (card.querySelector(".pro-card-status")) return;
+
+    const debtElement = card.querySelector(".bank-card-debt");
+    if (!debtElement) return;
+
+    const status = document.createElement("div");
+    status.className = "pro-card-status";
+
+    if (debt <= 0) {
+      status.classList.add("completed");
+      status.textContent = "Borç tamamlandı ✓";
+    } else if (card.classList.contains("loan-bank-card")) {
+      status.classList.add("loan");
+      status.textContent = "Aktif ihtiyaç kredisi";
+    } else {
+      status.classList.add("active");
+      status.textContent = "Aktif kredi kartı";
+    }
+
+    debtElement.insertAdjacentElement("afterend", status);
+  }
+
+  function parseMoney(value) {
+    const normalized = String(value || "")
+      .replace(/[^\d,.-]/g, "")
+      .replace(/\./g, "")
+      .replace(",", ".");
+
+    return Number(normalized) || 0;
+  }
+
+  function installProfessionalCardStyles() {
+    if (document.getElementById("yfProfessionalCardStyles")) return;
+
+    const style = document.createElement("style");
+    style.id = "yfProfessionalCardStyles";
+
+    style.textContent = `
+      #cardsList .bank-card {
+        position: relative;
+        overflow: hidden;
+        border: 1px solid rgba(255,255,255,.10);
+        border-radius: 24px;
+        padding: 18px;
+        background:
+          radial-gradient(
+            circle at 88% 15%,
+            rgba(255,255,255,.12),
+            transparent 30%
+          ),
+          linear-gradient(
+            145deg,
+            rgba(25,57,88,.98),
+            rgba(10,31,52,.98)
+          );
+        box-shadow:
+          0 20px 46px rgba(0,0,0,.22),
+          inset 0 1px 0 rgba(255,255,255,.05);
+        transition:
+          transform .2s ease,
+          border-color .2s ease,
+          box-shadow .2s ease;
+      }
+
+      #cardsList .bank-card:active {
+        transform: scale(.988);
+      }
+
+      #cardsList .bank-card::after {
+        content: "";
+        position: absolute;
+        right: -55px;
+        bottom: -70px;
+        width: 180px;
+        height: 180px;
+        border-radius: 50%;
+        background: rgba(255,255,255,.045);
+        pointer-events: none;
+      }
+
+      #cardsList .bank-card-header {
+        position: relative;
+        z-index: 2;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      #cardsList .bank-card-header > div:not(.bank-card-actions):not(.pro-bank-logo) {
+        min-width: 0;
+        flex: 1;
+      }
+
+      .pro-bank-logo {
+        width: 46px;
+        height: 46px;
+        flex: 0 0 46px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 15px;
+        color: #fff;
+        background: rgba(255,255,255,.12);
+        border: 1px solid rgba(255,255,255,.12);
+        font-size: 18px;
+        font-weight: 950;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.08);
+      }
+
+      #cardsList .bank-card-header > div > span {
+        display: block;
+        color: rgba(220,234,247,.72);
+        font-size: 9px;
+        font-weight: 900;
+        letter-spacing: .12em;
+        text-transform: uppercase;
+      }
+
+      #cardsList .bank-card-header h3 {
+        margin: 4px 0 0;
+        overflow: hidden;
+        color: #fff;
+        font-size: 16px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      #cardsList .bank-card-debt {
+        position: relative;
+        z-index: 2;
+        display: block;
+        margin-top: 18px;
+        color: #fff;
+        font-size: 29px;
+        line-height: 1;
+        letter-spacing: -.03em;
+      }
+
+      .pro-card-status {
+        position: relative;
+        z-index: 2;
+        display: inline-flex;
+        align-items: center;
+        min-height: 25px;
+        margin-top: 10px;
+        padding: 0 9px;
+        border-radius: 999px;
+        font-size: 8.5px;
+        font-weight: 900;
+      }
+
+      .pro-card-status.active {
+        color: #76c4ff;
+        background: rgba(15,140,255,.12);
+        border: 1px solid rgba(72,171,255,.18);
+      }
+
+      .pro-card-status.loan {
+        color: #ffd277;
+        background: rgba(255,177,72,.11);
+        border: 1px solid rgba(255,177,72,.18);
+      }
+
+      .pro-card-status.completed {
+        color: #4ce0aa;
+        background: rgba(43,211,154,.11);
+        border: 1px solid rgba(43,211,154,.18);
+      }
+
+      #cardsList .bank-card-actions {
+        display: flex;
+        flex: 0 0 auto;
+        gap: 6px;
+      }
+
+      #cardsList .bank-card-actions button {
+        min-height: 32px;
+        padding: 0 9px;
+        border: 1px solid rgba(255,255,255,.10);
+        border-radius: 10px;
+        color: #dce9f5;
+        background: rgba(255,255,255,.055);
+        font-size: 8.5px;
+        font-weight: 800;
+      }
+
+      #cardsList .card-minimum-status,
+      #cardsList .loan-installment-box > div,
+      #cardsList .bank-card-details > div,
+      #cardsList .bank-card-dates > div {
+        position: relative;
+        z-index: 2;
+        backdrop-filter: blur(7px);
+        -webkit-backdrop-filter: blur(7px);
+      }
+
+      #cardsList .card-minimum-status {
+        margin-top: 15px;
+        border-color: rgba(255,255,255,.08);
+        background: rgba(4,17,30,.24);
+      }
+
+      #cardsList .bank-card-details,
+      #cardsList .bank-card-dates {
+        position: relative;
+        z-index: 2;
+      }
+
+      #cardsList .bank-card-details > div,
+      #cardsList .bank-card-dates > div,
+      #cardsList .loan-installment-box > div {
+        background: rgba(255,255,255,.045);
+        border: 1px solid rgba(255,255,255,.055);
+      }
+
+      .pro-bank-ziraat {
+        border-color: rgba(239,68,68,.25) !important;
+        background:
+          radial-gradient(circle at 88% 15%,rgba(239,68,68,.20),transparent 31%),
+          linear-gradient(145deg,#4f1721,#201020) !important;
+      }
+
+      .pro-bank-garanti {
+        border-color: rgba(45,212,191,.23) !important;
+        background:
+          radial-gradient(circle at 88% 15%,rgba(45,212,191,.18),transparent 31%),
+          linear-gradient(145deg,#0d4d45,#0a2530) !important;
+      }
+
+      .pro-bank-akbank {
+        border-color: rgba(255,78,104,.24) !important;
+        background:
+          radial-gradient(circle at 88% 15%,rgba(255,78,104,.18),transparent 31%),
+          linear-gradient(145deg,#591629,#211020) !important;
+      }
+
+      .pro-bank-qnb {
+        border-color: rgba(168,85,247,.24) !important;
+        background:
+          radial-gradient(circle at 88% 15%,rgba(168,85,247,.20),transparent 31%),
+          linear-gradient(145deg,#3f1d63,#18132c) !important;
+      }
+
+      .pro-bank-is {
+        border-color: rgba(59,130,246,.24) !important;
+        background:
+          radial-gradient(circle at 88% 15%,rgba(59,130,246,.19),transparent 31%),
+          linear-gradient(145deg,#153f6e,#101c31) !important;
+      }
+
+      .pro-bank-tom {
+        border-color: rgba(34,197,94,.22) !important;
+        background:
+          radial-gradient(circle at 88% 15%,rgba(34,197,94,.18),transparent 31%),
+          linear-gradient(145deg,#164b34,#0e2824) !important;
+      }
+
+      .pro-bank-other {
+        border-color: rgba(148,163,184,.20) !important;
+      }
+
+      .pro-card-completed {
+        border-color: rgba(43,211,154,.30) !important;
+        background:
+          radial-gradient(circle at 88% 15%,rgba(43,211,154,.22),transparent 31%),
+          linear-gradient(145deg,#104b3c,#0b2826) !important;
+      }
+
+      body.light-theme #cardsList .bank-card {
+        color: #102033;
+        box-shadow: 0 18px 40px rgba(18,57,90,.10);
+      }
+
+      body.light-theme #cardsList .bank-card-header h3,
+      body.light-theme #cardsList .bank-card-debt {
+        color: #fff;
+      }
+
+      @media(max-width:370px) {
+        #cardsList .bank-card {
+          padding: 15px;
+        }
+
+        #cardsList .bank-card-debt {
+          font-size: 25px;
+        }
+
+        .pro-bank-logo {
+          width: 41px;
+          height: 41px;
+          flex-basis: 41px;
+        }
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+});
 
