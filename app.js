@@ -9219,4 +9219,442 @@ document.addEventListener("DOMContentLoaded", () => {
     }, true);
   }
 });
+// =========================================
+// YF v3.8 — Borç Geçmişi + Geliri Varlıklara Yansıt
+// app.js dosyasının EN ALTINA eklenir.
+// =========================================
+
+document.addEventListener("DOMContentLoaded", () => {
+  const TX_KEY = "yf_transactions_v1";
+  const DEBT_KEY = "yf_cards_v1";
+  const ASSET_KEY = "yf_assets_v1";
+
+  const $ = id => document.getElementById(id);
+
+  installV38Styles();
+  refreshV38();
+
+  document.addEventListener("click", event => {
+    const pageButton = event.target.closest("[data-page]");
+    if (!pageButton) return;
+
+    setTimeout(refreshV38, 80);
+    setTimeout(refreshV38, 250);
+  });
+
+  window.addEventListener("storage", refreshV38);
+  window.addEventListener("pageshow", refreshV38);
+  window.addEventListener("yf-refresh-dashboard", refreshV38);
+
+  function refreshV38() {
+    refreshAssetAmounts();
+    refreshDebtHistory();
+  }
+
+  // -----------------------------------------
+  // MAAŞ / GELİRİ VARLIKLARA YANSIT
+  // -----------------------------------------
+  function refreshAssetAmounts() {
+    const transactions = loadJson(TX_KEY);
+    const debts = loadJson(DEBT_KEY);
+    const manualAssets = loadJson(ASSET_KEY);
+
+    const income = transactions
+      .filter(item => item.type === "income")
+      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+    // Kartla yapılan alışveriş nakdi hemen azaltmaz.
+    const cashExpenses = transactions
+      .filter(item =>
+        item.type === "expense" &&
+        item.paymentMethod !== "card"
+      )
+      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+    const cardPayments = transactions
+      .filter(item => item.type === "card-payment")
+      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+    const loanPayments = transactions
+      .filter(item => item.type === "loan-payment")
+      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+    const goalPayments = transactions
+      .filter(item => item.type === "goal-payment")
+      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+    const transactionCash = roundMoney(
+      income -
+      cashExpenses -
+      cardPayments -
+      loanPayments -
+      goalPayments
+    );
+
+    const manualTotal = roundMoney(
+      manualAssets.reduce(
+        (sum, item) => sum + Number(item.value || 0),
+        0
+      )
+    );
+
+    const totalAssets = roundMoney(
+      manualTotal + Math.max(0, transactionCash)
+    );
+
+    const totalDebt = roundMoney(
+      debts.reduce(
+        (sum, item) => sum + Number(item.debt || 0),
+        0
+      )
+    );
+
+    const netWorth = roundMoney(totalAssets - totalDebt);
+
+    const manualCash = roundMoney(
+      manualAssets
+        .filter(item => item.type === "cash")
+        .reduce(
+          (sum, item) => sum + Number(item.value || 0),
+          0
+        )
+    );
+
+    const cashTotal = roundMoney(
+      manualCash + Math.max(0, transactionCash)
+    );
+
+    setMoney("assetPageTotal", totalAssets);
+    setMoney("assetPageDebt", totalDebt);
+    setMoney("assetPageNet", netWorth);
+    setMoney("assetSummaryCash", cashTotal);
+    setMoney("dashboardAssetTotal", totalAssets);
+    setMoney("dashboardNetWorth", netWorth);
+
+    // İşlem sayfası değerleri de aynı mantıkta güncel tutulsun.
+    setMoney("totalIncome", income);
+    setMoney(
+      "totalExpense",
+      cashExpenses + cardPayments + loanPayments + goalPayments
+    );
+    setMoney("transactionBalance", transactionCash);
+
+    updateAutomaticCashRow(transactionCash);
+
+    const status = $("assetOverviewStatus");
+    if (status) {
+      status.textContent = netWorth >= 0 ? "Pozitif" : "Ekside";
+      status.className =
+        netWorth >= 0
+          ? "asset-overview-badge positive"
+          : "asset-overview-badge negative";
+    }
+
+    const net = $("dashboardNetWorth");
+    if (net) {
+      net.classList.toggle("positive", netWorth >= 0);
+      net.classList.toggle("negative", netWorth < 0);
+    }
+  }
+
+  function updateAutomaticCashRow(value) {
+    const list = $("assetList");
+    if (!list) return;
+
+    let row = $("automaticTransactionCashAsset");
+
+    if (!row) {
+      row = document.createElement("article");
+      row.id = "automaticTransactionCashAsset";
+      row.className = "asset-item automatic-cash-asset";
+
+      row.innerHTML = `
+        <div class="asset-item-icon">💵</div>
+
+        <div class="asset-item-info">
+          <strong>İşlem Bakiyesi</strong>
+          <span>Maaş ve gelirlerden otomatik hesaplanır</span>
+          <small>Kart ve kredi ödemeleri otomatik düşülür</small>
+        </div>
+
+        <div class="asset-item-side">
+          <strong id="automaticTransactionCashValue">₺0,00</strong>
+          <div class="automatic-asset-badge">OTOMATİK</div>
+        </div>
+      `;
+
+      list.prepend(row);
+    }
+
+    setMoney("automaticTransactionCashValue", value);
+    row.classList.toggle("negative", value < 0);
+  }
+
+  // -----------------------------------------
+  // BORÇ ÖDEME GEÇMİŞİNİ DÜZGÜN KARTLI GÖSTER
+  // -----------------------------------------
+  function refreshDebtHistory() {
+    const history = $("debtPaymentHistory");
+    if (!history) return;
+
+    const payments = loadJson(TX_KEY)
+      .filter(item =>
+        item.type === "card-payment" ||
+        item.type === "loan-payment"
+      )
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt || b.date) -
+          new Date(a.createdAt || a.date)
+      );
+
+    history.className = "payment-history-list v38-payment-history";
+    history.innerHTML = "";
+
+    if (!payments.length) {
+      history.innerHTML = `
+        <div class="empty-state">
+          Henüz borç ödemesi yapılmadı.
+        </div>
+      `;
+      return;
+    }
+
+    payments.slice(0, 30).forEach(payment => {
+      const isLoan = payment.type === "loan-payment";
+
+      const item = document.createElement("article");
+      item.className = "v38-payment-item";
+
+      item.innerHTML = `
+        <div class="v38-payment-icon ${isLoan ? "loan" : "card"}">
+          ${isLoan ? "🏦" : "💳"}
+        </div>
+
+        <div class="v38-payment-info">
+          <strong>${escapeHtml(
+            cleanPaymentName(payment)
+          )}</strong>
+
+          <span>
+            ${
+              isLoan
+                ? "İhtiyaç Kredisi Taksiti"
+                : payment.paymentKind === "minimum"
+                  ? "Asgari Kredi Kartı Ödemesi"
+                  : "Kredi Kartı Ödemesi"
+            }
+          </span>
+
+          <small>${formatDateTime(
+            payment.createdAt || payment.date
+          )}</small>
+        </div>
+
+        <div class="v38-payment-side">
+          <strong>${formatMoney(payment.amount)}</strong>
+          <span>Ödendi ✓</span>
+        </div>
+      `;
+
+      history.appendChild(item);
+    });
+  }
+
+  function cleanPaymentName(payment) {
+    const value =
+      payment.cardName ||
+      payment.name ||
+      "Borç Ödemesi";
+
+    return String(value)
+      .replace(/\s*İhtiyaç Kredisi Taksiti\s*/gi, " ")
+      .replace(/\s*Kredi Kartı Ödemesi\s*/gi, " ")
+      .replace(/\s+/g, " ")
+      .trim() || "Borç Ödemesi";
+  }
+
+  function loadJson(key) {
+    try {
+      return JSON.parse(localStorage.getItem(key) || "[]");
+    } catch {
+      return [];
+    }
+  }
+
+  function roundMoney(value) {
+    return Math.round(
+      (Number(value) + Number.EPSILON) * 100
+    ) / 100;
+  }
+
+  function formatMoney(value) {
+    return new Intl.NumberFormat("tr-TR", {
+      style: "currency",
+      currency: "TRY"
+    }).format(Number(value) || 0);
+  }
+
+  function setMoney(id, value) {
+    const element = $(id);
+    if (element) {
+      element.textContent = formatMoney(value);
+    }
+  }
+
+  function formatDateTime(value) {
+    if (!value) return "Tarih belirtilmedi";
+
+    const date = new Date(
+      String(value).includes("T")
+        ? value
+        : `${value}T12:00:00`
+    );
+
+    if (Number.isNaN(date.getTime())) {
+      return "Tarih belirtilmedi";
+    }
+
+    return date.toLocaleString("tr-TR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function installV38Styles() {
+    if ($("yfV38Styles")) return;
+
+    const style = document.createElement("style");
+    style.id = "yfV38Styles";
+
+    style.textContent = `
+      .v38-payment-history {
+        display: grid;
+        gap: 10px;
+      }
+
+      .v38-payment-item {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        padding: 13px;
+        border: 1px solid rgba(255,255,255,.07);
+        border-radius: 16px;
+        background: rgba(255,255,255,.035);
+      }
+
+      .v38-payment-icon {
+        width: 43px;
+        height: 43px;
+        flex: 0 0 43px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 13px;
+        font-size: 19px;
+      }
+
+      .v38-payment-icon.loan {
+        background: rgba(255,177,72,.10);
+      }
+
+      .v38-payment-icon.card {
+        background: rgba(15,140,255,.10);
+      }
+
+      .v38-payment-info {
+        min-width: 0;
+        flex: 1;
+      }
+
+      .v38-payment-info strong,
+      .v38-payment-info span,
+      .v38-payment-info small {
+        display: block;
+      }
+
+      .v38-payment-info strong {
+        overflow: hidden;
+        font-size: 11px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .v38-payment-info span {
+        margin-top: 4px;
+        color: #9aabba;
+        font-size: 9px;
+      }
+
+      .v38-payment-info small {
+        margin-top: 4px;
+        color: #71859a;
+        font-size: 8px;
+      }
+
+      .v38-payment-side {
+        flex: 0 0 auto;
+        text-align: right;
+      }
+
+      .v38-payment-side strong,
+      .v38-payment-side span {
+        display: block;
+      }
+
+      .v38-payment-side strong {
+        color: #4ce0aa;
+        font-size: 11px;
+      }
+
+      .v38-payment-side span {
+        margin-top: 4px;
+        color: #4ce0aa;
+        font-size: 8px;
+      }
+
+      .automatic-cash-asset {
+        border-color: rgba(43,211,154,.18);
+        background: rgba(43,211,154,.055);
+      }
+
+      .automatic-cash-asset.negative {
+        border-color: rgba(255,91,122,.18);
+        background: rgba(255,91,122,.055);
+      }
+
+      .automatic-asset-badge {
+        display: inline-flex;
+        align-items: center;
+        min-height: 22px;
+        margin-top: 7px;
+        padding: 0 7px;
+        border-radius: 999px;
+        color: #4ce0aa;
+        background: rgba(43,211,154,.10);
+        font-size: 7px;
+        font-weight: 900;
+      }
+
+      .automatic-cash-asset.negative .automatic-asset-badge,
+      .automatic-cash-asset.negative #automaticTransactionCashValue {
+        color: #ff8298;
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+});
 
