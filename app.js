@@ -8604,4 +8604,452 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 });
+// =========================================
+// YF v3.5 — İhtiyaç Kredisi Ödeme ve Maaştan Düşme Düzeltmesi
+// Bu kod app.js dosyasının EN ALTINA eklenir.
+// =========================================
+
+document.addEventListener("DOMContentLoaded", () => {
+  const DEBT_KEY = "yf_cards_v1";
+  const TX_KEY = "yf_transactions_v1";
+
+  const $ = id => document.getElementById(id);
+
+  installLoanPaymentFix();
+  refreshDebtPaymentList();
+  refreshTransactionBalance();
+  refreshDebtPaymentHistory();
+
+  document
+    .querySelectorAll('[data-page="debtPaymentPage"]')
+    .forEach(button => {
+      button.addEventListener("click", () => {
+        setTimeout(() => {
+          refreshDebtPaymentList();
+          refreshDebtPaymentHistory();
+        }, 180);
+      });
+    });
+
+  document
+    .querySelectorAll('[data-page="transactionsPage"]')
+    .forEach(button => {
+      button.addEventListener("click", () => {
+        setTimeout(refreshTransactionBalance, 120);
+      });
+    });
+
+  window.addEventListener("storage", () => {
+    refreshDebtPaymentList();
+    refreshTransactionBalance();
+    refreshDebtPaymentHistory();
+  });
+
+  window.addEventListener("yf-refresh-dashboard", () => {
+    refreshTransactionBalance();
+  });
+
+  // -------------------------------------------------
+  // BORÇ ÖDE LİSTESİNE KART + İHTİYAÇ KREDİSİ EKLE
+  // -------------------------------------------------
+  function refreshDebtPaymentList() {
+    const select = $("debtPaymentCard");
+    if (!select) return;
+
+    const debts = loadJson(DEBT_KEY)
+      .filter(item => Number(item.debt || 0) > 0);
+
+    const oldValue = select.value;
+
+    select.innerHTML =
+      '<option value="">Kart veya kredi seç</option>';
+
+    const loans = debts.filter(
+      item => item.type === "personal-loan"
+    );
+
+    const cards = debts.filter(
+      item => item.type !== "personal-loan"
+    );
+
+    loans.forEach(item => {
+      const option = document.createElement("option");
+      option.value = item.id;
+      option.textContent =
+        `🏦 ${item.bank} - ${item.name} (${formatMoney(item.debt)})`;
+      select.appendChild(option);
+    });
+
+    cards.forEach(item => {
+      const option = document.createElement("option");
+      option.value = item.id;
+      option.textContent =
+        `💳 ${item.bank} - ${item.name} (${formatMoney(item.debt)})`;
+      select.appendChild(option);
+    });
+
+    if (debts.some(item => item.id === oldValue)) {
+      select.value = oldValue;
+    }
+
+    select.dispatchEvent(
+      new Event("change", { bubbles: true })
+    );
+  }
+
+  // -------------------------------------------------
+  // İHTİYAÇ KREDİSİ ÖDEMESİ
+  // -------------------------------------------------
+  function installLoanPaymentFix() {
+    const form = $("debtPaymentForm");
+    const select = $("debtPaymentCard");
+    const amountInput = $("debtPaymentAmount");
+
+    if (!form || !select || !amountInput) return;
+
+    select.addEventListener("change", () => {
+      const debt = loadJson(DEBT_KEY).find(
+        item => item.id === select.value
+      );
+
+      const smartPanel = $("smartMinimumPanel");
+      const selectedDebt = $("selectedCardDebt");
+      const submitButton =
+        form.querySelector('button[type="submit"]');
+
+      if (!debt) {
+        if (selectedDebt) {
+          selectedDebt.textContent = formatMoney(0);
+        }
+        return;
+      }
+
+      if (selectedDebt) {
+        selectedDebt.textContent = formatMoney(debt.debt);
+      }
+
+      if (debt.type === "personal-loan") {
+        smartPanel?.classList.add("hidden");
+
+        amountInput.value = Math.min(
+          Number(debt.monthlyInstallment || 0),
+          Number(debt.debt || 0)
+        ).toFixed(2);
+
+        amountInput.max = Number(debt.debt || 0);
+
+        if (submitButton) {
+          submitButton.textContent = "Kredi Taksitini Öde";
+        }
+      } else {
+        smartPanel?.classList.remove("hidden");
+        amountInput.removeAttribute("max");
+
+        if (submitButton) {
+          submitButton.textContent = "Borcu Öde";
+        }
+      }
+    });
+
+    form.addEventListener(
+      "submit",
+      event => {
+        const debts = loadJson(DEBT_KEY);
+        const selected = debts.find(
+          item => item.id === select.value
+        );
+
+        if (!selected || selected.type !== "personal-loan") {
+          return;
+        }
+
+        event.preventDefault();
+        event.stopImmediatePropagation();
+
+        const amount = Number(amountInput.value);
+
+        if (!Number.isFinite(amount) || amount <= 0) {
+          alert("Geçerli bir ödeme tutarı gir.");
+          return;
+        }
+
+        if (amount > Number(selected.debt || 0)) {
+          alert("Ödeme kalan kredi borcundan büyük olamaz.");
+          return;
+        }
+
+        selected.debt = roundMoney(
+          Math.max(
+            0,
+            Number(selected.debt || 0) - amount
+          )
+        );
+
+        if (selected.remainingInstallments > 0) {
+          selected.remainingInstallments -= 1;
+        }
+
+        if (selected.debt <= 0) {
+          selected.debt = 0;
+          selected.remainingInstallments = 0;
+          selected.nextPaymentDate = "";
+          selected.dueDate = "";
+        } else {
+          selected.nextPaymentDate = addOneMonth(
+            selected.nextPaymentDate || selected.dueDate
+          );
+          selected.dueDate = selected.nextPaymentDate;
+        }
+
+        selected.updatedAt = new Date().toISOString();
+
+        const transactions = loadJson(TX_KEY);
+        const now = new Date();
+
+        transactions.unshift({
+          id: createId(),
+          type: "loan-payment",
+          name: "İhtiyaç Kredisi Taksit Ödemesi",
+          amount: roundMoney(amount),
+          category: "loan-payment",
+          date: now.toISOString().split("T")[0],
+          paymentMethod: "cash",
+          cardId: selected.id,
+          cardName: `${selected.bank} - ${selected.name}`,
+          debtType: "personal-loan",
+          createdAt: now.toISOString()
+        });
+
+        saveJson(DEBT_KEY, debts);
+        saveJson(TX_KEY, transactions);
+
+        amountInput.value = "";
+
+        refreshDebtPaymentList();
+        refreshTransactionBalance();
+        refreshDebtPaymentHistory();
+
+        window.dispatchEvent(
+          new CustomEvent("yf-refresh-dashboard")
+        );
+
+        alert("Kredi taksiti ödendi.");
+      },
+      true
+    );
+  }
+
+  // -------------------------------------------------
+  // MAAŞ / İŞLEM BAKİYESİNDEN KREDİ TAKSİTLERİNİ DÜŞ
+  // -------------------------------------------------
+  function refreshTransactionBalance() {
+    const transactions = loadJson(TX_KEY);
+
+    const income = transactions
+      .filter(item => item.type === "income")
+      .reduce(
+        (sum, item) => sum + Number(item.amount || 0),
+        0
+      );
+
+    const expenses = transactions
+      .filter(item => item.type === "expense")
+      .reduce(
+        (sum, item) => sum + Number(item.amount || 0),
+        0
+      );
+
+    const cardPayments = transactions
+      .filter(item => item.type === "card-payment")
+      .reduce(
+        (sum, item) => sum + Number(item.amount || 0),
+        0
+      );
+
+    const loanPayments = transactions
+      .filter(item => item.type === "loan-payment")
+      .reduce(
+        (sum, item) => sum + Number(item.amount || 0),
+        0
+      );
+
+    const balance = roundMoney(
+      income - expenses - cardPayments - loanPayments
+    );
+
+    setText("totalIncome", formatMoney(income));
+    setText("totalExpense", formatMoney(expenses));
+    setText("transactionBalance", formatMoney(balance));
+  }
+
+  // -------------------------------------------------
+  // BORÇ ÖDEME GEÇMİŞİNDE KREDİLERİ DE GÖSTER
+  // -------------------------------------------------
+  function refreshDebtPaymentHistory() {
+    const history =
+      $("debtPaymentHistory") ||
+      document.querySelector(
+        "#debtPaymentPage .payment-history-list"
+      ) ||
+      document.querySelector(
+        "#debtPaymentPage .debt-payment-history"
+      );
+
+    if (!history) return;
+
+    const transactions = loadJson(TX_KEY)
+      .filter(item =>
+        item.type === "card-payment" ||
+        item.type === "loan-payment"
+      )
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt || b.date) -
+          new Date(a.createdAt || a.date)
+      );
+
+    history.innerHTML = "";
+
+    if (!transactions.length) {
+      history.innerHTML = `
+        <div class="empty-state">
+          Henüz borç ödemesi yapılmadı.
+        </div>
+      `;
+      return;
+    }
+
+    transactions.slice(0, 20).forEach(item => {
+      const row = document.createElement("article");
+      row.className = "debt-history-item";
+
+      row.innerHTML = `
+        <div>
+          <strong>
+            ${escapeHtml(
+              item.cardName ||
+              item.name ||
+              "Borç Ödemesi"
+            )}
+          </strong>
+
+          <span>
+            ${
+              item.type === "loan-payment"
+                ? "İhtiyaç Kredisi Taksiti"
+                : "Kredi Kartı Ödemesi"
+            }
+          </span>
+
+          <small>
+            ${formatDateTime(item.createdAt || item.date)}
+          </small>
+        </div>
+
+        <strong class="debt-history-amount">
+          ${formatMoney(item.amount)}
+        </strong>
+      `;
+
+      history.appendChild(row);
+    });
+  }
+
+  function addOneMonth(value) {
+    if (!value) return "";
+
+    const date = new Date(`${value}T12:00:00`);
+
+    if (Number.isNaN(date.getTime())) return value;
+
+    const originalDay = date.getDate();
+
+    date.setDate(1);
+    date.setMonth(date.getMonth() + 1);
+
+    const lastDay = new Date(
+      date.getFullYear(),
+      date.getMonth() + 1,
+      0
+    ).getDate();
+
+    date.setDate(Math.min(originalDay, lastDay));
+
+    return [
+      date.getFullYear(),
+      String(date.getMonth() + 1).padStart(2, "0"),
+      String(date.getDate()).padStart(2, "0")
+    ].join("-");
+  }
+
+  function createId() {
+    return window.crypto?.randomUUID
+      ? crypto.randomUUID()
+      : String(Date.now() + Math.random());
+  }
+
+  function roundMoney(value) {
+    return Math.round(
+      (Number(value) + Number.EPSILON) * 100
+    ) / 100;
+  }
+
+  function formatMoney(value) {
+    return new Intl.NumberFormat("tr-TR", {
+      style: "currency",
+      currency: "TRY"
+    }).format(Number(value) || 0);
+  }
+
+  function formatDateTime(value) {
+    if (!value) return "Tarih yok";
+
+    const date = new Date(
+      String(value).includes("T")
+        ? value
+        : `${value}T12:00:00`
+    );
+
+    if (Number.isNaN(date.getTime())) {
+      return "Tarih yok";
+    }
+
+    return date.toLocaleString("tr-TR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+  }
+
+  function loadJson(key) {
+    try {
+      return JSON.parse(localStorage.getItem(key) || "[]");
+    } catch {
+      return [];
+    }
+  }
+
+  function saveJson(key, value) {
+    localStorage.setItem(key, JSON.stringify(value));
+  }
+
+  function setText(id, value) {
+    const element = $(id);
+
+    if (element) {
+      element.textContent = String(value);
+    }
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+});
 
