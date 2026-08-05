@@ -7270,4 +7270,101 @@ document.addEventListener("DOMContentLoaded", () => {
     document.head.appendChild(style);
   }
 });
+// =========================================
+// YF v2.8.1 — Takvim Menüsü Kesin Düzeltme
+// Bu kod app.js dosyasının EN ALTINA eklenir.
+// Mevcut v2.8 takvim kodunu silme.
+// =========================================
+
+document.addEventListener("DOMContentLoaded", () => {
+  const PAGE_KEY = "yf_last_open_page_v1";
+
+  setTimeout(() => {
+    const calendarPage = document.getElementById("calendarPage");
+    if (!calendarPage) return;
+
+    let calendarButton = document.querySelector(
+      '.side-menu-item[data-page="calendarPage"]'
+    );
+
+    if (!calendarButton) {
+      const allMenuItems = [
+        ...document.querySelectorAll(".side-menu-item")
+      ];
+
+      const remindersButton = allMenuItems.find(item =>
+        item.textContent
+          ?.toLocaleLowerCase("tr-TR")
+          .includes("hatırlatmalar")
+      );
+
+      const goalsButton = allMenuItems.find(item =>
+        item.textContent
+          ?.toLocaleLowerCase("tr-TR")
+          .includes("hedefler")
+      );
+
+      calendarButton = document.createElement("button");
+      calendarButton.type = "button";
+      calendarButton.className = "side-menu-item";
+      calendarButton.dataset.page = "calendarPage";
+
+      calendarButton.innerHTML = `
+        <span class="side-menu-icon">📅</span>
+        <span>Takvim</span>
+      `;
+
+      if (remindersButton) {
+        remindersButton.insertAdjacentElement(
+          "afterend",
+          calendarButton
+        );
+      } else if (goalsButton) {
+        goalsButton.insertAdjacentElement(
+          "afterend",
+          calendarButton
+        );
+      } else {
+        const menuContainer =
+          document.querySelector(".side-menu-content") ||
+          document.querySelector("#sideMenuLayer .side-menu") ||
+          document.querySelector("#sideMenuLayer");
+
+        menuContainer?.appendChild(calendarButton);
+      }
+    }
+
+    calendarButton?.addEventListener("click", () => {
+      document
+        .querySelectorAll(".page")
+        .forEach(page => {
+          page.classList.toggle(
+            "active",
+            page.id === "calendarPage"
+          );
+        });
+
+      document
+        .querySelectorAll(".bottom-navigation .nav-item")
+        .forEach(item => {
+          item.classList.remove("active");
+        });
+
+      const layer = document.getElementById("sideMenuLayer");
+
+      layer?.classList.remove("open");
+      layer?.setAttribute("aria-hidden", "true");
+
+      document.body.style.overflow = "";
+      document.documentElement.style.overflow = "";
+
+      localStorage.setItem(PAGE_KEY, "calendarPage");
+
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+      });
+    });
+  }, 500);
+});
 
