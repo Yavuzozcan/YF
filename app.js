@@ -5199,4 +5199,502 @@ document.addEventListener("DOMContentLoaded", () => {
     document.head.appendChild(style);
   }
 });
+// =========================================
+// YF v2.6.1 — Hedefe Para Ekleme Sistemi
+// Bu kod app.js dosyasının EN ALTINA eklenir.
+// =========================================
+
+document.addEventListener("DOMContentLoaded", () => {
+  const GOAL_KEY = "yf_custom_goals_v1";
+  const TRANSACTION_KEY = "yf_transactions_v1";
+
+  installGoalPaymentStyles();
+  enhanceGoalCards();
+
+  window.addEventListener("storage", enhanceGoalCards);
+
+  function enhanceGoalCards() {
+    const list = document.getElementById("customGoalList");
+    if (!list) return;
+
+    setTimeout(() => {
+      const goals = loadJson(GOAL_KEY);
+
+      goals.forEach(goal => {
+        const card = findGoalCard(goal.id, list);
+        if (!card) return;
+
+        if (!card.querySelector(`[data-goal-pay="${goal.id}"]`)) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "custom-goal-pay-button";
+          button.dataset.goalPay = goal.id;
+          button.textContent =
+            Number(goal.currentAmount || 0) >= Number(goal.targetAmount || 0)
+              ? "Hedef Tamamlandı ✓"
+              : "＋ Hedefe Para Ekle";
+
+          button.disabled =
+            Number(goal.currentAmount || 0) >= Number(goal.targetAmount || 0);
+
+          button.addEventListener("click", () => {
+            openGoalPaymentModal(goal.id);
+          });
+
+          card.appendChild(button);
+        }
+      });
+    }, 100);
+  }
+
+  function findGoalCard(goalId, list) {
+    const menuButton = list.querySelector(
+      `[data-goal-menu="${goalId}"]`
+    );
+
+    return menuButton?.closest(".custom-goal-card") || null;
+  }
+
+  function openGoalPaymentModal(goalId) {
+    const goals = loadJson(GOAL_KEY);
+    const goal = goals.find(item => item.id === goalId);
+
+    if (!goal) {
+      alert("Hedef bulunamadı.");
+      return;
+    }
+
+    let modal = document.getElementById("goalPaymentModal");
+
+    if (!modal) {
+      modal = createGoalPaymentModal();
+    }
+
+    document.getElementById("goalPaymentId").value = goal.id;
+    document.getElementById("goalPaymentName").textContent = goal.name;
+    document.getElementById("goalPaymentCurrent").textContent =
+      formatMoney(goal.currentAmount);
+    document.getElementById("goalPaymentRemaining").textContent =
+      formatMoney(
+        Math.max(
+          0,
+          Number(goal.targetAmount || 0) -
+          Number(goal.currentAmount || 0)
+        )
+      );
+
+    document.getElementById("goalPaymentAmount").value = "";
+
+    modal.classList.remove("hidden");
+    document.body.style.overflow = "hidden";
+
+    setTimeout(() => {
+      document.getElementById("goalPaymentAmount")?.focus();
+    }, 120);
+  }
+
+  function createGoalPaymentModal() {
+    const modal = document.createElement("div");
+    modal.id = "goalPaymentModal";
+    modal.className = "goal-payment-modal hidden";
+
+    modal.innerHTML = `
+      <div class="goal-payment-backdrop"></div>
+
+      <section class="goal-payment-sheet">
+        <div class="goal-payment-head">
+          <div>
+            <span>HEDEFE PARA EKLE</span>
+            <h2 id="goalPaymentName">Hedef</h2>
+          </div>
+
+          <button
+            id="closeGoalPaymentModal"
+            class="goal-payment-close"
+            type="button"
+          >
+            ×
+          </button>
+        </div>
+
+        <div class="goal-payment-summary">
+          <div>
+            <span>Mevcut birikim</span>
+            <strong id="goalPaymentCurrent">₺0,00</strong>
+          </div>
+
+          <div>
+            <span>Kalan tutar</span>
+            <strong id="goalPaymentRemaining">₺0,00</strong>
+          </div>
+        </div>
+
+        <form id="goalPaymentForm">
+          <input id="goalPaymentId" type="hidden">
+
+          <label class="goal-payment-label">
+            Eklenecek tutar
+
+            <input
+              id="goalPaymentAmount"
+              type="number"
+              min="0.01"
+              step="0.01"
+              placeholder="0,00"
+              required
+            >
+          </label>
+
+          <div class="goal-payment-actions">
+            <button
+              id="cancelGoalPayment"
+              class="goal-payment-secondary"
+              type="button"
+            >
+              Vazgeç
+            </button>
+
+            <button
+              class="goal-payment-primary"
+              type="submit"
+            >
+              Para Ekle
+            </button>
+          </div>
+        </form>
+      </section>
+    `;
+
+    document.body.appendChild(modal);
+
+    document
+      .getElementById("closeGoalPaymentModal")
+      ?.addEventListener("click", closeGoalPaymentModal);
+
+    document
+      .getElementById("cancelGoalPayment")
+      ?.addEventListener("click", closeGoalPaymentModal);
+
+    modal
+      .querySelector(".goal-payment-backdrop")
+      ?.addEventListener("click", closeGoalPaymentModal);
+
+    document
+      .getElementById("goalPaymentForm")
+      ?.addEventListener("submit", saveGoalPayment);
+
+    return modal;
+  }
+
+  function closeGoalPaymentModal() {
+    document
+      .getElementById("goalPaymentModal")
+      ?.classList.add("hidden");
+
+    document.body.style.overflow = "";
+  }
+
+  function saveGoalPayment(event) {
+    event.preventDefault();
+
+    const goalId = document.getElementById("goalPaymentId").value;
+    const amount = Number(
+      document.getElementById("goalPaymentAmount").value
+    );
+
+    const goals = loadJson(GOAL_KEY);
+    const goal = goals.find(item => item.id === goalId);
+
+    if (!goal) {
+      alert("Hedef bulunamadı.");
+      return;
+    }
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      alert("Geçerli bir tutar gir.");
+      return;
+    }
+
+    const remaining = roundMoney(
+      Math.max(
+        0,
+        Number(goal.targetAmount || 0) -
+        Number(goal.currentAmount || 0)
+      )
+    );
+
+    if (amount > remaining) {
+      alert(
+        `En fazla ${formatMoney(remaining)} ekleyebilirsin.`
+      );
+      return;
+    }
+
+    goal.currentAmount = roundMoney(
+      Number(goal.currentAmount || 0) + amount
+    );
+    goal.updatedAt = new Date().toISOString();
+
+    saveJson(GOAL_KEY, goals);
+
+    const transactions = loadJson(TRANSACTION_KEY);
+    const now = new Date();
+
+    transactions.unshift({
+      id: createId(),
+      type: "goal-payment",
+      name: goal.name,
+      amount: roundMoney(amount),
+      category: "Hedef Birikimi",
+      date: now.toISOString().split("T")[0],
+      paymentMethod: "cash",
+      goalId: goal.id,
+      goalName: goal.name,
+      createdAt: now.toISOString()
+    });
+
+    saveJson(TRANSACTION_KEY, transactions);
+
+    closeGoalPaymentModal();
+
+    // Hedefler sayfasını yeniden çizmek için sayfayı yenile.
+    sessionStorage.setItem("yf_open_goals_after_reload", "1");
+    window.location.reload();
+  }
+
+  if (
+    sessionStorage.getItem("yf_open_goals_after_reload") === "1"
+  ) {
+    sessionStorage.removeItem("yf_open_goals_after_reload");
+
+    setTimeout(() => {
+      document
+        .querySelector('[data-page="goalsPage"]')
+        ?.click();
+    }, 300);
+  }
+
+  function formatMoney(value) {
+    return new Intl.NumberFormat("tr-TR", {
+      style: "currency",
+      currency: "TRY"
+    }).format(Number(value) || 0);
+  }
+
+  function roundMoney(value) {
+    return Math.round(
+      (Number(value) + Number.EPSILON) * 100
+    ) / 100;
+  }
+
+  function createId() {
+    return window.crypto?.randomUUID
+      ? crypto.randomUUID()
+      : String(Date.now() + Math.random());
+  }
+
+  function loadJson(key) {
+    try {
+      return JSON.parse(localStorage.getItem(key) || "[]");
+    } catch {
+      return [];
+    }
+  }
+
+  function saveJson(key, value) {
+    localStorage.setItem(key, JSON.stringify(value));
+  }
+
+  function installGoalPaymentStyles() {
+    if (document.getElementById("yfGoalPaymentStyles")) return;
+
+    const style = document.createElement("style");
+    style.id = "yfGoalPaymentStyles";
+
+    style.textContent = `
+      .custom-goal-pay-button {
+        width: 100%;
+        min-height: 42px;
+        margin-top: 12px;
+        border: 1px solid rgba(72,171,255,.22);
+        border-radius: 12px;
+        color: #74c2ff;
+        background: rgba(15,140,255,.10);
+        font: inherit;
+        font-size: 10px;
+        font-weight: 850;
+      }
+
+      .custom-goal-pay-button:disabled {
+        color: #4ce0aa;
+        border-color: rgba(43,211,154,.20);
+        background: rgba(43,211,154,.08);
+        opacity: 1;
+      }
+
+      .goal-payment-modal {
+        position: fixed;
+        z-index: 4500;
+        inset: 0;
+      }
+
+      .goal-payment-backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(0,0,0,.74);
+        backdrop-filter: blur(5px);
+        -webkit-backdrop-filter: blur(5px);
+      }
+
+      .goal-payment-sheet {
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        padding:
+          18px
+          18px
+          calc(22px + env(safe-area-inset-bottom));
+        border-radius: 26px 26px 0 0;
+        border: 1px solid rgba(255,255,255,.10);
+        background:
+          linear-gradient(
+            180deg,
+            rgba(18,43,69,.99),
+            rgba(8,23,38,.99)
+          );
+      }
+
+      .goal-payment-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 14px;
+        margin-bottom: 16px;
+      }
+
+      .goal-payment-head span {
+        color: #67baff;
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: .14em;
+      }
+
+      .goal-payment-head h2 {
+        margin: 5px 0 0;
+        font-size: 22px;
+      }
+
+      .goal-payment-close {
+        width: 40px;
+        height: 40px;
+        border: 1px solid rgba(255,255,255,.10);
+        border-radius: 13px;
+        color: inherit;
+        background: rgba(255,255,255,.05);
+        font-size: 25px;
+      }
+
+      .goal-payment-summary {
+        display: grid;
+        grid-template-columns: repeat(2,minmax(0,1fr));
+        gap: 10px;
+        margin-bottom: 15px;
+      }
+
+      .goal-payment-summary > div {
+        padding: 13px;
+        border-radius: 14px;
+        background: rgba(255,255,255,.04);
+        border: 1px solid rgba(255,255,255,.06);
+      }
+
+      .goal-payment-summary span,
+      .goal-payment-summary strong {
+        display: block;
+      }
+
+      .goal-payment-summary span {
+        margin-bottom: 5px;
+        color: #8fa2ba;
+        font-size: 9px;
+      }
+
+      .goal-payment-summary strong {
+        font-size: 13px;
+      }
+
+      .goal-payment-label {
+        display: grid;
+        gap: 7px;
+        margin-bottom: 15px;
+        color: #b9c8d8;
+        font-size: 11px;
+        font-weight: 750;
+      }
+
+      .goal-payment-label input {
+        width: 100%;
+        min-height: 48px;
+        padding: 0 13px;
+        border: 1px solid rgba(255,255,255,.10);
+        border-radius: 14px;
+        color: inherit;
+        background: rgba(255,255,255,.055);
+        font: inherit;
+        box-sizing: border-box;
+      }
+
+      .goal-payment-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .goal-payment-primary,
+      .goal-payment-secondary {
+        min-height: 48px;
+        border-radius: 14px;
+        font: inherit;
+        font-weight: 850;
+      }
+
+      .goal-payment-primary {
+        border: 0;
+        color: #fff;
+        background: linear-gradient(135deg,#0f8cff,#1aa1ff);
+      }
+
+      .goal-payment-secondary {
+        border: 1px solid rgba(255,255,255,.10);
+        color: inherit;
+        background: rgba(255,255,255,.04);
+      }
+
+      .custom-goal-pin-row {
+        display: flex !important;
+        align-items: center !important;
+        gap: 10px !important;
+        width: 100%;
+        margin: 8px 0 18px !important;
+        overflow: hidden;
+      }
+
+      .custom-goal-pin-row input {
+        width: 22px !important;
+        height: 22px !important;
+        flex: 0 0 22px !important;
+        margin: 0 !important;
+      }
+
+      .custom-goal-pin-row span {
+        min-width: 0;
+        color: #b9c8d8;
+        font-size: 11px;
+        line-height: 1.35;
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+});
 
