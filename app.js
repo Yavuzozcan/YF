@@ -4373,4 +4373,830 @@ document.addEventListener("DOMContentLoaded", () => {
     document.head.appendChild(style);
   }
 });
+// =========================================
+// YF v2.6 — Gerçek Hedef Ekleme Sistemi
+// Bu kod app.js dosyasının EN ALTINA eklenir.
+// =========================================
+
+document.addEventListener("DOMContentLoaded", () => {
+  const GOAL_KEY = "yf_custom_goals_v1";
+
+  const addGoalButton = document.getElementById("addGoalButton");
+  const goalsPage = document.getElementById("goalsPage");
+
+  if (!addGoalButton || !goalsPage) return;
+
+  installCustomGoalStyles();
+  createGoalModal();
+  createCustomGoalSection();
+  renderCustomGoals();
+
+  addGoalButton.addEventListener("click", () => openGoalModal());
+
+  function createCustomGoalSection() {
+    if (document.getElementById("customGoalsSection")) return;
+
+    const addButtonCard = addGoalButton.closest(".content-card");
+    if (!addButtonCard) return;
+
+    const section = document.createElement("section");
+    section.id = "customGoalsSection";
+    section.className = "content-card";
+
+    section.innerHTML = `
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Kişisel Hedefler</p>
+          <h2>Birikim ve planlar</h2>
+        </div>
+      </div>
+
+      <div id="customGoalList" class="custom-goal-list">
+        <div class="empty-state">Henüz özel hedef eklenmedi.</div>
+      </div>
+    `;
+
+    addButtonCard.insertAdjacentElement("beforebegin", section);
+  }
+
+  function createGoalModal() {
+    if (document.getElementById("customGoalModal")) return;
+
+    const modal = document.createElement("div");
+    modal.id = "customGoalModal";
+    modal.className = "custom-goal-modal hidden";
+
+    modal.innerHTML = `
+      <div class="custom-goal-backdrop"></div>
+
+      <section class="custom-goal-sheet">
+        <div class="custom-goal-modal-head">
+          <div>
+            <span>YENİ HEDEF</span>
+            <h2 id="customGoalModalTitle">Hedef Ekle</h2>
+          </div>
+
+          <button
+            id="closeCustomGoalModal"
+            class="custom-goal-close"
+            type="button"
+            aria-label="Kapat"
+          >
+            ×
+          </button>
+        </div>
+
+        <form id="customGoalForm">
+          <input id="customGoalId" type="hidden">
+
+          <label class="custom-goal-label">
+            Hedef türü
+
+            <select id="customGoalType" required>
+              <option value="saving">💰 Birikim</option>
+              <option value="phone">📱 Telefon</option>
+              <option value="car">🚗 Araba</option>
+              <option value="home">🏠 Ev</option>
+              <option value="holiday">✈️ Tatil</option>
+              <option value="education">🎓 Eğitim</option>
+              <option value="wedding">❤️ Düğün</option>
+              <option value="other">🎯 Diğer</option>
+            </select>
+          </label>
+
+          <label class="custom-goal-label">
+            Hedef adı
+
+            <input
+              id="customGoalName"
+              type="text"
+              placeholder="Örn. Yeni telefon"
+              required
+            >
+          </label>
+
+          <label class="custom-goal-label">
+            Hedef tutarı
+
+            <input
+              id="customGoalTarget"
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="0,00"
+              required
+            >
+          </label>
+
+          <label class="custom-goal-label">
+            Şu anki birikim
+
+            <input
+              id="customGoalCurrent"
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="0,00"
+              value="0"
+            >
+          </label>
+
+          <label class="custom-goal-label">
+            Hedef tarihi
+
+            <input id="customGoalDate" type="date">
+          </label>
+
+          <label class="custom-goal-pin-row">
+            <input id="customGoalPinned" type="checkbox">
+            <span>Bu hedefi en üste sabitle</span>
+          </label>
+
+          <div class="custom-goal-actions">
+            <button
+              id="cancelCustomGoal"
+              class="custom-goal-secondary"
+              type="button"
+            >
+              Vazgeç
+            </button>
+
+            <button
+              class="custom-goal-primary"
+              type="submit"
+            >
+              Kaydet
+            </button>
+          </div>
+        </form>
+      </section>
+    `;
+
+    document.body.appendChild(modal);
+
+    document
+      .getElementById("closeCustomGoalModal")
+      ?.addEventListener("click", closeGoalModal);
+
+    document
+      .getElementById("cancelCustomGoal")
+      ?.addEventListener("click", closeGoalModal);
+
+    modal
+      .querySelector(".custom-goal-backdrop")
+      ?.addEventListener("click", closeGoalModal);
+
+    document
+      .getElementById("customGoalForm")
+      ?.addEventListener("submit", saveGoal);
+  }
+
+  function openGoalModal(goal = null) {
+    const form = document.getElementById("customGoalForm");
+    const modal = document.getElementById("customGoalModal");
+
+    if (!form || !modal) return;
+
+    form.reset();
+
+    document.getElementById("customGoalId").value = goal?.id || "";
+    document.getElementById("customGoalType").value =
+      goal?.type || "saving";
+    document.getElementById("customGoalName").value =
+      goal?.name || "";
+    document.getElementById("customGoalTarget").value =
+      goal?.targetAmount || "";
+    document.getElementById("customGoalCurrent").value =
+      goal?.currentAmount || 0;
+    document.getElementById("customGoalDate").value =
+      goal?.targetDate || "";
+    document.getElementById("customGoalPinned").checked =
+      Boolean(goal?.pinned);
+
+    document.getElementById("customGoalModalTitle").textContent =
+      goal ? "Hedefi Düzenle" : "Hedef Ekle";
+
+    modal.classList.remove("hidden");
+    document.body.style.overflow = "hidden";
+  }
+
+  function closeGoalModal() {
+    document
+      .getElementById("customGoalModal")
+      ?.classList.add("hidden");
+
+    document.body.style.overflow = "";
+  }
+
+  function saveGoal(event) {
+    event.preventDefault();
+
+    const id = document.getElementById("customGoalId").value;
+    const type = document.getElementById("customGoalType").value;
+    const name = document.getElementById("customGoalName").value.trim();
+    const targetAmount = Number(
+      document.getElementById("customGoalTarget").value
+    );
+    const currentAmount = Number(
+      document.getElementById("customGoalCurrent").value || 0
+    );
+    const targetDate =
+      document.getElementById("customGoalDate").value || "";
+    const pinned =
+      document.getElementById("customGoalPinned").checked;
+
+    if (!name) {
+      alert("Hedef adını yaz.");
+      return;
+    }
+
+    if (!Number.isFinite(targetAmount) || targetAmount <= 0) {
+      alert("Hedef tutarını doğru gir.");
+      return;
+    }
+
+    if (!Number.isFinite(currentAmount) || currentAmount < 0) {
+      alert("Mevcut birikimi doğru gir.");
+      return;
+    }
+
+    if (currentAmount > targetAmount) {
+      alert("Mevcut birikim hedef tutarından büyük olamaz.");
+      return;
+    }
+
+    const goals = loadGoals();
+    const oldGoal = goals.find(item => item.id === id);
+
+    const goal = {
+      id: id || createId(),
+      type,
+      name,
+      targetAmount: roundMoney(targetAmount),
+      currentAmount: roundMoney(currentAmount),
+      targetDate,
+      pinned,
+      createdAt: oldGoal?.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    const index = goals.findIndex(item => item.id === goal.id);
+
+    if (index >= 0) {
+      goals[index] = goal;
+    } else {
+      goals.unshift(goal);
+    }
+
+    saveGoals(goals);
+    renderCustomGoals();
+    closeGoalModal();
+  }
+
+  function renderCustomGoals() {
+    const list = document.getElementById("customGoalList");
+    if (!list) return;
+
+    const goals = loadGoals().sort((a, b) => {
+      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+      return new Date(b.createdAt) - new Date(a.createdAt);
+    });
+
+    list.innerHTML = "";
+
+    if (!goals.length) {
+      list.innerHTML = `
+        <div class="empty-state">
+          Henüz özel hedef eklenmedi.
+        </div>
+      `;
+      return;
+    }
+
+    goals.forEach(goal => {
+      const percent = goal.targetAmount > 0
+        ? Math.min(
+            100,
+            Math.round(
+              (goal.currentAmount / goal.targetAmount) * 100
+            )
+          )
+        : 0;
+
+      const remaining = Math.max(
+        0,
+        goal.targetAmount - goal.currentAmount
+      );
+
+      const card = document.createElement("article");
+      card.className = "custom-goal-card";
+
+      card.innerHTML = `
+        <div class="custom-goal-card-head">
+          <div class="custom-goal-icon">
+            ${getGoalIcon(goal.type)}
+          </div>
+
+          <div class="custom-goal-card-info">
+            <div class="custom-goal-title-row">
+              <strong>${escapeHtml(goal.name)}</strong>
+              ${
+                goal.pinned
+                  ? '<span class="custom-goal-pin-badge">📌 Sabit</span>'
+                  : ""
+              }
+            </div>
+
+            <span>${getGoalTypeText(goal.type)}</span>
+          </div>
+
+          <div class="custom-goal-menu">
+            <button
+              type="button"
+              data-goal-menu="${goal.id}"
+            >
+              ⋯
+            </button>
+          </div>
+        </div>
+
+        <div class="goal-progress-track">
+          <div
+            class="goal-progress-fill"
+            style="width:${percent}%"
+          ></div>
+        </div>
+
+        <div class="custom-goal-stats">
+          <div>
+            <span>Birikim</span>
+            <strong>${formatMoney(goal.currentAmount)}</strong>
+          </div>
+
+          <div>
+            <span>Kalan</span>
+            <strong>${formatMoney(remaining)}</strong>
+          </div>
+
+          <div>
+            <span>İlerleme</span>
+            <strong>%${percent}</strong>
+          </div>
+        </div>
+
+        ${
+          goal.targetDate
+            ? `
+              <div class="custom-goal-date">
+                Hedef tarihi:
+                <strong>${formatDate(goal.targetDate)}</strong>
+              </div>
+            `
+            : ""
+        }
+
+        <div
+          id="goalActions-${goal.id}"
+          class="custom-goal-action-panel hidden"
+        >
+          <button
+            type="button"
+            data-goal-edit="${goal.id}"
+          >
+            ✏️ Düzenle
+          </button>
+
+          <button
+            type="button"
+            data-goal-pin="${goal.id}"
+          >
+            ${goal.pinned ? "📌 Sabitlemeyi Kaldır" : "📌 Sabitle"}
+          </button>
+
+          <button
+            type="button"
+            data-goal-delete="${goal.id}"
+            class="danger"
+          >
+            🗑️ Sil
+          </button>
+        </div>
+      `;
+
+      card
+        .querySelector("[data-goal-menu]")
+        ?.addEventListener("click", () => {
+          document
+            .getElementById(`goalActions-${goal.id}`)
+            ?.classList.toggle("hidden");
+        });
+
+      card
+        .querySelector("[data-goal-edit]")
+        ?.addEventListener("click", () => {
+          openGoalModal(goal);
+        });
+
+      card
+        .querySelector("[data-goal-pin]")
+        ?.addEventListener("click", () => {
+          togglePin(goal.id);
+        });
+
+      card
+        .querySelector("[data-goal-delete]")
+        ?.addEventListener("click", () => {
+          deleteGoal(goal.id);
+        });
+
+      list.appendChild(card);
+    });
+  }
+
+  function togglePin(goalId) {
+    const goals = loadGoals();
+    const goal = goals.find(item => item.id === goalId);
+
+    if (!goal) return;
+
+    goal.pinned = !goal.pinned;
+    goal.updatedAt = new Date().toISOString();
+
+    saveGoals(goals);
+    renderCustomGoals();
+  }
+
+  function deleteGoal(goalId) {
+    const goal = loadGoals().find(item => item.id === goalId);
+    if (!goal) return;
+
+    if (!confirm(`"${goal.name}" hedefi silinsin mi?`)) return;
+
+    const goals = loadGoals().filter(item => item.id !== goalId);
+
+    saveGoals(goals);
+    renderCustomGoals();
+  }
+
+  function getGoalIcon(type) {
+    const icons = {
+      saving: "💰",
+      phone: "📱",
+      car: "🚗",
+      home: "🏠",
+      holiday: "✈️",
+      education: "🎓",
+      wedding: "❤️",
+      other: "🎯"
+    };
+
+    return icons[type] || "🎯";
+  }
+
+  function getGoalTypeText(type) {
+    const labels = {
+      saving: "Birikim",
+      phone: "Telefon",
+      car: "Araba",
+      home: "Ev",
+      holiday: "Tatil",
+      education: "Eğitim",
+      wedding: "Düğün",
+      other: "Diğer"
+    };
+
+    return labels[type] || "Diğer";
+  }
+
+  function formatMoney(value) {
+    return new Intl.NumberFormat("tr-TR", {
+      style: "currency",
+      currency: "TRY"
+    }).format(Number(value) || 0);
+  }
+
+  function formatDate(value) {
+    if (!value) return "";
+
+    const date = new Date(`${value}T12:00:00`);
+
+    return date.toLocaleDateString("tr-TR", {
+      day: "numeric",
+      month: "long",
+      year: "numeric"
+    });
+  }
+
+  function roundMoney(value) {
+    return Math.round(
+      (Number(value) + Number.EPSILON) * 100
+    ) / 100;
+  }
+
+  function createId() {
+    return window.crypto?.randomUUID
+      ? crypto.randomUUID()
+      : String(Date.now() + Math.random());
+  }
+
+  function loadGoals() {
+    try {
+      return JSON.parse(localStorage.getItem(GOAL_KEY) || "[]");
+    } catch {
+      return [];
+    }
+  }
+
+  function saveGoals(goals) {
+    localStorage.setItem(GOAL_KEY, JSON.stringify(goals));
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function installCustomGoalStyles() {
+    if (document.getElementById("yfCustomGoalStyles")) return;
+
+    const style = document.createElement("style");
+    style.id = "yfCustomGoalStyles";
+
+    style.textContent = `
+      .custom-goal-modal {
+        position: fixed;
+        z-index: 4000;
+        inset: 0;
+      }
+
+      .custom-goal-backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(0,0,0,.74);
+        backdrop-filter: blur(5px);
+        -webkit-backdrop-filter: blur(5px);
+      }
+
+      .custom-goal-sheet {
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        max-height: 88vh;
+        overflow-y: auto;
+        padding:
+          18px
+          18px
+          calc(22px + env(safe-area-inset-bottom));
+        border-radius: 26px 26px 0 0;
+        border: 1px solid rgba(255,255,255,.10);
+        background:
+          linear-gradient(
+            180deg,
+            rgba(18,43,69,.99),
+            rgba(8,23,38,.99)
+          );
+      }
+
+      .custom-goal-modal-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 14px;
+        margin-bottom: 16px;
+      }
+
+      .custom-goal-modal-head span {
+        color: #67baff;
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: .14em;
+      }
+
+      .custom-goal-modal-head h2 {
+        margin: 5px 0 0;
+        font-size: 22px;
+      }
+
+      .custom-goal-close {
+        width: 40px;
+        height: 40px;
+        border: 1px solid rgba(255,255,255,.10);
+        border-radius: 13px;
+        color: inherit;
+        background: rgba(255,255,255,.05);
+        font-size: 25px;
+      }
+
+      .custom-goal-label {
+        display: grid;
+        gap: 7px;
+        margin-bottom: 13px;
+        color: #b9c8d8;
+        font-size: 11px;
+        font-weight: 750;
+      }
+
+      .custom-goal-label input,
+      .custom-goal-label select {
+        min-height: 48px;
+        width: 100%;
+        padding: 0 13px;
+        border: 1px solid rgba(255,255,255,.10);
+        border-radius: 14px;
+        color: inherit;
+        background: rgba(255,255,255,.055);
+        font: inherit;
+        box-sizing: border-box;
+      }
+
+      .custom-goal-pin-row {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        margin: 5px 0 17px;
+        color: #b9c8d8;
+        font-size: 11px;
+      }
+
+      .custom-goal-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .custom-goal-primary,
+      .custom-goal-secondary {
+        min-height: 48px;
+        border-radius: 14px;
+        font: inherit;
+        font-weight: 850;
+      }
+
+      .custom-goal-primary {
+        border: 0;
+        color: #fff;
+        background: linear-gradient(135deg,#0f8cff,#1aa1ff);
+      }
+
+      .custom-goal-secondary {
+        border: 1px solid rgba(255,255,255,.10);
+        color: inherit;
+        background: rgba(255,255,255,.04);
+      }
+
+      .custom-goal-list {
+        display: grid;
+        gap: 11px;
+      }
+
+      .custom-goal-card {
+        padding: 14px;
+        border: 1px solid rgba(255,255,255,.07);
+        border-radius: 17px;
+        background: rgba(255,255,255,.035);
+      }
+
+      .custom-goal-card-head {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        margin-bottom: 12px;
+      }
+
+      .custom-goal-icon {
+        width: 40px;
+        height: 40px;
+        flex: 0 0 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 13px;
+        background: rgba(15,140,255,.10);
+      }
+
+      .custom-goal-card-info {
+        min-width: 0;
+        flex: 1;
+      }
+
+      .custom-goal-title-row {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        flex-wrap: wrap;
+      }
+
+      .custom-goal-card-info span {
+        display: block;
+        margin-top: 4px;
+        color: #8fa2ba;
+        font-size: 10px;
+      }
+
+      .custom-goal-pin-badge {
+        display: inline-flex !important;
+        align-items: center;
+        min-height: 21px;
+        margin: 0 !important;
+        padding: 0 7px;
+        border-radius: 999px;
+        color: #ffd073 !important;
+        background: rgba(255,177,72,.10);
+        font-size: 8px !important;
+        font-weight: 850;
+      }
+
+      .custom-goal-menu button {
+        width: 34px;
+        height: 34px;
+        border: 1px solid rgba(255,255,255,.08);
+        border-radius: 11px;
+        color: inherit;
+        background: rgba(255,255,255,.04);
+        font-size: 20px;
+      }
+
+      .custom-goal-stats {
+        display: grid;
+        grid-template-columns: repeat(3,minmax(0,1fr));
+        gap: 8px;
+        margin-top: 11px;
+      }
+
+      .custom-goal-stats > div {
+        padding: 10px;
+        border-radius: 12px;
+        background: rgba(255,255,255,.035);
+      }
+
+      .custom-goal-stats span,
+      .custom-goal-stats strong {
+        display: block;
+      }
+
+      .custom-goal-stats span {
+        margin-bottom: 4px;
+        color: #8fa2ba;
+        font-size: 8.5px;
+      }
+
+      .custom-goal-stats strong {
+        font-size: 10.5px;
+      }
+
+      .custom-goal-date {
+        margin-top: 10px;
+        color: #8fa2ba;
+        font-size: 9.5px;
+      }
+
+      .custom-goal-date strong {
+        color: #b9c8d8;
+      }
+
+      .custom-goal-action-panel {
+        display: grid;
+        gap: 7px;
+        margin-top: 11px;
+      }
+
+      .custom-goal-action-panel button {
+        min-height: 38px;
+        padding: 0 11px;
+        border: 1px solid rgba(255,255,255,.08);
+        border-radius: 11px;
+        color: inherit;
+        background: rgba(255,255,255,.04);
+        text-align: left;
+        font: inherit;
+        font-size: 10px;
+        font-weight: 750;
+      }
+
+      .custom-goal-action-panel button.danger {
+        color: #ff8298;
+        border-color: rgba(255,91,122,.18);
+        background: rgba(255,91,122,.06);
+      }
+
+      body.light-theme .custom-goal-sheet,
+      body.light-theme .custom-goal-card {
+        color: #102033;
+        background: rgba(250,253,255,.98);
+      }
+
+      @media(max-width:370px) {
+        .custom-goal-stats {
+          grid-template-columns: 1fr;
+        }
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+});
 
