@@ -9052,3 +9052,171 @@ document.addEventListener("DOMContentLoaded", () => {
       .replaceAll("'", "&#039;");
   }
 });
+
+// =========================================
+// YF v4.1 — İşlem Ekle Kesin Buton Onarımı
+// =========================================
+document.addEventListener("DOMContentLoaded", () => {
+  const CARD_KEY = "yf_cards_v1";
+  const TX_KEY = "yf_transactions_v1";
+
+  const byId = id => document.getElementById(id);
+  const load = key => {
+    try { return JSON.parse(localStorage.getItem(key) || "[]"); }
+    catch { return []; }
+  };
+  const save = (key, value) => localStorage.setItem(key, JSON.stringify(value));
+  const round = value => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+  const uid = () => window.crypto?.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random());
+  const money = value => new Intl.NumberFormat("tr-TR", {style:"currency", currency:"TRY"}).format(Number(value)||0);
+
+  function isAddTransactionButton(element) {
+    const button = element?.closest?.("button, a");
+    if (!button) return null;
+
+    if (button.id === "openTransactionFormButton") return button;
+
+    const text = String(button.textContent || "")
+      .toLocaleLowerCase("tr-TR")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    return text.includes("işlem ekle") || text.includes("islem ekle")
+      ? button
+      : null;
+  }
+
+  function fillCards() {
+    const select = byId("transactionCard");
+    if (!select) return;
+
+    const cards = load(CARD_KEY).filter(item => item.type !== "personal-loan");
+    select.innerHTML = '<option value="">Kart seç</option>';
+
+    cards.forEach(card => {
+      const option = document.createElement("option");
+      option.value = card.id;
+      option.textContent = `${card.bank} - ${card.name} (${money(card.debt)})`;
+      select.appendChild(option);
+    });
+  }
+
+  function toggleCardField() {
+    const show = byId("transactionType")?.value === "expense" &&
+      byId("transactionPaymentMethod")?.value === "card";
+
+    byId("transactionCardField")?.classList.toggle("hidden", !show);
+    if (!show && byId("transactionCard")) byId("transactionCard").value = "";
+  }
+
+  function openModal() {
+    const modal = byId("transactionModal");
+    const form = byId("transactionForm");
+
+    if (!modal || !form) {
+      alert("İşlem ekleme penceresi bulunamadı.");
+      return;
+    }
+
+    form.reset();
+    fillCards();
+
+    const date = byId("transactionDate");
+    if (date) date.value = new Date().toISOString().split("T")[0];
+
+    toggleCardField();
+    modal.classList.remove("hidden");
+    modal.style.display = "";
+    document.body.style.overflow = "hidden";
+  }
+
+  function closeModal() {
+    byId("transactionModal")?.classList.add("hidden");
+    document.body.style.overflow = "";
+  }
+
+  document.addEventListener("click", event => {
+    const button = isAddTransactionButton(event.target);
+    if (button) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      openModal();
+      return;
+    }
+
+    if (
+      event.target.closest("#closeTransactionFormButton") ||
+      event.target.closest("#cancelTransactionButton") ||
+      event.target.closest("#transactionModalBackdrop")
+    ) {
+      event.preventDefault();
+      closeModal();
+    }
+  }, true);
+
+  byId("transactionType")?.addEventListener("change", toggleCardField);
+  byId("transactionPaymentMethod")?.addEventListener("change", toggleCardField);
+
+  const form = byId("transactionForm");
+  if (form && !form.dataset.yfV41Bound) {
+    form.dataset.yfV41Bound = "1";
+
+    form.addEventListener("submit", event => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+
+      const type = byId("transactionType")?.value || "";
+      const name = byId("transactionName")?.value?.trim() || "";
+      const amount = Number(byId("transactionAmount")?.value);
+      const category = byId("transactionCategory")?.value || "";
+      const date = byId("transactionDate")?.value || "";
+      const paymentMethod = byId("transactionPaymentMethod")?.value || "cash";
+      const cardId = type === "expense" && paymentMethod === "card"
+        ? byId("transactionCard")?.value || ""
+        : "";
+
+      if (!type || !name || !category || !date || !Number.isFinite(amount) || amount <= 0) {
+        alert("İşlem bilgilerini doğru gir.");
+        return;
+      }
+
+      const debts = load(CARD_KEY);
+      const transaction = {
+        id: uid(), type, name, amount: round(amount), category, date,
+        paymentMethod, cardId, cardDebtDelta: 0,
+        createdAt: new Date().toISOString()
+      };
+
+      if (cardId) {
+        const card = debts.find(item => item.id === cardId && item.type !== "personal-loan");
+        if (!card) {
+          alert("Seçilen kart bulunamadı.");
+          return;
+        }
+
+        const newDebt = round(Number(card.debt || 0) + amount);
+        if (Number(card.limit || 0) > 0 && newDebt > Number(card.limit || 0)) {
+          alert("Bu işlem kart limitini aşıyor.");
+          return;
+        }
+
+        card.debt = newDebt;
+        transaction.cardDebtDelta = round(amount);
+        save(CARD_KEY, debts);
+      }
+
+      const transactions = load(TX_KEY);
+      transactions.unshift(transaction);
+      save(TX_KEY, transactions);
+
+      closeModal();
+      window.dispatchEvent(new CustomEvent("yf-refresh-dashboard"));
+      window.dispatchEvent(new CustomEvent("yf-refresh-upcoming-payments"));
+
+      const txPageButton = document.querySelector('[data-page="transactionsPage"]');
+      txPageButton?.click();
+      setTimeout(() => window.location.reload(), 80);
+    }, true);
+  }
+});
+
