@@ -6094,4 +6094,1180 @@ document.addEventListener("DOMContentLoaded", () => {
     document.head.appendChild(style);
   }
 });
+// =========================================
+// YF v2.8 — Takvimli Borç Takibi
+// Bu kod app.js dosyasının EN ALTINA eklenir.
+// =========================================
+
+document.addEventListener("DOMContentLoaded", () => {
+  const DEBT_KEY = "yf_cards_v1";
+  const TX_KEY = "yf_transactions_v1";
+  const PAGE_KEY = "yf_last_open_page_v1";
+
+  let calendarDate = new Date();
+  calendarDate.setDate(1);
+
+  installCalendarStyles();
+  createCalendarMenuItem();
+  createCalendarPage();
+  createCalendarDayModal();
+  bindCalendarEvents();
+  renderCalendar();
+
+  function createCalendarMenuItem() {
+    if (document.querySelector('[data-page="calendarPage"]')) return;
+
+    const sideMenu =
+      document.querySelector(".side-menu-content") ||
+      document.querySelector(".side-menu");
+
+    if (!sideMenu) return;
+
+    const reference =
+      document.querySelector('[data-page="remindersPage"]') ||
+      document.querySelector('.side-menu-item[data-feature="Hatırlatmalar"]');
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "side-menu-item";
+    button.dataset.page = "calendarPage";
+
+    button.innerHTML = `
+      <span class="side-menu-icon">📅</span>
+      <span>Takvim</span>
+    `;
+
+    if (reference) {
+      reference.insertAdjacentElement("afterend", button);
+    } else {
+      sideMenu.appendChild(button);
+    }
+  }
+
+  function createCalendarPage() {
+    if (document.getElementById("calendarPage")) return;
+
+    const main = document.querySelector("main.app-shell");
+    if (!main) return;
+
+    const page = document.createElement("section");
+    page.id = "calendarPage";
+    page.className = "page";
+
+    page.innerHTML = `
+      <header class="top-header">
+        <div>
+          <p class="eyebrow">ÖDEME TAKVİMİ</p>
+          <h1>Takvim</h1>
+        </div>
+
+        <button
+          id="calendarBackButton"
+          class="reports-back-button"
+          type="button"
+        >
+          Ana Sayfa
+        </button>
+      </header>
+
+      <section class="calendar-summary-grid">
+        <article class="calendar-summary-card overdue">
+          <span>Geciken</span>
+          <strong id="calendarOverdueCount">0</strong>
+        </article>
+
+        <article class="calendar-summary-card today">
+          <span>Bugün</span>
+          <strong id="calendarTodayCount">0</strong>
+        </article>
+
+        <article class="calendar-summary-card upcoming">
+          <span>Bu Ay</span>
+          <strong id="calendarMonthCount">0</strong>
+        </article>
+
+        <article class="calendar-summary-card paid">
+          <span>Ödenen</span>
+          <strong id="calendarPaidCount">0</strong>
+        </article>
+      </section>
+
+      <section class="content-card calendar-main-card">
+        <div class="calendar-toolbar">
+          <button id="calendarPrevMonth" type="button" aria-label="Önceki ay">
+            ‹
+          </button>
+
+          <div>
+            <span>AYLIK PLAN</span>
+            <h2 id="calendarMonthTitle">Ağustos 2026</h2>
+          </div>
+
+          <button id="calendarNextMonth" type="button" aria-label="Sonraki ay">
+            ›
+          </button>
+        </div>
+
+        <div class="calendar-weekdays">
+          <span>Pzt</span>
+          <span>Sal</span>
+          <span>Çar</span>
+          <span>Per</span>
+          <span>Cum</span>
+          <span>Cmt</span>
+          <span>Paz</span>
+        </div>
+
+        <div id="calendarGrid" class="calendar-grid"></div>
+
+        <div class="calendar-legend">
+          <span><i class="overdue"></i> Gecikmiş</span>
+          <span><i class="today"></i> Bugün</span>
+          <span><i class="upcoming"></i> Yaklaşan</span>
+          <span><i class="paid"></i> Ödendi</span>
+        </div>
+      </section>
+
+      <section class="content-card">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">BU AY</p>
+            <h2>Ödeme planı</h2>
+          </div>
+        </div>
+
+        <div id="calendarPaymentList" class="calendar-payment-list"></div>
+      </section>
+    `;
+
+    main.appendChild(page);
+  }
+
+  function createCalendarDayModal() {
+    if (document.getElementById("calendarDayModal")) return;
+
+    const modal = document.createElement("div");
+    modal.id = "calendarDayModal";
+    modal.className = "calendar-day-modal hidden";
+
+    modal.innerHTML = `
+      <div class="calendar-day-backdrop"></div>
+
+      <section class="calendar-day-sheet">
+        <div class="calendar-day-head">
+          <div>
+            <span>GÜNÜN ÖDEMELERİ</span>
+            <h2 id="calendarDayTitle">Tarih</h2>
+          </div>
+
+          <button id="calendarDayClose" type="button">×</button>
+        </div>
+
+        <div id="calendarDayList" class="calendar-day-list"></div>
+      </section>
+    `;
+
+    document.body.appendChild(modal);
+  }
+
+  function bindCalendarEvents() {
+    document.addEventListener("click", event => {
+      const pageButton = event.target.closest('[data-page="calendarPage"]');
+
+      if (pageButton) {
+        closeSideMenu();
+        showPage("calendarPage");
+        localStorage.setItem(PAGE_KEY, "calendarPage");
+        renderCalendar();
+      }
+    });
+
+    document
+      .getElementById("calendarBackButton")
+      ?.addEventListener("click", () => {
+        showPage("dashboardPage");
+        localStorage.setItem(PAGE_KEY, "dashboardPage");
+      });
+
+    document
+      .getElementById("calendarPrevMonth")
+      ?.addEventListener("click", () => {
+        calendarDate.setMonth(calendarDate.getMonth() - 1);
+        renderCalendar();
+      });
+
+    document
+      .getElementById("calendarNextMonth")
+      ?.addEventListener("click", () => {
+        calendarDate.setMonth(calendarDate.getMonth() + 1);
+        renderCalendar();
+      });
+
+    document
+      .getElementById("calendarDayClose")
+      ?.addEventListener("click", closeDayModal);
+
+    document
+      .querySelector(".calendar-day-backdrop")
+      ?.addEventListener("click", closeDayModal);
+
+    window.addEventListener("storage", renderCalendar);
+
+    const saved = localStorage.getItem(PAGE_KEY);
+    if (saved === "calendarPage") {
+      setTimeout(() => {
+        showPage("calendarPage");
+        renderCalendar();
+      }, 350);
+    }
+  }
+
+  function renderCalendar() {
+    const grid = document.getElementById("calendarGrid");
+    if (!grid) return;
+
+    const debts = loadJson(DEBT_KEY);
+    const transactions = loadJson(TX_KEY);
+
+    const year = calendarDate.getFullYear();
+    const month = calendarDate.getMonth();
+
+    document.getElementById("calendarMonthTitle").textContent =
+      calendarDate.toLocaleDateString("tr-TR", {
+        month: "long",
+        year: "numeric"
+      });
+
+    const monthItems = createMonthItems(debts, transactions, year, month);
+
+    updateSummary(monthItems);
+    renderMonthGrid(grid, monthItems, year, month);
+    renderMonthPaymentList(monthItems);
+  }
+
+  function createMonthItems(debts, transactions, year, month) {
+    const items = [];
+
+    debts
+      .filter(item => Number(item.debt || 0) > 0)
+      .forEach(item => {
+        const isLoan = item.type === "personal-loan";
+        const dateValue = isLoan
+          ? item.nextPaymentDate || item.dueDate
+          : item.dueDate;
+
+        if (!dateValue) return;
+
+        const date = parseDate(dateValue);
+        if (!date) return;
+
+        if (
+          date.getFullYear() !== year ||
+          date.getMonth() !== month
+        ) {
+          return;
+        }
+
+        const paid = isDebtPaidForDate(item, transactions, date);
+
+        const amount = isLoan
+          ? Math.min(
+              Number(item.monthlyInstallment || 0),
+              Number(item.debt || 0)
+            )
+          : getRemainingMinimum(item, transactions);
+
+        const daysLeft = differenceInDays(date, new Date());
+
+        items.push({
+          id: item.id,
+          bank: item.bank || "Banka",
+          name: item.name || "",
+          type: isLoan ? "loan" : "card",
+          date,
+          dateKey: toDateKey(date),
+          amount,
+          debt: Number(item.debt || 0),
+          paid,
+          status: paid
+            ? "paid"
+            : daysLeft < 0
+              ? "overdue"
+              : daysLeft === 0
+                ? "today"
+                : "upcoming"
+        });
+      });
+
+    transactions
+      .filter(transaction =>
+        (
+          transaction.type === "card-payment" ||
+          transaction.type === "loan-payment"
+        ) &&
+        isSameMonth(transaction.createdAt || transaction.date, year, month)
+      )
+      .forEach(transaction => {
+        const date = parseDate(transaction.createdAt || transaction.date);
+        if (!date) return;
+
+        const exists = items.some(item =>
+          item.id === transaction.cardId &&
+          item.dateKey === toDateKey(date) &&
+          item.paid
+        );
+
+        if (exists) return;
+
+        items.push({
+          id: transaction.cardId || transaction.id,
+          bank: transaction.cardName || transaction.name || "Ödeme",
+          name:
+            transaction.type === "loan-payment"
+              ? "Kredi taksiti ödendi"
+              : "Kart borcu ödendi",
+          type:
+            transaction.type === "loan-payment"
+              ? "loan"
+              : "card",
+          date,
+          dateKey: toDateKey(date),
+          amount: Number(transaction.amount || 0),
+          debt: 0,
+          paid: true,
+          status: "paid",
+          historyOnly: true
+        });
+      });
+
+    return items.sort((a, b) => a.date - b.date);
+  }
+
+  function renderMonthGrid(grid, items, year, month) {
+    grid.innerHTML = "";
+
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const leading = (firstDay.getDay() + 6) % 7;
+    const totalCells = Math.ceil((leading + lastDay.getDate()) / 7) * 7;
+
+    for (let index = 0; index < totalCells; index++) {
+      const dayNumber = index - leading + 1;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "calendar-day";
+
+      if (dayNumber < 1 || dayNumber > lastDay.getDate()) {
+        button.classList.add("empty");
+        button.disabled = true;
+        grid.appendChild(button);
+        continue;
+      }
+
+      const date = new Date(year, month, dayNumber);
+      const dateKey = toDateKey(date);
+      const dayItems = items.filter(item => item.dateKey === dateKey);
+
+      button.innerHTML = `
+        <span class="calendar-day-number">${dayNumber}</span>
+        <span class="calendar-day-dots"></span>
+      `;
+
+      if (toDateKey(new Date()) === dateKey) {
+        button.classList.add("current-day");
+      }
+
+      const dots = button.querySelector(".calendar-day-dots");
+
+      [...new Set(dayItems.map(item => item.status))]
+        .slice(0, 3)
+        .forEach(status => {
+          const dot = document.createElement("i");
+          dot.className = status;
+          dots.appendChild(dot);
+        });
+
+      if (dayItems.length) {
+        button.classList.add("has-payment");
+        button.addEventListener("click", () => {
+          openDayModal(date, dayItems);
+        });
+      }
+
+      grid.appendChild(button);
+    }
+  }
+
+  function renderMonthPaymentList(items) {
+    const list = document.getElementById("calendarPaymentList");
+    if (!list) return;
+
+    list.innerHTML = "";
+
+    if (!items.length) {
+      list.innerHTML = `
+        <div class="empty-state">
+          Bu ay için ödeme kaydı bulunmuyor.
+        </div>
+      `;
+      return;
+    }
+
+    items.forEach(item => {
+      const row = document.createElement("article");
+      row.className = `calendar-payment-item ${item.status}`;
+
+      row.innerHTML = `
+        <div class="calendar-payment-date">
+          <strong>${item.date.getDate()}</strong>
+          <span>${item.date.toLocaleDateString("tr-TR", {
+            month: "short"
+          })}</span>
+        </div>
+
+        <div class="calendar-payment-info">
+          <strong>${escapeHtml(item.bank)}</strong>
+          <span>${escapeHtml(item.name)}</span>
+          <small>
+            ${item.type === "loan" ? "İhtiyaç Kredisi" : "Kredi Kartı"}
+          </small>
+        </div>
+
+        <div class="calendar-payment-side">
+          <strong>${formatMoney(item.amount)}</strong>
+          <span>${statusText(item.status)}</span>
+        </div>
+      `;
+
+      row.addEventListener("click", () => {
+        openDayModal(item.date, [item]);
+      });
+
+      list.appendChild(row);
+    });
+  }
+
+  function openDayModal(date, items) {
+    const modal = document.getElementById("calendarDayModal");
+    const title = document.getElementById("calendarDayTitle");
+    const list = document.getElementById("calendarDayList");
+
+    if (!modal || !title || !list) return;
+
+    title.textContent = date.toLocaleDateString("tr-TR", {
+      day: "numeric",
+      month: "long",
+      year: "numeric"
+    });
+
+    list.innerHTML = "";
+
+    items.forEach(item => {
+      const row = document.createElement("article");
+      row.className = `calendar-day-item ${item.status}`;
+
+      row.innerHTML = `
+        <div class="calendar-day-item-icon">
+          ${item.type === "loan" ? "🏦" : "💳"}
+        </div>
+
+        <div class="calendar-day-item-info">
+          <strong>${escapeHtml(item.bank)}</strong>
+          <span>${escapeHtml(item.name)}</span>
+          <small>${statusText(item.status)}</small>
+        </div>
+
+        <div class="calendar-day-item-side">
+          <strong>${formatMoney(item.amount)}</strong>
+          ${
+            item.paid || item.historyOnly
+              ? '<span class="calendar-paid-label">Ödendi ✓</span>'
+              : '<button type="button">Şimdi Öde</button>'
+          }
+        </div>
+      `;
+
+      row.querySelector("button")?.addEventListener("click", () => {
+        closeDayModal();
+        openPaymentPage(item.id);
+      });
+
+      list.appendChild(row);
+    });
+
+    modal.classList.remove("hidden");
+    document.body.style.overflow = "hidden";
+  }
+
+  function closeDayModal() {
+    document
+      .getElementById("calendarDayModal")
+      ?.classList.add("hidden");
+
+    document.body.style.overflow = "";
+  }
+
+  function openPaymentPage(debtId) {
+    document
+      .querySelector('[data-page="debtPaymentPage"]')
+      ?.click();
+
+    setTimeout(() => {
+      const select = document.getElementById("debtPaymentCard");
+
+      if (!select) return;
+
+      select.value = debtId;
+      select.dispatchEvent(
+        new Event("change", { bubbles: true })
+      );
+
+      document
+        .getElementById("debtPickerButtonText")
+        ?.dispatchEvent(new Event("change", { bubbles: true }));
+    }, 260);
+  }
+
+  function updateSummary(items) {
+    const nowKey = toDateKey(new Date());
+
+    setText(
+      "calendarOverdueCount",
+      items.filter(item => item.status === "overdue").length
+    );
+
+    setText(
+      "calendarTodayCount",
+      items.filter(item =>
+        item.dateKey === nowKey &&
+        item.status !== "paid"
+      ).length
+    );
+
+    setText(
+      "calendarMonthCount",
+      items.filter(item => !item.historyOnly).length
+    );
+
+    setText(
+      "calendarPaidCount",
+      items.filter(item => item.status === "paid").length
+    );
+  }
+
+  function getRemainingMinimum(card, transactions) {
+    const statementDebt = Number(
+      card.statementDebt !== undefined
+        ? card.statementDebt
+        : card.debt || 0
+    );
+
+    const minimum = roundMoney(statementDebt * 0.20);
+    const cycle =
+      card.statementCycle ||
+      cycleKey(card.dueDate);
+
+    const paid = roundMoney(
+      transactions
+        .filter(transaction => {
+          if (
+            transaction.type !== "card-payment" ||
+            transaction.cardId !== card.id
+          ) {
+            return false;
+          }
+
+          if (transaction.statementCycle) {
+            return transaction.statementCycle === cycle;
+          }
+
+          return isSameMonth(
+            transaction.createdAt || transaction.date,
+            new Date(card.dueDate).getFullYear(),
+            new Date(card.dueDate).getMonth()
+          );
+        })
+        .reduce(
+          (sum, transaction) =>
+            sum + Number(transaction.amount || 0),
+          0
+        )
+    );
+
+    return roundMoney(Math.max(0, minimum - paid));
+  }
+
+  function isDebtPaidForDate(debt, transactions, date) {
+    const paymentType =
+      debt.type === "personal-loan"
+        ? "loan-payment"
+        : "card-payment";
+
+    return transactions.some(transaction => {
+      if (
+        transaction.type !== paymentType ||
+        transaction.cardId !== debt.id
+      ) {
+        return false;
+      }
+
+      return isSameMonth(
+        transaction.createdAt || transaction.date,
+        date.getFullYear(),
+        date.getMonth()
+      );
+    });
+  }
+
+  function statusText(status) {
+    const labels = {
+      overdue: "Gecikmiş",
+      today: "Bugün",
+      upcoming: "Yaklaşan",
+      paid: "Ödendi"
+    };
+
+    return labels[status] || "";
+  }
+
+  function differenceInDays(first, second) {
+    const a = new Date(first);
+    const b = new Date(second);
+
+    a.setHours(0, 0, 0, 0);
+    b.setHours(0, 0, 0, 0);
+
+    return Math.round((a - b) / 86400000);
+  }
+
+  function parseDate(value) {
+    if (!value) return null;
+
+    const date = new Date(
+      String(value).includes("T")
+        ? value
+        : `${value}T12:00:00`
+    );
+
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  function isSameMonth(value, year, month) {
+    const date = parseDate(value);
+
+    return Boolean(
+      date &&
+      date.getFullYear() === year &&
+      date.getMonth() === month
+    );
+  }
+
+  function cycleKey(value) {
+    const match = String(value || "").match(/^(\d{4})-(\d{2})/);
+
+    if (match) return `${match[1]}-${match[2]}`;
+
+    const now = new Date();
+
+    return `${now.getFullYear()}-${String(
+      now.getMonth() + 1
+    ).padStart(2, "0")}`;
+  }
+
+  function toDateKey(date) {
+    return [
+      date.getFullYear(),
+      String(date.getMonth() + 1).padStart(2, "0"),
+      String(date.getDate()).padStart(2, "0")
+    ].join("-");
+  }
+
+  function showPage(pageId) {
+    document.querySelectorAll(".page").forEach(page => {
+      page.classList.toggle("active", page.id === pageId);
+    });
+
+    document
+      .querySelectorAll(".bottom-navigation .nav-item")
+      .forEach(item => {
+        item.classList.toggle(
+          "active",
+          item.dataset.page === pageId
+        );
+      });
+
+    document.body.style.overflow = "";
+    document.documentElement.style.overflow = "";
+
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function closeSideMenu() {
+    const layer = document.getElementById("sideMenuLayer");
+
+    layer?.classList.remove("open");
+    layer?.setAttribute("aria-hidden", "true");
+
+    document.body.style.overflow = "";
+    document.documentElement.style.overflow = "";
+  }
+
+  function loadJson(key) {
+    try {
+      return JSON.parse(localStorage.getItem(key) || "[]");
+    } catch {
+      return [];
+    }
+  }
+
+  function formatMoney(value) {
+    return new Intl.NumberFormat("tr-TR", {
+      style: "currency",
+      currency: "TRY"
+    }).format(Number(value) || 0);
+  }
+
+  function roundMoney(value) {
+    return Math.round(
+      (Number(value) + Number.EPSILON) * 100
+    ) / 100;
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function setText(id, value) {
+    const element = document.getElementById(id);
+
+    if (element) {
+      element.textContent = String(value);
+    }
+  }
+
+  function installCalendarStyles() {
+    if (document.getElementById("yfCalendarStyles")) return;
+
+    const style = document.createElement("style");
+    style.id = "yfCalendarStyles";
+
+    style.textContent = `
+      .calendar-summary-grid {
+        display: grid;
+        grid-template-columns: repeat(2,minmax(0,1fr));
+        gap: 11px;
+        margin-bottom: 14px;
+      }
+
+      .calendar-summary-card {
+        padding: 16px;
+        border: 1px solid rgba(255,255,255,.08);
+        border-radius: 18px;
+        background: rgba(255,255,255,.04);
+      }
+
+      .calendar-summary-card span,
+      .calendar-summary-card strong {
+        display: block;
+      }
+
+      .calendar-summary-card span {
+        margin-bottom: 7px;
+        color: #8fa2ba;
+        font-size: 11px;
+      }
+
+      .calendar-summary-card strong {
+        font-size: 24px;
+      }
+
+      .calendar-summary-card.overdue {
+        border-color: rgba(255,91,122,.20);
+        background: rgba(255,91,122,.06);
+      }
+
+      .calendar-summary-card.today {
+        border-color: rgba(255,177,72,.20);
+        background: rgba(255,177,72,.06);
+      }
+
+      .calendar-summary-card.upcoming {
+        border-color: rgba(72,171,255,.20);
+        background: rgba(15,140,255,.06);
+      }
+
+      .calendar-summary-card.paid {
+        border-color: rgba(43,211,154,.20);
+        background: rgba(43,211,154,.06);
+      }
+
+      .calendar-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 13px;
+        margin-bottom: 17px;
+      }
+
+      .calendar-toolbar > button {
+        width: 42px;
+        height: 42px;
+        flex: 0 0 42px;
+        border: 1px solid rgba(255,255,255,.09);
+        border-radius: 13px;
+        color: #75c3ff;
+        background: rgba(255,255,255,.04);
+        font-size: 27px;
+      }
+
+      .calendar-toolbar > div {
+        text-align: center;
+      }
+
+      .calendar-toolbar span {
+        color: #67baff;
+        font-size: 9px;
+        font-weight: 900;
+        letter-spacing: .14em;
+      }
+
+      .calendar-toolbar h2 {
+        margin: 5px 0 0;
+        font-size: 19px;
+        text-transform: capitalize;
+      }
+
+      .calendar-weekdays,
+      .calendar-grid {
+        display: grid;
+        grid-template-columns: repeat(7,minmax(0,1fr));
+        gap: 6px;
+      }
+
+      .calendar-weekdays {
+        margin-bottom: 7px;
+      }
+
+      .calendar-weekdays span {
+        color: #7f93a8;
+        font-size: 8px;
+        font-weight: 850;
+        text-align: center;
+      }
+
+      .calendar-day {
+        position: relative;
+        min-width: 0;
+        aspect-ratio: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        border: 1px solid rgba(255,255,255,.06);
+        border-radius: 12px;
+        color: inherit;
+        background: rgba(255,255,255,.025);
+        font: inherit;
+      }
+
+      .calendar-day.empty {
+        opacity: 0;
+      }
+
+      .calendar-day.has-payment {
+        background: rgba(15,140,255,.05);
+        border-color: rgba(72,171,255,.13);
+      }
+
+      .calendar-day.current-day {
+        border-color: rgba(72,171,255,.32);
+        box-shadow: inset 0 0 0 1px rgba(72,171,255,.10);
+      }
+
+      .calendar-day-number {
+        font-size: 11px;
+        font-weight: 800;
+      }
+
+      .calendar-day-dots {
+        min-height: 5px;
+        display: flex;
+        gap: 3px;
+      }
+
+      .calendar-day-dots i,
+      .calendar-legend i {
+        width: 5px;
+        height: 5px;
+        display: inline-block;
+        border-radius: 50%;
+      }
+
+      .calendar-day-dots i.overdue,
+      .calendar-legend i.overdue {
+        background: #ff647f;
+      }
+
+      .calendar-day-dots i.today,
+      .calendar-legend i.today {
+        background: #ffb348;
+      }
+
+      .calendar-day-dots i.upcoming,
+      .calendar-legend i.upcoming {
+        background: #47a8ff;
+      }
+
+      .calendar-day-dots i.paid,
+      .calendar-legend i.paid {
+        background: #2bd39b;
+      }
+
+      .calendar-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 15px;
+        color: #8093a8;
+        font-size: 8.5px;
+      }
+
+      .calendar-legend span {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+      }
+
+      .calendar-payment-list,
+      .calendar-day-list {
+        display: grid;
+        gap: 10px;
+      }
+
+      .calendar-payment-item,
+      .calendar-day-item {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        padding: 13px;
+        border: 1px solid rgba(255,255,255,.07);
+        border-radius: 16px;
+        background: rgba(255,255,255,.035);
+      }
+
+      .calendar-payment-item.overdue,
+      .calendar-day-item.overdue {
+        border-color: rgba(255,91,122,.18);
+      }
+
+      .calendar-payment-item.today,
+      .calendar-day-item.today {
+        border-color: rgba(255,177,72,.18);
+      }
+
+      .calendar-payment-item.paid,
+      .calendar-day-item.paid {
+        border-color: rgba(43,211,154,.18);
+      }
+
+      .calendar-payment-date {
+        width: 42px;
+        height: 48px;
+        flex: 0 0 42px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        border-radius: 13px;
+        background: rgba(15,140,255,.09);
+      }
+
+      .calendar-payment-date strong {
+        font-size: 16px;
+      }
+
+      .calendar-payment-date span {
+        margin-top: 2px;
+        color: #8fa2ba;
+        font-size: 8px;
+        text-transform: uppercase;
+      }
+
+      .calendar-payment-info,
+      .calendar-day-item-info {
+        min-width: 0;
+        flex: 1;
+      }
+
+      .calendar-payment-info strong,
+      .calendar-payment-info span,
+      .calendar-payment-info small,
+      .calendar-day-item-info strong,
+      .calendar-day-item-info span,
+      .calendar-day-item-info small {
+        display: block;
+      }
+
+      .calendar-payment-info strong,
+      .calendar-day-item-info strong {
+        font-size: 12px;
+      }
+
+      .calendar-payment-info span,
+      .calendar-day-item-info span {
+        margin-top: 3px;
+        color: #aebfd0;
+        font-size: 9.5px;
+      }
+
+      .calendar-payment-info small,
+      .calendar-day-item-info small {
+        margin-top: 5px;
+        color: #75899f;
+        font-size: 8px;
+      }
+
+      .calendar-payment-side,
+      .calendar-day-item-side {
+        flex: 0 0 auto;
+        text-align: right;
+      }
+
+      .calendar-payment-side strong,
+      .calendar-payment-side span,
+      .calendar-day-item-side strong {
+        display: block;
+      }
+
+      .calendar-payment-side strong,
+      .calendar-day-item-side strong {
+        font-size: 11px;
+      }
+
+      .calendar-payment-side span {
+        margin-top: 5px;
+        color: #8093a8;
+        font-size: 8px;
+      }
+
+      .calendar-day-modal {
+        position: fixed;
+        z-index: 5000;
+        inset: 0;
+      }
+
+      .calendar-day-backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(0,0,0,.74);
+        backdrop-filter: blur(5px);
+        -webkit-backdrop-filter: blur(5px);
+      }
+
+      .calendar-day-sheet {
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        max-height: 78vh;
+        overflow-y: auto;
+        padding:
+          18px
+          18px
+          calc(22px + env(safe-area-inset-bottom));
+        border-radius: 26px 26px 0 0;
+        border: 1px solid rgba(255,255,255,.10);
+        background:
+          linear-gradient(
+            180deg,
+            rgba(18,43,69,.99),
+            rgba(8,23,38,.99)
+          );
+      }
+
+      .calendar-day-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 14px;
+        margin-bottom: 15px;
+      }
+
+      .calendar-day-head span {
+        color: #67baff;
+        font-size: 9px;
+        font-weight: 900;
+        letter-spacing: .14em;
+      }
+
+      .calendar-day-head h2 {
+        margin: 5px 0 0;
+        font-size: 21px;
+      }
+
+      .calendar-day-head button {
+        width: 40px;
+        height: 40px;
+        border: 1px solid rgba(255,255,255,.10);
+        border-radius: 13px;
+        color: inherit;
+        background: rgba(255,255,255,.05);
+        font-size: 25px;
+      }
+
+      .calendar-day-item-icon {
+        width: 40px;
+        height: 40px;
+        flex: 0 0 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 13px;
+        background: rgba(15,140,255,.09);
+      }
+
+      .calendar-day-item-side button {
+        min-height: 30px;
+        margin-top: 7px;
+        padding: 0 9px;
+        border: 1px solid rgba(72,171,255,.22);
+        border-radius: 10px;
+        color: #74c2ff;
+        background: rgba(15,140,255,.10);
+        font-size: 8px;
+        font-weight: 850;
+      }
+
+      .calendar-paid-label {
+        display: block;
+        margin-top: 6px;
+        color: #4ce0aa;
+        font-size: 8px;
+        font-weight: 850;
+      }
+
+      @media(max-width:370px) {
+        .calendar-weekdays,
+        .calendar-grid {
+          gap: 4px;
+        }
+
+        .calendar-day {
+          border-radius: 9px;
+        }
+
+        .calendar-day-number {
+          font-size: 10px;
+        }
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+});
 
