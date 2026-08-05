@@ -3604,4 +3604,136 @@ document.addEventListener("DOMContentLoaded", () => {
     document.head.appendChild(style);
   }
 });
+// YF v2.4 — Hatırlatmalar Ekranı
+document.addEventListener("DOMContentLoaded", () => {
+  const DK="yf_cards_v1", TK="yf_transactions_v1";
+  const $=id=>document.getElementById(id);
+  const load=k=>{try{return JSON.parse(localStorage.getItem(k)||"[]")}catch{return[]}};
+  const money=v=>new Intl.NumberFormat("tr-TR",{style:"currency",currency:"TRY"}).format(Number(v)||0);
+  const esc=v=>String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
+  const round=v=>Math.round((Number(v)+Number.EPSILON)*100)/100;
+
+  const menu=document.querySelector('.side-menu-item[data-feature="Hatırlatmalar"]');
+  if(!menu)return;
+  menu.classList.remove("future-menu-item");
+  menu.removeAttribute("data-feature");
+  menu.dataset.page="remindersPage";
+
+  if(!$("remindersPage")){
+    const page=document.createElement("section");
+    page.id="remindersPage";
+    page.className="page";
+    page.innerHTML=`
+      <header class="top-header">
+        <div><p class="eyebrow">Ödeme Takibi</p><h1>Hatırlatmalar</h1></div>
+        <button id="remindersBackButton" class="reports-back-button" type="button">Ana Sayfa</button>
+      </header>
+
+      <section class="reminder-summary-grid">
+        <article class="reminder-summary-card overdue"><span>Geciken</span><strong id="reminderOverdueCount">0</strong></article>
+        <article class="reminder-summary-card today"><span>Bugün</span><strong id="reminderTodayCount">0</strong></article>
+        <article class="reminder-summary-card week"><span>Bu Hafta</span><strong id="reminderWeekCount">0</strong></article>
+        <article class="reminder-summary-card completed"><span>Tamamlanan</span><strong id="reminderCompletedCount">0</strong></article>
+      </section>
+
+      <section class="content-card">
+        <div class="section-heading"><div><p class="eyebrow">Filtrele</p><h2>Hatırlatma durumu</h2></div></div>
+        <div class="reminder-filter-row" id="reminderFilters">
+          <button class="reminder-filter active" data-filter="all" type="button">Hepsi</button>
+          <button class="reminder-filter" data-filter="overdue" type="button">Geciken</button>
+          <button class="reminder-filter" data-filter="today" type="button">Bugün</button>
+          <button class="reminder-filter" data-filter="upcoming" type="button">Yaklaşan</button>
+          <button class="reminder-filter" data-filter="completed" type="button">Tamamlanan</button>
+        </div>
+      </section>
+
+      <section class="content-card">
+        <div class="section-heading"><div><p class="eyebrow">Ödeme Planı</p><h2>Hatırlatmaların</h2></div></div>
+        <div id="reminderList" class="reminder-list"></div>
+      </section>
+
+      <section class="content-card">
+        <button id="addReminderButton" class="reminder-add-button" type="button">
+          <span>＋</span><div><strong>Hatırlatma Ekle</strong><small>Kira, fatura veya özel ödeme ekle</small></div>
+        </button>
+      </section>`;
+    document.querySelector("main.app-shell")?.appendChild(page);
+  }
+
+  if(!$("yfReminderStyles")){
+    const s=document.createElement("style");
+    s.id="yfReminderStyles";
+    s.textContent=`
+      .reminder-summary-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;margin-bottom:14px}
+      .reminder-summary-card{padding:16px;border-radius:18px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.04)}
+      .reminder-summary-card span,.reminder-summary-card strong{display:block}.reminder-summary-card span{margin-bottom:7px;color:#8fa2ba;font-size:11px}.reminder-summary-card strong{font-size:24px}
+      .reminder-summary-card.overdue{border-color:rgba(255,91,122,.22);background:rgba(255,91,122,.07)}
+      .reminder-summary-card.today{border-color:rgba(255,177,72,.22);background:rgba(255,177,72,.07)}
+      .reminder-summary-card.week{border-color:rgba(69,166,255,.22);background:rgba(69,166,255,.07)}
+      .reminder-summary-card.completed{border-color:rgba(43,211,154,.22);background:rgba(43,211,154,.07)}
+      .reminder-filter-row{display:flex;gap:8px;overflow-x:auto}.reminder-filter{min-height:38px;padding:0 13px;border:1px solid rgba(255,255,255,.09);border-radius:999px;color:#9db0c4;background:rgba(255,255,255,.035);font:inherit;font-size:11px;font-weight:800;white-space:nowrap}
+      .reminder-filter.active{color:#dff1ff;border-color:rgba(72,171,255,.26);background:rgba(15,140,255,.13)}
+      .reminder-list{display:grid;gap:11px}.reminder-item{display:flex;align-items:center;gap:12px;padding:14px;border:1px solid rgba(255,255,255,.07);border-radius:17px;background:rgba(255,255,255,.035)}
+      .reminder-item-icon{width:42px;height:42px;flex:0 0 42px;display:flex;align-items:center;justify-content:center;border-radius:14px;font-weight:900}
+      .reminder-item-icon.overdue{color:#ff8298;background:rgba(255,91,122,.12)}.reminder-item-icon.today,.reminder-item-icon.week{color:#ffd073;background:rgba(255,177,72,.11)}.reminder-item-icon.upcoming{color:#72c2ff;background:rgba(15,140,255,.11)}.reminder-item-icon.completed{color:#4ce0aa;background:rgba(43,211,154,.11)}
+      .reminder-item-info{min-width:0;flex:1}.reminder-item-info strong,.reminder-item-info span,.reminder-item-info small{display:block}.reminder-item-info span{margin-top:4px;color:#b7c7d7;font-size:11px}.reminder-item-info small{margin-top:6px;color:#8093a8;font-size:9.5px}
+      .reminder-item-side{text-align:right}.reminder-item-side>strong{display:block;font-size:12px}.reminder-pay-button{min-height:30px;margin-top:7px;padding:0 9px;border:1px solid rgba(72,171,255,.22);border-radius:10px;color:#74c2ff;background:rgba(15,140,255,.10);font-size:9px;font-weight:850}
+      .reminder-add-button{width:100%;min-height:62px;display:flex;align-items:center;gap:13px;padding:13px;border:1px dashed rgba(72,171,255,.24);border-radius:17px;color:inherit;background:rgba(15,140,255,.055);text-align:left;font:inherit}
+      .reminder-add-button>span{width:38px;height:38px;display:flex;align-items:center;justify-content:center;border-radius:12px;color:#72c2ff;background:rgba(15,140,255,.11);font-size:21px}.reminder-add-button strong,.reminder-add-button small{display:block}.reminder-add-button small{margin-top:4px;color:#8093a8;font-size:10px}`;
+    document.head.appendChild(s);
+  }
+
+  const showPage=id=>{
+    document.querySelectorAll(".page").forEach(p=>p.classList.toggle("active",p.id===id));
+    document.querySelectorAll(".bottom-navigation .nav-item").forEach(n=>n.classList.toggle("active",n.dataset.page===id));
+    window.scrollTo({top:0,behavior:"smooth"});
+  };
+
+  const days=v=>{const a=new Date();a.setHours(0,0,0,0);const b=new Date(`${v}T00:00:00`);return Math.ceil((b-a)/86400000)};
+  const currentMonth=v=>{const d=new Date(String(v).includes("T")?v:`${v}T12:00:00`),n=new Date();return !Number.isNaN(d.getTime())&&d.getMonth()===n.getMonth()&&d.getFullYear()===n.getFullYear()};
+  const cycle=v=>{const m=String(v||"").match(/^(\d{4})-(\d{2})/);return m?`${m[1]}-${m[2]}`:""};
+  const paidFor=(c,tx)=>round(tx.filter(t=>t.type==="card-payment"&&t.cardId===c.id&&(t.statementCycle?t.statementCycle===cycle(c.dueDate):currentMonth(t.createdAt||t.date))).reduce((s,t)=>s+Number(t.amount||0),0));
+
+  function render(filter="all"){
+    const debts=load(DK),tx=load(TK),list=$("reminderList");
+    const reminders=debts.filter(x=>Number(x.debt||0)>0).map(x=>{
+      const isLoan=x.type==="personal-loan",date=isLoan?(x.nextPaymentDate||x.dueDate):x.dueDate;
+      if(!date)return null;
+      const d=days(date);
+      const due=isLoan?Math.min(Number(x.monthlyInstallment||0),Number(x.debt||0)):Math.max(0,round(Number(x.statementDebt??x.debt??0)*.2)-paidFor(x,tx));
+      const status=d<0?"overdue":d===0?"today":d<=7?"week":"upcoming";
+      return{id:x.id,bank:x.bank,name:x.name,date,due,status,days:d,isLoan};
+    }).filter(Boolean).sort((a,b)=>a.days-b.days);
+
+    const completed=tx.filter(t=>(t.type==="card-payment"||t.type==="loan-payment")&&currentMonth(t.createdAt||t.date)).map(t=>({id:t.id,status:"completed",bank:t.cardName||t.name,name:t.type==="loan-payment"?"Kredi taksiti ödendi":"Kart borcu ödendi",due:Number(t.amount||0),date:t.createdAt||t.date}));
+
+    $("reminderOverdueCount").textContent=reminders.filter(x=>x.status==="overdue").length;
+    $("reminderTodayCount").textContent=reminders.filter(x=>x.status==="today").length;
+    $("reminderWeekCount").textContent=reminders.filter(x=>x.status==="today"||x.status==="week").length;
+    $("reminderCompletedCount").textContent=completed.length;
+
+    const all=[...reminders,...completed].filter(x=>filter==="all"||x.status===filter||(filter==="upcoming"&&(x.status==="week"||x.status==="upcoming")));
+    list.innerHTML="";
+    if(!all.length){list.innerHTML='<div class="empty-state">Bu filtrede hatırlatma bulunmuyor.</div>';return}
+
+    all.forEach(x=>{
+      const el=document.createElement("article");
+      el.className="reminder-item";
+      if(x.status==="completed"){
+        el.innerHTML=`<div class="reminder-item-icon completed">✓</div><div class="reminder-item-info"><strong>${esc(x.bank)}</strong><span>${esc(x.name)}</span><small>${new Date(x.date).toLocaleString("tr-TR")}</small></div><div class="reminder-item-side"><strong>${money(x.due)}</strong></div>`;
+      }else{
+        const text=x.days<0?`${Math.abs(x.days)} gün gecikti`:x.days===0?"Bugün son gün":x.days===1?"Yarın":`${x.days} gün kaldı`;
+        el.innerHTML=`<div class="reminder-item-icon ${x.status}">${x.status==="overdue"?"!":x.status==="today"?"●":x.status==="week"?"⌛":"○"}</div><div class="reminder-item-info"><strong>${esc(x.bank)}</strong><span>${esc(x.name)}</span><small>${x.isLoan?"İhtiyaç Kredisi":"Kredi Kartı"} · ${text}</small></div><div class="reminder-item-side"><strong>${money(x.due)}</strong><button class="reminder-pay-button" type="button">Şimdi Öde</button></div>`;
+        el.querySelector("button").onclick=()=>{document.querySelector('[data-page="debtPaymentPage"]')?.click();setTimeout(()=>{const s=$("debtPaymentCard");if(s){s.value=x.id;s.dispatchEvent(new Event("change",{bubbles:true}))}},220)};
+      }
+      list.appendChild(el);
+    });
+  }
+
+  menu.addEventListener("click",()=>{document.getElementById("sideMenuLayer")?.classList.remove("open");showPage("remindersPage");render()});
+  $("remindersBackButton")?.addEventListener("click",()=>showPage("dashboardPage"));
+  $("reminderFilters")?.addEventListener("click",e=>{const b=e.target.closest("[data-filter]");if(!b)return;document.querySelectorAll(".reminder-filter").forEach(x=>x.classList.remove("active"));b.classList.add("active");render(b.dataset.filter)});
+  $("addReminderButton")?.addEventListener("click",()=>alert("Özel hatırlatma ekleme sonraki aşamada aktif edilecek."));
+  render();
+});
 
