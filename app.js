@@ -1,4 +1,4 @@
-// YF v4.0 — Temizlenmiş ve çakışmaları giderilmiş tek dosya sürümü
+// YF v3.0 — Temizlenmiş tek dosya sürümü
 // Eski localStorage anahtarları ve mevcut özellikler korunmuştur.
 // YF v2.0 — Akıllı Asgari Ödeme Sistemi
 document.addEventListener("DOMContentLoaded", () => {
@@ -33,13 +33,13 @@ document.addEventListener("DOMContentLoaded", () => {
   $("modalBackdrop")?.addEventListener("click",closeCard);
   cardForm?.addEventListener("submit",e=>{e.preventDefault();const limit=Number(cardLimit.value),debt=Number(cardDebt.value);if(!bankName.value||!cardName.value.trim()||!Number.isFinite(limit)||limit<0||!Number.isFinite(debt)||debt<0){alert("Kart bilgilerini doğru gir.");return}const old=cards.find(c=>c.id===cardId.value);const c={id:cardId.value||uid(),bank:bankName.value,name:cardName.value.trim(),limit,debt,statementDebt:debt,statementCycle:cycleOf(dueDate.value),statementDate:statementDate.value||"",dueDate:dueDate.value||"",createdAt:old?.createdAt||new Date().toISOString()};const i=cards.findIndex(x=>x.id===c.id);i>=0?cards[i]=c:cards.unshift(c);save(CK,cards);renderAll();closeCard();showPage("cardsPage")});
   const txModal=$("transactionModal"),txForm=$("transactionForm"),txType=$("transactionType"),txName=$("transactionName"),txAmount=$("transactionAmount"),txCat=$("transactionCategory"),txDate=$("transactionDate"),txMethod=$("transactionPaymentMethod"),txCard=$("transactionCard"),txCardField=$("transactionCardField");
-  function fillTxCards(){if(!txCard)return;txCard.innerHTML='<option value="">Kart seç</option>';cards.filter(c=>c.type!=="personal-loan").forEach(c=>{const o=document.createElement("option");o.value=c.id;o.textContent=`${c.bank} - ${c.name}`;txCard.appendChild(o)})}
+  function fillTxCards(){if(!txCard)return;txCard.innerHTML='<option value="">Kart seç</option>';cards.forEach(c=>{const o=document.createElement("option");o.value=c.id;o.textContent=`${c.bank} - ${c.name}`;txCard.appendChild(o)})}
   function toggleTxCard(){const show=txType?.value==="expense"&&txMethod?.value==="card";txCardField?.classList.toggle("hidden",!show);if(!show&&txCard)txCard.value=""}
-  function openTx(){if(!txModal||!txForm)return;txForm.reset();fillTxCards();if(txDate)txDate.value=new Date().toISOString().split("T")[0];toggleTxCard();txModal.classList.remove("hidden");document.body.style.overflow="hidden"}
+  function openTx(e){e?.preventDefault();if(!txModal||!txForm)return alert("İşlem formu bulunamadı.");txForm.reset();fillTxCards();if(txDate)txDate.value=new Date().toISOString().split("T")[0];toggleTxCard();txModal.classList.remove("hidden");document.body.style.overflow="hidden"}
   function closeTx(){txModal.classList.add("hidden");document.body.style.overflow=""}
-  $("openTransactionFormButton")?.addEventListener("click",openTx);
-  $("closeTransactionFormButton")?.addEventListener("click",closeTx);
-  $("cancelTransactionButton")?.addEventListener("click",closeTx);
+  document.querySelectorAll("#openTransactionFormButton").forEach(button=>button.addEventListener("click",openTx));
+  document.querySelectorAll("#closeTransactionFormButton").forEach(button=>button.addEventListener("click",closeTx));
+  document.querySelectorAll("#cancelTransactionButton").forEach(button=>button.addEventListener("click",closeTx));
   $("transactionModalBackdrop")?.addEventListener("click",closeTx);
   txType?.addEventListener("change",toggleTxCard);txMethod?.addEventListener("change",toggleTxCard);
   txForm?.addEventListener("submit",e=>{e.preventDefault();const type=txType.value,amount=Number(txAmount.value),method=txMethod.value,cardId=type==="expense"&&method==="card"?txCard.value:"";if(!txName.value.trim()||!txCat.value||!txDate.value||!Number.isFinite(amount)||amount<=0){alert("İşlem bilgilerini doğru gir.");return}const t={id:uid(),type,name:txName.value.trim(),amount,category:txCat.value,date:txDate.value,paymentMethod:method,cardId,cardDebtDelta:0,createdAt:new Date().toISOString()};if(cardId){const c=cards.find(x=>x.id===cardId);if(!c){alert("Kart bulunamadı.");return}if(c.limit>0&&c.debt+amount>c.limit){alert("Bu işlem kart limitini aşıyor.");return}c.debt+=amount;t.cardDebtDelta=amount;save(CK,cards)}txs.unshift(t);save(TK,txs);renderAll();closeTx()});
@@ -58,12 +58,11 @@ document.addEventListener("DOMContentLoaded", () => {
   function updateMinimumPanel(){const c=selectedPaymentCard(),a=$("smartMinimumAmount"),p=$("smartPaidAmount"),r=$("smartRemainingAmount"),b=$("smartMinimumBadge"),f=$("smartMinimumProgress"),t=$("smartMinimumText"),btn=$("payMinimumButton");if(!a)return;if(!c){a.textContent=p.textContent=r.textContent=money(0);b.textContent="Kart seç";b.className="smart-minimum-badge waiting";f.style.width="0%";t.textContent="Kart seçildiğinde otomatik hesaplanır.";btn.disabled=true;return}const i=minimumInfo(c);a.textContent=money(i.minimum);p.textContent=money(i.paid);r.textContent=money(i.remaining);f.style.width=`${i.pct}%`;t.textContent=`${money(i.paid)} / ${money(i.minimum)} · %${i.pct}`;if(i.remaining<=0){b.textContent="Asgari ödendi ✓";b.className="smart-minimum-badge completed";btn.disabled=true}else if(i.paid>0){b.textContent="Kısmen ödendi";b.className="smart-minimum-badge partial";btn.disabled=false}else{b.textContent="Asgari bekliyor";b.className="smart-minimum-badge waiting";btn.disabled=false}}
   addSmartPanel();
   $("debtPaymentForm")?.addEventListener("submit",()=>{const id=$("debtPaymentCard").value,amount=Number($("debtPaymentAmount").value),stamp=Date.now();setTimeout(()=>{const list=load(TK),c=load(CK).find(x=>x.id===id),t=list.find(x=>x.type==="card-payment"&&x.cardId===id&&Math.abs(Number(x.amount)-amount)<.01&&Math.abs(new Date(x.createdAt||x.date).getTime()-stamp)<15000);if(t&&!t.statementCycle){t.statementCycle=c?.statementCycle||cycleOf(c?.dueDate);const info=minimumInfo(c);t.paymentKind=Math.abs(amount-info.remaining)<.01?"minimum":"custom";save(TK,list)}},100)},true);
-  function deleteTx(id){if(!confirm("Bu işlem silinsin mi?"))return;const t=txs.find(x=>x.id===id);if(!t)return;const c=t.cardId?cards.find(x=>x.id===t.cardId):null;if(c){if(t.type==="expense"&&Number(t.cardDebtDelta||0)>0){c.debt=round(Math.max(0,Number(c.debt||0)-Number(t.cardDebtDelta||0)))}else if(t.type==="card-payment"){c.debt=round(Number(c.debt||0)+Number(t.amount||0))}else if(t.type==="loan-payment"&&c.type==="personal-loan"){c.debt=round(Number(c.debt||0)+Number(t.amount||0));c.remainingInstallments=Number(c.remainingInstallments||0)+1;c.nextPaymentDate=subtractOneMonth(c.nextPaymentDate||c.dueDate);c.dueDate=c.nextPaymentDate}save(CK,cards)}txs=txs.filter(x=>x.id!==id);save(TK,txs);renderAll()}
-  function subtractOneMonth(v){if(!v)return"";const d=new Date(`${v}T12:00:00`);if(Number.isNaN(d.getTime()))return v;const day=d.getDate();d.setDate(1);d.setMonth(d.getMonth()-1);const last=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();d.setDate(Math.min(day,last));return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`}
+  function deleteTx(id){if(!confirm("Bu işlem silinsin mi?"))return;const t=txs.find(x=>x.id===id);if(!t)return;const d=Number(t.cardDebtDelta??0);if(t.cardId&&d!==0){const c=cards.find(x=>x.id===t.cardId);if(c)c.debt=Math.max(0,c.debt-d);save(CK,cards)}txs=txs.filter(x=>x.id!==id);save(TK,txs);renderAll()}
   function renderCards(){const list=$("cardsList");if(!list)return;list.innerHTML="";if(!cards.length){list.innerHTML='<div class="empty-state">Henüz kart eklenmedi.</div>';return}cards.forEach(c=>{const i=minimumInfo(c),available=Math.max(0,c.limit-c.debt),usage=c.limit?Math.min(100,Math.round(c.debt/c.limit*100)):0,el=document.createElement("article");el.className=`bank-card ${bankClass(c.bank)}`;el.innerHTML=`<div class="bank-card-header"><div><span>${esc(c.bank)}</span><h3>${esc(c.name)}</h3></div><div class="bank-card-actions"><button data-edit="${c.id}">Düzenle</button><button data-delete="${c.id}">Sil</button></div></div><strong class="bank-card-debt">${money(c.debt)}</strong><div class="card-minimum-status"><div class="card-minimum-status-head"><div><span>Otomatik asgari (%20)</span><strong>${money(i.minimum)}</strong></div><span class="card-minimum-status-badge ${i.remaining<=0?"completed":i.paid>0?"partial":"waiting"}">${i.remaining<=0?"Asgari ödendi ✓":i.paid>0?`${money(i.remaining)} kaldı`:"Asgari bekliyor"}</span></div><div class="card-minimum-status-track"><div style="width:${i.pct}%"></div></div><small>Bu dönem: ${money(i.paid)} / ${money(i.minimum)}</small></div><div class="bank-card-details"><div><span>Kart Limiti</span><strong>${money(c.limit)}</strong></div><div><span>Kalan Limit</span><strong>${money(available)}</strong></div><div><span>Kullanım</span><strong>%${usage}</strong></div></div><div class="bank-card-dates"><div><span>Hesap Kesim</span><strong>${dateText(c.statementDate)}</strong></div><div><span>Son Ödeme</span><strong>${dateText(c.dueDate)}</strong></div></div>`;
     el.querySelector("[data-edit]").onclick=()=>openCard(c);el.querySelector("[data-delete]").onclick=()=>{if(confirm(`${c.bank} kartı silinsin mi?`)){cards=cards.filter(x=>x.id!==c.id);save(CK,cards);renderAll()}};list.appendChild(el)})}
-  function renderTx(){const list=$("transactionsList");if(!list)return;list.innerHTML="";if(!txs.length){list.innerHTML='<div class="empty-state">Henüz işlem eklenmedi.</div>';return}txs.forEach(t=>{const income=t.type==="income",c=cards.find(x=>x.id===t.cardId),el=document.createElement("article"),label=t.type==="card-payment"?(t.paymentKind==="minimum"?"Asgari Ödeme":"Kart Borcu Ödemesi"):t.type==="loan-payment"?"İhtiyaç Kredisi Taksiti":(t.category||"İşlem");el.className="transaction-item";el.innerHTML=`<div><h3>${esc(t.name||label)}</h3><small>${esc(label)}${c?` · ${esc(c.bank)} - ${esc(c.name)}`:t.cardName?` · ${esc(t.cardName)}`:""} · ${dateText(t.date||t.createdAt)}</small></div><div><strong class="${income?"transaction-income":"transaction-expense"}">${income?"+":"-"}${money(t.amount)}</strong><button data-del="${t.id}">Sil</button></div>`;el.querySelector("[data-del]").onclick=()=>deleteTx(t.id);list.appendChild(el)})}
-  function renderDashboard(){const debt=cards.reduce((s,c)=>s+c.debt,0),limit=cards.reduce((s,c)=>s+c.limit,0),income=txs.filter(t=>t.type==="income").reduce((s,t)=>s+t.amount,0),expense=txs.filter(t=>t.type==="expense").reduce((s,t)=>s+t.amount,0),cashExpense=txs.filter(t=>t.type==="expense"&&t.paymentMethod!=="card").reduce((s,t)=>s+t.amount,0),payments=txs.filter(t=>(t.type==="card-payment"||t.type==="loan-payment")&&currentMonth(t.createdAt||t.date)).reduce((s,t)=>s+t.amount,0),cash=income-cashExpense-payments,net=cash-debt;
+  function renderTx(){const list=$("transactionsList");if(!list)return;list.innerHTML="";if(!txs.length){list.innerHTML='<div class="empty-state">Henüz işlem eklenmedi.</div>';return}txs.forEach(t=>{const income=t.type==="income",c=cards.find(x=>x.id===t.cardId),el=document.createElement("article"),label=t.type==="card-payment"?(t.paymentKind==="minimum"?"Asgari Ödeme":"Kart Borcu Ödemesi"):(t.category||"İşlem");el.className="transaction-item";el.innerHTML=`<div><h3>${esc(t.name||label)}</h3><small>${esc(label)}${c?` · ${esc(c.bank)} - ${esc(c.name)}`:t.cardName?` · ${esc(t.cardName)}`:""} · ${dateText(t.date||t.createdAt)}</small></div><div><strong class="${income?"transaction-income":"transaction-expense"}">${income?"+":"-"}${money(t.amount)}</strong><button data-del="${t.id}">Sil</button></div>`;el.querySelector("[data-del]").onclick=()=>deleteTx(t.id);list.appendChild(el)})}
+  function renderDashboard(){const debt=cards.reduce((s,c)=>s+c.debt,0),limit=cards.reduce((s,c)=>s+c.limit,0),income=txs.filter(t=>t.type==="income").reduce((s,t)=>s+t.amount,0),expense=txs.filter(t=>t.type==="expense").reduce((s,t)=>s+t.amount,0),cashExpense=txs.filter(t=>t.type==="expense"&&t.paymentMethod!=="card").reduce((s,t)=>s+t.amount,0),payments=txs.filter(t=>t.type==="card-payment"&&currentMonth(t.createdAt||t.date)).reduce((s,t)=>s+t.amount,0),cash=income-cashExpense-payments,net=cash-debt;
     [["totalDebt",money(debt)],["totalAssets",money(Math.max(0,cash))],["monthlyPayment",money(payments)],["netBalance",money(net)],["cardCount",String(cards.length)],["cardsTotalDebt",money(debt)],["cardsTotalLimit",money(limit)],["cardsAvailableLimit",money(Math.max(0,limit-debt))],["totalIncome",money(income)],["totalExpense",money(expense)],["transactionBalance",money(cash)]].forEach(([id,v])=>{if($(id))$(id).textContent=v});if($("balanceStatus"))$("balanceStatus").textContent=net<0?"Ekside":net>0?"Pozitif":"Dengeli"}
   function renderUpcoming(){const list=$("upcomingPayments");if(!list)return;list.innerHTML="";const arr=cards.filter(c=>c.dueDate&&c.debt>0).sort((a,b)=>new Date(a.dueDate)-new Date(b.dueDate));if(!arr.length){list.innerHTML='<div class="empty-state">Henüz kart veya ödeme kaydı bulunmuyor.</div>';return}arr.slice(0,4).forEach(c=>{const i=minimumInfo(c),el=document.createElement("article");el.className="payment-item";el.innerHTML=`<div class="bank-icon ${iconClass(c.bank)}">${esc(c.bank.charAt(0))}</div><div class="payment-info"><strong>${esc(c.bank)}</strong><span>Son ödeme: ${dateText(c.dueDate)} · Kalan asgari: ${money(i.remaining)}</span></div><strong class="payment-amount">${money(c.debt)}</strong>`;list.appendChild(el)})}
   function addStyles(){const s=document.createElement("style");s.textContent=`.smart-minimum-panel,.card-minimum-status{display:grid;gap:12px;padding:15px;border:1px solid rgba(40,212,154,.2);border-radius:17px;background:rgba(24,72,69,.35)}.smart-minimum-head,.card-minimum-status-head{display:flex;justify-content:space-between;gap:12px}.smart-minimum-head span,.card-minimum-status-head span{display:block;color:#8fa2ba;font-size:10px}.smart-minimum-head strong,.card-minimum-status-head strong{display:block;color:#fff;font-size:20px;margin-top:4px}.smart-minimum-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.smart-minimum-grid>div{padding:10px;border-radius:12px;background:rgba(255,255,255,.04)}.smart-minimum-grid span{display:block;color:#8fa2ba;font-size:9px}.smart-minimum-grid strong{display:block;color:#fff;margin-top:4px}.smart-minimum-track,.card-minimum-status-track{height:8px;overflow:hidden;border-radius:99px;background:rgba(255,255,255,.08)}.smart-minimum-track>div,.card-minimum-status-track>div{height:100%;background:linear-gradient(90deg,#25c98d,#5ee8b7)}.smart-minimum-button{min-height:48px;border:0;border-radius:14px;background:linear-gradient(135deg,#52e6b2,#25c98d);color:#08271e;font-weight:900}.smart-minimum-button:disabled{opacity:.45}.smart-minimum-badge,.card-minimum-status-badge{height:26px;padding:0 8px;border-radius:99px;font-size:9px;font-weight:800;display:flex;align-items:center}.waiting{color:#ffc96d;background:rgba(255,184,71,.12)}.partial{color:#74c2ff;background:rgba(15,140,255,.12)}.completed{color:#4de0aa;background:rgba(40,212,154,.12)}.card-minimum-status{margin:14px 0}.card-minimum-status small,#smartMinimumText{color:#8fa2ba;font-size:10px}@media(max-width:370px){.smart-minimum-grid{grid-template-columns:1fr}.smart-minimum-head,.card-minimum-status-head{flex-direction:column}}`;document.head.appendChild(s)}
@@ -1348,22 +1347,8 @@ document.addEventListener("DOMContentLoaded", () => {
   function renderMixedDebts() {
     const list = $("cardsList");
     if (!list) return;
+    const debts = loadJson(CARD_KEY);
     const transactions = loadJson(TRANSACTION_KEY);
-    const debts = loadJson(CARD_KEY).sort((a,b) => {
-      const score = item => {
-        if (Number(item.debt || 0) <= 0) return 9e15;
-        const dateValue = item.type === "personal-loan" ? (item.nextPaymentDate || item.dueDate) : item.dueDate;
-        const date = dateValue ? new Date(`${dateValue}T00:00:00`).getTime() : 8e15;
-        if (item.type !== "personal-loan") {
-          const statementDebt = Number(item.statementDebt ?? item.debt ?? 0);
-          const minimum = roundMoney(statementDebt * 0.20);
-          const paid = getCardPayments(item, transactions);
-          if (minimum > 0 && paid >= minimum) return 7e15 + date;
-        }
-        return date;
-      };
-      return score(a) - score(b);
-    });
     list.innerHTML = "";
     if (!debts.length) {
       list.innerHTML =
@@ -8617,5 +8602,453 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (looksLikeQuickActions) section.remove();
     });
+  }
+});
+// =========================================
+// YF v3.5 — İhtiyaç Kredisi Ödeme ve Maaştan Düşme Düzeltmesi
+// Bu kod app.js dosyasının EN ALTINA eklenir.
+// =========================================
+
+document.addEventListener("DOMContentLoaded", () => {
+  const DEBT_KEY = "yf_cards_v1";
+  const TX_KEY = "yf_transactions_v1";
+
+  const $ = id => document.getElementById(id);
+
+  installLoanPaymentFix();
+  refreshDebtPaymentList();
+  refreshTransactionBalance();
+  refreshDebtPaymentHistory();
+
+  document
+    .querySelectorAll('[data-page="debtPaymentPage"]')
+    .forEach(button => {
+      button.addEventListener("click", () => {
+        setTimeout(() => {
+          refreshDebtPaymentList();
+          refreshDebtPaymentHistory();
+        }, 180);
+      });
+    });
+
+  document
+    .querySelectorAll('[data-page="transactionsPage"]')
+    .forEach(button => {
+      button.addEventListener("click", () => {
+        setTimeout(refreshTransactionBalance, 120);
+      });
+    });
+
+  window.addEventListener("storage", () => {
+    refreshDebtPaymentList();
+    refreshTransactionBalance();
+    refreshDebtPaymentHistory();
+  });
+
+  window.addEventListener("yf-refresh-dashboard", () => {
+    refreshTransactionBalance();
+  });
+
+  // -------------------------------------------------
+  // BORÇ ÖDE LİSTESİNE KART + İHTİYAÇ KREDİSİ EKLE
+  // -------------------------------------------------
+  function refreshDebtPaymentList() {
+    const select = $("debtPaymentCard");
+    if (!select) return;
+
+    const debts = loadJson(DEBT_KEY)
+      .filter(item => Number(item.debt || 0) > 0);
+
+    const oldValue = select.value;
+
+    select.innerHTML =
+      '<option value="">Kart veya kredi seç</option>';
+
+    const loans = debts.filter(
+      item => item.type === "personal-loan"
+    );
+
+    const cards = debts.filter(
+      item => item.type !== "personal-loan"
+    );
+
+    loans.forEach(item => {
+      const option = document.createElement("option");
+      option.value = item.id;
+      option.textContent =
+        `🏦 ${item.bank} - ${item.name} (${formatMoney(item.debt)})`;
+      select.appendChild(option);
+    });
+
+    cards.forEach(item => {
+      const option = document.createElement("option");
+      option.value = item.id;
+      option.textContent =
+        `💳 ${item.bank} - ${item.name} (${formatMoney(item.debt)})`;
+      select.appendChild(option);
+    });
+
+    if (debts.some(item => item.id === oldValue)) {
+      select.value = oldValue;
+    }
+
+    select.dispatchEvent(
+      new Event("change", { bubbles: true })
+    );
+  }
+
+  // -------------------------------------------------
+  // İHTİYAÇ KREDİSİ ÖDEMESİ
+  // -------------------------------------------------
+  function installLoanPaymentFix() {
+    const form = $("debtPaymentForm");
+    const select = $("debtPaymentCard");
+    const amountInput = $("debtPaymentAmount");
+
+    if (!form || !select || !amountInput) return;
+
+    select.addEventListener("change", () => {
+      const debt = loadJson(DEBT_KEY).find(
+        item => item.id === select.value
+      );
+
+      const smartPanel = $("smartMinimumPanel");
+      const selectedDebt = $("selectedCardDebt");
+      const submitButton =
+        form.querySelector('button[type="submit"]');
+
+      if (!debt) {
+        if (selectedDebt) {
+          selectedDebt.textContent = formatMoney(0);
+        }
+        return;
+      }
+
+      if (selectedDebt) {
+        selectedDebt.textContent = formatMoney(debt.debt);
+      }
+
+      if (debt.type === "personal-loan") {
+        smartPanel?.classList.add("hidden");
+
+        amountInput.value = Math.min(
+          Number(debt.monthlyInstallment || 0),
+          Number(debt.debt || 0)
+        ).toFixed(2);
+
+        amountInput.max = Number(debt.debt || 0);
+
+        if (submitButton) {
+          submitButton.textContent = "Kredi Taksitini Öde";
+        }
+      } else {
+        smartPanel?.classList.remove("hidden");
+        amountInput.removeAttribute("max");
+
+        if (submitButton) {
+          submitButton.textContent = "Borcu Öde";
+        }
+      }
+    });
+
+    form.addEventListener(
+      "submit",
+      event => {
+        const debts = loadJson(DEBT_KEY);
+        const selected = debts.find(
+          item => item.id === select.value
+        );
+
+        if (!selected || selected.type !== "personal-loan") {
+          return;
+        }
+
+        event.preventDefault();
+        event.stopImmediatePropagation();
+
+        const amount = Number(amountInput.value);
+
+        if (!Number.isFinite(amount) || amount <= 0) {
+          alert("Geçerli bir ödeme tutarı gir.");
+          return;
+        }
+
+        if (amount > Number(selected.debt || 0)) {
+          alert("Ödeme kalan kredi borcundan büyük olamaz.");
+          return;
+        }
+
+        selected.debt = roundMoney(
+          Math.max(
+            0,
+            Number(selected.debt || 0) - amount
+          )
+        );
+
+        if (selected.remainingInstallments > 0) {
+          selected.remainingInstallments -= 1;
+        }
+
+        if (selected.debt <= 0) {
+          selected.debt = 0;
+          selected.remainingInstallments = 0;
+          selected.nextPaymentDate = "";
+          selected.dueDate = "";
+        } else {
+          selected.nextPaymentDate = addOneMonth(
+            selected.nextPaymentDate || selected.dueDate
+          );
+          selected.dueDate = selected.nextPaymentDate;
+        }
+
+        selected.updatedAt = new Date().toISOString();
+
+        const transactions = loadJson(TX_KEY);
+        const now = new Date();
+
+        transactions.unshift({
+          id: createId(),
+          type: "loan-payment",
+          name: "İhtiyaç Kredisi Taksit Ödemesi",
+          amount: roundMoney(amount),
+          category: "loan-payment",
+          date: now.toISOString().split("T")[0],
+          paymentMethod: "cash",
+          cardId: selected.id,
+          cardName: `${selected.bank} - ${selected.name}`,
+          debtType: "personal-loan",
+          createdAt: now.toISOString()
+        });
+
+        saveJson(DEBT_KEY, debts);
+        saveJson(TX_KEY, transactions);
+
+        amountInput.value = "";
+
+        refreshDebtPaymentList();
+        refreshTransactionBalance();
+        refreshDebtPaymentHistory();
+
+        window.dispatchEvent(
+          new CustomEvent("yf-refresh-dashboard")
+        );
+
+        alert("Kredi taksiti ödendi.");
+      },
+      true
+    );
+  }
+
+  // -------------------------------------------------
+  // MAAŞ / İŞLEM BAKİYESİNDEN KREDİ TAKSİTLERİNİ DÜŞ
+  // -------------------------------------------------
+  function refreshTransactionBalance() {
+    const transactions = loadJson(TX_KEY);
+
+    const income = transactions
+      .filter(item => item.type === "income")
+      .reduce(
+        (sum, item) => sum + Number(item.amount || 0),
+        0
+      );
+
+    const expenses = transactions
+      .filter(item => item.type === "expense")
+      .reduce(
+        (sum, item) => sum + Number(item.amount || 0),
+        0
+      );
+
+    const cardPayments = transactions
+      .filter(item => item.type === "card-payment")
+      .reduce(
+        (sum, item) => sum + Number(item.amount || 0),
+        0
+      );
+
+    const loanPayments = transactions
+      .filter(item => item.type === "loan-payment")
+      .reduce(
+        (sum, item) => sum + Number(item.amount || 0),
+        0
+      );
+
+    const balance = roundMoney(
+      income - expenses - cardPayments - loanPayments
+    );
+
+    setText("totalIncome", formatMoney(income));
+    setText("totalExpense", formatMoney(expenses));
+    setText("transactionBalance", formatMoney(balance));
+  }
+
+  // -------------------------------------------------
+  // BORÇ ÖDEME GEÇMİŞİNDE KREDİLERİ DE GÖSTER
+  // -------------------------------------------------
+  function refreshDebtPaymentHistory() {
+    const history =
+      $("debtPaymentHistory") ||
+      document.querySelector(
+        "#debtPaymentPage .payment-history-list"
+      ) ||
+      document.querySelector(
+        "#debtPaymentPage .debt-payment-history"
+      );
+
+    if (!history) return;
+
+    const transactions = loadJson(TX_KEY)
+      .filter(item =>
+        item.type === "card-payment" ||
+        item.type === "loan-payment"
+      )
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt || b.date) -
+          new Date(a.createdAt || a.date)
+      );
+
+    history.innerHTML = "";
+
+    if (!transactions.length) {
+      history.innerHTML = `
+        <div class="empty-state">
+          Henüz borç ödemesi yapılmadı.
+        </div>
+      `;
+      return;
+    }
+
+    transactions.slice(0, 20).forEach(item => {
+      const row = document.createElement("article");
+      row.className = "debt-history-item";
+
+      row.innerHTML = `
+        <div>
+          <strong>
+            ${escapeHtml(
+              item.cardName ||
+              item.name ||
+              "Borç Ödemesi"
+            )}
+          </strong>
+
+          <span>
+            ${
+              item.type === "loan-payment"
+                ? "İhtiyaç Kredisi Taksiti"
+                : "Kredi Kartı Ödemesi"
+            }
+          </span>
+
+          <small>
+            ${formatDateTime(item.createdAt || item.date)}
+          </small>
+        </div>
+
+        <strong class="debt-history-amount">
+          ${formatMoney(item.amount)}
+        </strong>
+      `;
+
+      history.appendChild(row);
+    });
+  }
+
+  function addOneMonth(value) {
+    if (!value) return "";
+
+    const date = new Date(`${value}T12:00:00`);
+
+    if (Number.isNaN(date.getTime())) return value;
+
+    const originalDay = date.getDate();
+
+    date.setDate(1);
+    date.setMonth(date.getMonth() + 1);
+
+    const lastDay = new Date(
+      date.getFullYear(),
+      date.getMonth() + 1,
+      0
+    ).getDate();
+
+    date.setDate(Math.min(originalDay, lastDay));
+
+    return [
+      date.getFullYear(),
+      String(date.getMonth() + 1).padStart(2, "0"),
+      String(date.getDate()).padStart(2, "0")
+    ].join("-");
+  }
+
+  function createId() {
+    return window.crypto?.randomUUID
+      ? crypto.randomUUID()
+      : String(Date.now() + Math.random());
+  }
+
+  function roundMoney(value) {
+    return Math.round(
+      (Number(value) + Number.EPSILON) * 100
+    ) / 100;
+  }
+
+  function formatMoney(value) {
+    return new Intl.NumberFormat("tr-TR", {
+      style: "currency",
+      currency: "TRY"
+    }).format(Number(value) || 0);
+  }
+
+  function formatDateTime(value) {
+    if (!value) return "Tarih yok";
+
+    const date = new Date(
+      String(value).includes("T")
+        ? value
+        : `${value}T12:00:00`
+    );
+
+    if (Number.isNaN(date.getTime())) {
+      return "Tarih yok";
+    }
+
+    return date.toLocaleString("tr-TR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+  }
+
+  function loadJson(key) {
+    try {
+      return JSON.parse(localStorage.getItem(key) || "[]");
+    } catch {
+      return [];
+    }
+  }
+
+  function saveJson(key, value) {
+    localStorage.setItem(key, JSON.stringify(value));
+  }
+
+  function setText(id, value) {
+    const element = $(id);
+
+    if (element) {
+      element.textContent = String(value);
+    }
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
   }
 });
