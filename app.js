@@ -3736,4 +3736,35 @@ document.addEventListener("DOMContentLoaded", () => {
   $("addReminderButton")?.addEventListener("click",()=>alert("Özel hatırlatma ekleme sonraki aşamada aktif edilecek."));
   render();
 });
+// =========================================
+// YF v2.4.1 — Hatırlatmalar Sayfası Kaydırma Düzeltmesi
+// Bu kod app.js dosyasının EN ALTINA eklenir.
+// =========================================
+
+document.addEventListener("DOMContentLoaded", () => {
+  const reminderMenuButton = document.querySelector(
+    '[data-page="remindersPage"]'
+  );
+
+  const remindersBackButton = document.getElementById(
+    "remindersBackButton"
+  );
+
+  function unlockPageScroll() {
+    document.body.style.overflow = "";
+    document.documentElement.style.overflow = "";
+  }
+
+  reminderMenuButton?.addEventListener("click", () => {
+    setTimeout(unlockPageScroll, 50);
+  });
+
+  remindersBackButton?.addEventListener("click", () => {
+    setTimeout(unlockPageScroll, 50);
+  });
+
+  window.addEventListener("pageshow", unlockPageScroll);
+
+  setTimeout(unlockPageScroll, 150);
+});
 
