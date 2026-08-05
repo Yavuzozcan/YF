@@ -9913,4 +9913,814 @@ document.addEventListener("DOMContentLoaded", () => {
     document.head.appendChild(style);
   }
 });
+// =========================================
+// YF v3.7 — KESİN İŞLEM VE ÖDEME ONARIMI
+// app.js dosyasının EN ALTINA eklenir.
+// =========================================
+
+document.addEventListener("DOMContentLoaded", () => {
+  const DEBT_KEY = "yf_cards_v1";
+  const TX_KEY = "yf_transactions_v1";
+  const GOAL_KEY = "yf_custom_goals_v1";
+
+  const $ = id => document.getElementById(id);
+  const load = key => {
+    try {
+      return JSON.parse(localStorage.getItem(key) || "[]");
+    } catch {
+      return [];
+    }
+  };
+  const save = (key, value) =>
+    localStorage.setItem(key, JSON.stringify(value));
+  const money = value =>
+    new Intl.NumberFormat("tr-TR", {
+      style: "currency",
+      currency: "TRY"
+    }).format(Number(value) || 0);
+  const round = value =>
+    Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+  const uid = () =>
+    window.crypto?.randomUUID
+      ? crypto.randomUUID()
+      : String(Date.now() + Math.random());
+  const esc = value =>
+    String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+
+  installStyles();
+  bindOpenButton();
+  bindFormSubmit();
+  bindDeleteSystem();
+  bindPageRefresh();
+  forceRefreshAll();
+
+  // -----------------------------
+  // İŞLEM EKLE BUTONU
+  // -----------------------------
+  function bindOpenButton() {
+    document.addEventListener(
+      "click",
+      event => {
+        const button = event.target.closest(
+          "#openTransactionFormButton"
+        );
+
+        if (!button) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+
+        const modal = $("transactionModal");
+        const form = $("transactionForm");
+
+        if (!modal || !form) {
+          alert("İşlem formu bulunamadı.");
+          return;
+        }
+
+        form.reset();
+
+        if ($("transactionDate")) {
+          $("transactionDate").value =
+            new Date().toISOString().split("T")[0];
+        }
+
+        fillCardOptions();
+        toggleCardField();
+
+        modal.classList.remove("hidden");
+        document.body.style.overflow = "hidden";
+      },
+      true
+    );
+
+    document.addEventListener(
+      "click",
+      event => {
+        if (
+          event.target.closest("#closeTransactionFormButton") ||
+          event.target.closest("#cancelTransactionButton") ||
+          event.target.closest("#transactionModalBackdrop")
+        ) {
+          closeTransactionModal();
+        }
+      },
+      true
+    );
+
+    $("transactionType")?.addEventListener(
+      "change",
+      toggleCardField
+    );
+
+    $("transactionPaymentMethod")?.addEventListener(
+      "change",
+      toggleCardField
+    );
+  }
+
+  function fillCardOptions() {
+    const select = $("transactionCard");
+    if (!select) return;
+
+    const cards = load(DEBT_KEY).filter(
+      item => item.type !== "personal-loan"
+    );
+
+    select.innerHTML = '<option value="">Kart seç</option>';
+
+    cards.forEach(card => {
+      const option = document.createElement("option");
+      option.value = card.id;
+      option.textContent =
+        `${card.bank} - ${card.name} (${money(card.debt)})`;
+      select.appendChild(option);
+    });
+  }
+
+  function toggleCardField() {
+    const show =
+      $("transactionType")?.value === "expense" &&
+      $("transactionPaymentMethod")?.value === "card";
+
+    $("transactionCardField")?.classList.toggle(
+      "hidden",
+      !show
+    );
+
+    if (!show && $("transactionCard")) {
+      $("transactionCard").value = "";
+    }
+  }
+
+  function closeTransactionModal() {
+    $("transactionModal")?.classList.add("hidden");
+    document.body.style.overflow = "";
+  }
+
+  // -----------------------------
+  // İŞLEM KAYDETME
+  // -----------------------------
+  function bindFormSubmit() {
+    const form = $("transactionForm");
+    if (!form) return;
+
+    form.addEventListener(
+      "submit",
+      event => {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+
+        const type = $("transactionType")?.value || "";
+        const name =
+          $("transactionName")?.value.trim() || "";
+        const amount = Number(
+          $("transactionAmount")?.value
+        );
+        const category =
+          $("transactionCategory")?.value || "";
+        const date =
+          $("transactionDate")?.value || "";
+        const paymentMethod =
+          $("transactionPaymentMethod")?.value ||
+          "cash";
+
+        const cardId =
+          type === "expense" &&
+          paymentMethod === "card"
+            ? $("transactionCard")?.value || ""
+            : "";
+
+        if (!type) {
+          alert("İşlem türünü seç.");
+          return;
+        }
+
+        if (!name) {
+          alert("İşlem adını yaz.");
+          return;
+        }
+
+        if (!Number.isFinite(amount) || amount <= 0) {
+          alert("Geçerli bir tutar gir.");
+          return;
+        }
+
+        if (!category) {
+          alert("Kategori seç.");
+          return;
+        }
+
+        if (!date) {
+          alert("Tarih seç.");
+          return;
+        }
+
+        const debts = load(DEBT_KEY);
+
+        const transaction = {
+          id: uid(),
+          type,
+          name,
+          amount: round(amount),
+          category,
+          date,
+          paymentMethod,
+          cardId,
+          cardDebtDelta: 0,
+          createdAt: new Date().toISOString()
+        };
+
+        if (cardId) {
+          const card = debts.find(
+            item => item.id === cardId
+          );
+
+          if (!card) {
+            alert("Seçilen kart bulunamadı.");
+            return;
+          }
+
+          const newDebt = round(
+            Number(card.debt || 0) + amount
+          );
+
+          if (
+            Number(card.limit || 0) > 0 &&
+            newDebt > Number(card.limit || 0)
+          ) {
+            alert("Bu işlem kart limitini aşıyor.");
+            return;
+          }
+
+          card.debt = newDebt;
+          transaction.cardDebtDelta = round(amount);
+          save(DEBT_KEY, debts);
+        }
+
+        const transactions = load(TX_KEY);
+        transactions.unshift(transaction);
+        save(TX_KEY, transactions);
+
+        closeTransactionModal();
+        forceRefreshAll();
+
+        setTimeout(() => {
+          document
+            .querySelector(
+              '[data-page="transactionsPage"]'
+            )
+            ?.click();
+        }, 80);
+      },
+      true
+    );
+  }
+
+  // -----------------------------
+  // SİLME VE BORCU GERİ ALMA
+  // -----------------------------
+  function bindDeleteSystem() {
+    document.addEventListener(
+      "click",
+      event => {
+        const button = event.target.closest(
+          "[data-fixed-tx-delete], [data-del]"
+        );
+
+        if (!button) return;
+
+        const id =
+          button.dataset.fixedTxDelete ||
+          button.dataset.del;
+
+        if (!id) return;
+
+        const transactions = load(TX_KEY);
+        const tx = transactions.find(
+          item => item.id === id
+        );
+
+        if (!tx) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+
+        if (!confirm("Bu işlem silinsin mi?")) {
+          return;
+        }
+
+        reverseTransaction(tx);
+
+        save(
+          TX_KEY,
+          transactions.filter(item => item.id !== id)
+        );
+
+        forceRefreshAll();
+      },
+      true
+    );
+  }
+
+  function reverseTransaction(tx) {
+    const debts = load(DEBT_KEY);
+    const debt = debts.find(
+      item => item.id === tx.cardId
+    );
+
+    if (
+      tx.type === "expense" &&
+      debt &&
+      Number(tx.cardDebtDelta || 0) > 0
+    ) {
+      debt.debt = round(
+        Math.max(
+          0,
+          Number(debt.debt || 0) -
+            Number(tx.cardDebtDelta || 0)
+        )
+      );
+
+      save(DEBT_KEY, debts);
+      return;
+    }
+
+    if (tx.type === "card-payment" && debt) {
+      debt.debt = round(
+        Number(debt.debt || 0) +
+          Number(tx.amount || 0)
+      );
+
+      save(DEBT_KEY, debts);
+      return;
+    }
+
+    if (
+      tx.type === "loan-payment" &&
+      debt &&
+      debt.type === "personal-loan"
+    ) {
+      debt.debt = round(
+        Number(debt.debt || 0) +
+          Number(tx.amount || 0)
+      );
+
+      debt.remainingInstallments =
+        Number(debt.remainingInstallments || 0) + 1;
+
+      debt.nextPaymentDate = subtractOneMonth(
+        debt.nextPaymentDate || debt.dueDate
+      );
+
+      debt.dueDate = debt.nextPaymentDate;
+      debt.updatedAt = new Date().toISOString();
+
+      save(DEBT_KEY, debts);
+      return;
+    }
+
+    if (tx.type === "goal-payment" && tx.goalId) {
+      const goals = load(GOAL_KEY);
+      const goal = goals.find(
+        item => item.id === tx.goalId
+      );
+
+      if (goal) {
+        goal.currentAmount = round(
+          Math.max(
+            0,
+            Number(goal.currentAmount || 0) -
+              Number(tx.amount || 0)
+          )
+        );
+
+        save(GOAL_KEY, goals);
+      }
+    }
+  }
+
+  function subtractOneMonth(value) {
+    if (!value) return "";
+
+    const date = new Date(`${value}T12:00:00`);
+
+    if (Number.isNaN(date.getTime())) {
+      return value;
+    }
+
+    const originalDay = date.getDate();
+
+    date.setDate(1);
+    date.setMonth(date.getMonth() - 1);
+
+    const lastDay = new Date(
+      date.getFullYear(),
+      date.getMonth() + 1,
+      0
+    ).getDate();
+
+    date.setDate(
+      Math.min(originalDay, lastDay)
+    );
+
+    return [
+      date.getFullYear(),
+      String(date.getMonth() + 1).padStart(2, "0"),
+      String(date.getDate()).padStart(2, "0")
+    ].join("-");
+  }
+
+  // -----------------------------
+  // SAYFA YENİLEME
+  // -----------------------------
+  function bindPageRefresh() {
+    document.addEventListener("click", event => {
+      const pageButton =
+        event.target.closest("[data-page]");
+
+      if (!pageButton) return;
+
+      setTimeout(forceRefreshAll, 60);
+      setTimeout(forceRefreshAll, 250);
+      setTimeout(forceRefreshAll, 600);
+    });
+
+    window.addEventListener("storage", forceRefreshAll);
+  }
+
+  function forceRefreshAll() {
+    renderTransactions();
+    renderDebtHistory();
+    refreshSummaries();
+
+    window.dispatchEvent(
+      new CustomEvent("yf-refresh-dashboard")
+    );
+  }
+
+  // -----------------------------
+  // İŞLEM SAYFASI
+  // -----------------------------
+  function refreshSummaries() {
+    const txs = load(TX_KEY);
+
+    const income = txs
+      .filter(tx => tx.type === "income")
+      .reduce(
+        (sum, tx) =>
+          sum + Number(tx.amount || 0),
+        0
+      );
+
+    const expense = txs
+      .filter(tx =>
+        tx.type === "expense" ||
+        tx.type === "card-payment" ||
+        tx.type === "loan-payment" ||
+        tx.type === "goal-payment"
+      )
+      .reduce(
+        (sum, tx) =>
+          sum + Number(tx.amount || 0),
+        0
+      );
+
+    const balance = round(income - expense);
+
+    if ($("totalIncome")) {
+      $("totalIncome").textContent = money(income);
+    }
+
+    if ($("totalExpense")) {
+      $("totalExpense").textContent = money(expense);
+    }
+
+    if ($("transactionBalance")) {
+      $("transactionBalance").textContent =
+        money(balance);
+    }
+  }
+
+  function renderTransactions() {
+    const list = $("transactionsList");
+    if (!list) return;
+
+    const txs = load(TX_KEY).sort(
+      (a, b) =>
+        new Date(b.createdAt || b.date) -
+        new Date(a.createdAt || a.date)
+    );
+
+    list.innerHTML = "";
+
+    if (!txs.length) {
+      list.innerHTML =
+        '<div class="empty-state">Henüz işlem eklenmedi.</div>';
+      return;
+    }
+
+    txs.slice(0, 100).forEach(tx => {
+      const income = tx.type === "income";
+
+      const item = document.createElement("article");
+      item.className = "yf-v37-tx";
+
+      item.innerHTML = `
+        <div class="yf-v37-tx-icon ${
+          income ? "income" : "expense"
+        }">
+          ${income ? "+" : "−"}
+        </div>
+
+        <div class="yf-v37-tx-info">
+          <strong>${esc(
+            tx.name || transactionLabel(tx)
+          )}</strong>
+          <span>${esc(transactionLabel(tx))}</span>
+          <small>${formatDateTime(
+            tx.createdAt || tx.date
+          )}</small>
+        </div>
+
+        <div class="yf-v37-tx-side">
+          <strong class="${
+            income ? "income" : "expense"
+          }">
+            ${income ? "+" : "-"}${money(tx.amount)}
+          </strong>
+
+          <button
+            type="button"
+            data-fixed-tx-delete="${tx.id}"
+          >
+            Sil
+          </button>
+        </div>
+      `;
+
+      list.appendChild(item);
+    });
+  }
+
+  // -----------------------------
+  // BORÇ ÖDEME GEÇMİŞİ
+  // -----------------------------
+  function renderDebtHistory() {
+    const page = $("debtPaymentPage");
+    if (!page) return;
+
+    let list = $("cleanDebtPaymentHistory");
+
+    if (!list) {
+      const sections = [
+        ...page.querySelectorAll(
+          "section, .content-card"
+        )
+      ];
+
+      const section = sections.find(item =>
+        String(item.textContent || "")
+          .toLocaleLowerCase("tr-TR")
+          .includes("borç ödeme geçmişi")
+      );
+
+      if (!section) return;
+
+      list = document.createElement("div");
+      list.id = "cleanDebtPaymentHistory";
+      list.className = "yf-v37-history";
+      section.appendChild(list);
+    }
+
+    const payments = load(TX_KEY)
+      .filter(tx =>
+        tx.type === "card-payment" ||
+        tx.type === "loan-payment"
+      )
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt || b.date) -
+          new Date(a.createdAt || a.date)
+      );
+
+    list.innerHTML = "";
+
+    if (!payments.length) {
+      list.innerHTML =
+        '<div class="empty-state">Henüz borç ödemesi yapılmadı.</div>';
+      return;
+    }
+
+    payments.forEach(tx => {
+      const loan = tx.type === "loan-payment";
+      const item = document.createElement("article");
+      item.className = "yf-v37-history-item";
+
+      item.innerHTML = `
+        <div class="yf-v37-history-icon">
+          ${loan ? "🏦" : "💳"}
+        </div>
+
+        <div class="yf-v37-history-info">
+          <strong>${esc(
+            tx.cardName || tx.name || "Borç Ödemesi"
+          )}</strong>
+          <span>${
+            loan
+              ? "İhtiyaç Kredisi Taksiti"
+              : "Kredi Kartı Ödemesi"
+          }</span>
+          <small>${formatDateTime(
+            tx.createdAt || tx.date
+          )}</small>
+        </div>
+
+        <div class="yf-v37-history-side">
+          <strong>${money(tx.amount)}</strong>
+          <span>Ödendi ✓</span>
+        </div>
+      `;
+
+      list.appendChild(item);
+    });
+  }
+
+  function transactionLabel(tx) {
+    if (tx.type === "income") {
+      return tx.category || "Gelir";
+    }
+
+    if (tx.type === "expense") {
+      return tx.category || "Gider";
+    }
+
+    if (tx.type === "card-payment") {
+      return "Kredi Kartı Ödemesi";
+    }
+
+    if (tx.type === "loan-payment") {
+      return "İhtiyaç Kredisi Taksiti";
+    }
+
+    if (tx.type === "goal-payment") {
+      return "Hedef Birikimi";
+    }
+
+    return tx.category || "İşlem";
+  }
+
+  function formatDateTime(value) {
+    if (!value) return "Tarih yok";
+
+    const date = new Date(
+      String(value).includes("T")
+        ? value
+        : `${value}T12:00:00`
+    );
+
+    if (Number.isNaN(date.getTime())) {
+      return "Tarih yok";
+    }
+
+    return date.toLocaleString("tr-TR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+  }
+
+  function installStyles() {
+    if ($("yfV37Styles")) return;
+
+    const style = document.createElement("style");
+    style.id = "yfV37Styles";
+
+    style.textContent = `
+      .yf-v37-tx,
+      .yf-v37-history-item {
+        display:flex;
+        align-items:center;
+        gap:11px;
+        padding:13px;
+        border:1px solid rgba(255,255,255,.07);
+        border-radius:16px;
+        background:rgba(255,255,255,.035);
+      }
+
+      .yf-v37-tx + .yf-v37-tx,
+      .yf-v37-history-item + .yf-v37-history-item {
+        margin-top:10px;
+      }
+
+      .yf-v37-tx-icon,
+      .yf-v37-history-icon {
+        width:42px;
+        height:42px;
+        flex:0 0 42px;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        border-radius:13px;
+        font-weight:900;
+        background:rgba(15,140,255,.10);
+      }
+
+      .yf-v37-tx-icon.income {
+        color:#4ce0aa;
+        background:rgba(43,211,154,.10);
+      }
+
+      .yf-v37-tx-icon.expense {
+        color:#ff8298;
+        background:rgba(255,91,122,.10);
+      }
+
+      .yf-v37-tx-info,
+      .yf-v37-history-info {
+        min-width:0;
+        flex:1;
+      }
+
+      .yf-v37-tx-info strong,
+      .yf-v37-tx-info span,
+      .yf-v37-tx-info small,
+      .yf-v37-history-info strong,
+      .yf-v37-history-info span,
+      .yf-v37-history-info small {
+        display:block;
+      }
+
+      .yf-v37-tx-info strong,
+      .yf-v37-history-info strong {
+        font-size:11px;
+      }
+
+      .yf-v37-tx-info span,
+      .yf-v37-history-info span {
+        margin-top:4px;
+        color:#9aabba;
+        font-size:9px;
+      }
+
+      .yf-v37-tx-info small,
+      .yf-v37-history-info small {
+        margin-top:4px;
+        color:#71859a;
+        font-size:8px;
+      }
+
+      .yf-v37-tx-side,
+      .yf-v37-history-side {
+        flex:0 0 auto;
+        text-align:right;
+      }
+
+      .yf-v37-tx-side strong,
+      .yf-v37-history-side strong {
+        display:block;
+        font-size:11px;
+      }
+
+      .yf-v37-tx-side strong.income,
+      .yf-v37-history-side strong {
+        color:#4ce0aa;
+      }
+
+      .yf-v37-tx-side strong.expense {
+        color:#ff8298;
+      }
+
+      .yf-v37-tx-side button {
+        min-height:28px;
+        margin-top:7px;
+        padding:0 8px;
+        border:1px solid rgba(255,91,122,.16);
+        border-radius:9px;
+        color:#ff8298;
+        background:rgba(255,91,122,.06);
+        font-size:8px;
+      }
+
+      .yf-v37-history-side span {
+        display:block;
+        margin-top:4px;
+        color:#4ce0aa;
+        font-size:8px;
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+});
 
