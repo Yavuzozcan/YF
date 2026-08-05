@@ -8558,4 +8558,50 @@ document.addEventListener("DOMContentLoaded", () => {
     document.head.appendChild(style);
   }
 });
+// YF v3.4 — Ana Sayfadan Hızlı İşlemleri Kaldır
+document.addEventListener("DOMContentLoaded", () => {
+  removeQuickActions();
+
+  document.querySelectorAll('[data-page="dashboardPage"]').forEach(button => {
+    button.addEventListener("click", () => {
+      setTimeout(removeQuickActions, 80);
+    });
+  });
+
+  window.addEventListener("pageshow", removeQuickActions);
+
+  function removeQuickActions() {
+    const dashboard = document.getElementById("dashboardPage");
+    if (!dashboard) return;
+
+    ["quickActions","quickActionsCard","quickTransactions","dashboardQuickActions"]
+      .forEach(id => document.getElementById(id)?.remove());
+
+    const sections = [
+      ...dashboard.querySelectorAll("section, article, .content-card, .dashboard-card")
+    ];
+
+    sections.forEach(section => {
+      const title = section.querySelector("h1, h2, h3, .section-title, .section-heading");
+      const text = String(title?.textContent || section.textContent || "")
+        .toLocaleLowerCase("tr-TR")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      const hasQuickTitle =
+        text.includes("hızlı işlemler") ||
+        text.includes("hizli islemler");
+
+      const quickButtons = section.querySelectorAll(
+        '#quickAddCardButton, #openTransactionFormButton, [data-page="debtPaymentPage"], [data-page="transactionsPage"]'
+      );
+
+      const looksLikeQuickActions =
+        hasQuickTitle &&
+        (quickButtons.length >= 2 || section.querySelectorAll("button").length >= 3);
+
+      if (looksLikeQuickActions) section.remove();
+    });
+  }
+});
 
