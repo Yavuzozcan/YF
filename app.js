@@ -5976,3 +5976,1137 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }, 500);
 });
+// =========================================
+// YF v3.1 — Banka / Kart Detay Paneli
+// Bu kod app.js dosyasının EN ALTINA eklenir.
+// =========================================
+
+document.addEventListener("DOMContentLoaded", () => {
+  const DEBT_KEY = "yf_cards_v1";
+  const TX_KEY = "yf_transactions_v1";
+  const PAGE_KEY = "yf_last_open_page_v1";
+
+  installDetailStyles();
+  createDetailPage();
+  bindDetailEvents();
+
+  function createDetailPage() {
+    if (document.getElementById("cardDetailPage")) return;
+
+    const main = document.querySelector("main.app-shell");
+    if (!main) return;
+
+    const page = document.createElement("section");
+    page.id = "cardDetailPage";
+    page.className = "page";
+
+    page.innerHTML = `
+      <header class="top-header">
+        <div>
+          <p class="eyebrow">BANKA PANELİ</p>
+          <h1 id="detailPageTitle">Kart Detayı</h1>
+        </div>
+
+        <button
+          id="detailBackButton"
+          class="reports-back-button"
+          type="button"
+        >
+          Kartlar
+        </button>
+      </header>
+
+      <section id="detailHeroCard" class="detail-hero-card">
+        <div class="detail-bank-head">
+          <div id="detailBankLogo" class="detail-bank-logo">B</div>
+
+          <div class="detail-bank-name">
+            <span id="detailDebtType">Kredi Kartı</span>
+            <h2 id="detailBankName">Banka</h2>
+            <small id="detailCardName">Kart</small>
+          </div>
+
+          <span id="detailStatusBadge" class="detail-status-badge">
+            Aktif
+          </span>
+        </div>
+
+        <div class="detail-main-debt">
+          <span>Kalan Borç</span>
+          <strong id="detailCurrentDebt">₺0,00</strong>
+        </div>
+
+        <div id="detailProgressTrack" class="detail-progress-track">
+          <div id="detailProgressFill"></div>
+        </div>
+
+        <div id="detailProgressText" class="detail-progress-text">
+          Borç kullanımı %0
+        </div>
+      </section>
+
+      <section id="detailSummaryGrid" class="detail-summary-grid"></section>
+
+      <section class="content-card">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">HIZLI İŞLEMLER</p>
+            <h2>Ne yapmak istiyorsun?</h2>
+          </div>
+        </div>
+
+        <div class="detail-action-grid">
+          <button id="detailPayButton" type="button">
+            <span>💸</span>
+            <strong>Borç Öde</strong>
+          </button>
+
+          <button id="detailEditButton" type="button">
+            <span>✏️</span>
+            <strong>Düzenle</strong>
+          </button>
+
+          <button id="detailDeleteButton" class="danger" type="button">
+            <span>🗑️</span>
+            <strong>Sil</strong>
+          </button>
+        </div>
+      </section>
+
+      <section class="content-card">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">SON 6 AY</p>
+            <h2>Ödeme grafiği</h2>
+          </div>
+        </div>
+
+        <div id="detailChart" class="detail-chart"></div>
+      </section>
+
+      <section class="content-card">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">GEÇMİŞ</p>
+            <h2>Son işlemler</h2>
+          </div>
+        </div>
+
+        <div id="detailTransactionList" class="detail-transaction-list"></div>
+      </section>
+    `;
+
+    main.appendChild(page);
+  }
+
+  function bindDetailEvents() {
+    const cardsList = document.getElementById("cardsList");
+
+    cardsList?.addEventListener("click", event => {
+      if (
+        event.target.closest("button") ||
+        event.target.closest("[data-edit]") ||
+        event.target.closest("[data-delete]") ||
+        event.target.closest("[data-card-edit]") ||
+        event.target.closest("[data-card-delete]") ||
+        event.target.closest("[data-loan-edit]") ||
+        event.target.closest("[data-loan-delete]")
+      ) {
+        return;
+      }
+
+      const cardElement = event.target.closest(".bank-card");
+      if (!cardElement) return;
+
+      const id = findDebtId(cardElement);
+      if (!id) return;
+
+      openDetailPage(id);
+    });
+
+    document
+      .getElementById("detailBackButton")
+      ?.addEventListener("click", () => {
+        showPage("cardsPage");
+        localStorage.setItem(PAGE_KEY, "cardsPage");
+      });
+
+    document
+      .getElementById("detailPayButton")
+      ?.addEventListener("click", () => {
+        const id = document
+          .getElementById("cardDetailPage")
+          ?.dataset.debtId;
+
+        if (!id) return;
+
+        showPage("debtPaymentPage");
+
+        setTimeout(() => {
+          const select = document.getElementById("debtPaymentCard");
+          if (!select) return;
+
+          select.value = id;
+          select.dispatchEvent(
+            new Event("change", { bubbles: true })
+          );
+        }, 240);
+      });
+
+    document
+      .getElementById("detailEditButton")
+      ?.addEventListener("click", () => {
+        const id = document
+          .getElementById("cardDetailPage")
+          ?.dataset.debtId;
+
+        const debt = loadJson(DEBT_KEY).find(item => item.id === id);
+        if (!debt) return;
+
+        const editButton =
+          document.querySelector(`[data-card-edit="${id}"]`) ||
+          document.querySelector(`[data-loan-edit="${id}"]`) ||
+          document.querySelector(`[data-edit="${id}"]`);
+
+        if (editButton) {
+          showPage("cardsPage");
+          setTimeout(() => editButton.click(), 120);
+        }
+      });
+
+    document
+      .getElementById("detailDeleteButton")
+      ?.addEventListener("click", () => {
+        const page = document.getElementById("cardDetailPage");
+        const id = page?.dataset.debtId;
+        if (!id) return;
+
+        const debts = loadJson(DEBT_KEY);
+        const debt = debts.find(item => item.id === id);
+        if (!debt) return;
+
+        const typeText =
+          debt.type === "personal-loan"
+            ? "ihtiyaç kredisi"
+            : "kredi kartı";
+
+        if (
+          !confirm(
+            `${debt.bank} ${typeText} kaydı tamamen silinsin mi?`
+          )
+        ) {
+          return;
+        }
+
+        saveJson(
+          DEBT_KEY,
+          debts.filter(item => item.id !== id)
+        );
+
+        showPage("cardsPage");
+        window.location.reload();
+      });
+
+    window.addEventListener("storage", () => {
+      const page = document.getElementById("cardDetailPage");
+
+      if (page?.classList.contains("active") && page.dataset.debtId) {
+        renderDetail(page.dataset.debtId);
+      }
+    });
+  }
+
+  function findDebtId(cardElement) {
+    const action =
+      cardElement.querySelector("[data-card-edit]") ||
+      cardElement.querySelector("[data-loan-edit]") ||
+      cardElement.querySelector("[data-edit]") ||
+      cardElement.querySelector("[data-card-delete]") ||
+      cardElement.querySelector("[data-loan-delete]") ||
+      cardElement.querySelector("[data-delete]");
+
+    if (!action) return "";
+
+    return (
+      action.dataset.cardEdit ||
+      action.dataset.loanEdit ||
+      action.dataset.edit ||
+      action.dataset.cardDelete ||
+      action.dataset.loanDelete ||
+      action.dataset.delete ||
+      ""
+    );
+  }
+
+  function openDetailPage(id) {
+    renderDetail(id);
+    showPage("cardDetailPage");
+    localStorage.setItem(PAGE_KEY, "cardDetailPage");
+  }
+
+  function renderDetail(id) {
+    const debts = loadJson(DEBT_KEY);
+    const transactions = loadJson(TX_KEY);
+    const debt = debts.find(item => item.id === id);
+
+    if (!debt) {
+      alert("Kart veya kredi bulunamadı.");
+      showPage("cardsPage");
+      return;
+    }
+
+    const page = document.getElementById("cardDetailPage");
+    if (!page) return;
+
+    page.dataset.debtId = id;
+
+    const isLoan = debt.type === "personal-loan";
+    const currentDebt = Number(debt.debt || 0);
+    const limit = Number(debt.limit || 0);
+    const available = Math.max(0, limit - currentDebt);
+
+    const originalDebt = isLoan
+      ? Number(debt.originalDebt || currentDebt)
+      : limit;
+
+    const progress = originalDebt > 0
+      ? Math.min(
+          100,
+          Math.round(
+            isLoan
+              ? ((originalDebt - currentDebt) / originalDebt) * 100
+              : (currentDebt / originalDebt) * 100
+          )
+        )
+      : 0;
+
+    setText("detailPageTitle", debt.bank || "Kart Detayı");
+    setText("detailBankName", debt.bank || "Banka");
+    setText("detailCardName", debt.name || "");
+    setText(
+      "detailDebtType",
+      isLoan ? "İhtiyaç Kredisi" : "Kredi Kartı"
+    );
+    setText("detailCurrentDebt", formatMoney(currentDebt));
+
+    const logo = document.getElementById("detailBankLogo");
+    if (logo) {
+      logo.textContent =
+        String(debt.bank || "B").charAt(0).toLocaleUpperCase("tr-TR");
+    }
+
+    const badge = document.getElementById("detailStatusBadge");
+    if (badge) {
+      if (currentDebt <= 0) {
+        badge.textContent = "Borç Kapandı ✓";
+        badge.className = "detail-status-badge completed";
+      } else if (isLoan) {
+        badge.textContent = "Aktif Kredi";
+        badge.className = "detail-status-badge loan";
+      } else {
+        badge.textContent = "Aktif Kart";
+        badge.className = "detail-status-badge active";
+      }
+    }
+
+    const hero = document.getElementById("detailHeroCard");
+    if (hero) {
+      hero.className =
+        `detail-hero-card ${bankTheme(debt.bank)} ` +
+        `${currentDebt <= 0 ? "completed" : ""}`;
+    }
+
+    const fill = document.getElementById("detailProgressFill");
+    if (fill) fill.style.width = `${progress}%`;
+
+    setText(
+      "detailProgressText",
+      isLoan
+        ? `Kredinin %${progress} kadarı ödendi`
+        : `Kart limitinin %${progress} kadarı kullanılıyor`
+    );
+
+    renderSummary(debt, {
+      isLoan,
+      currentDebt,
+      limit,
+      available,
+      progress
+    });
+
+    renderChart(debt, transactions);
+    renderTransactions(debt, transactions);
+  }
+
+  function renderSummary(debt, info) {
+    const grid = document.getElementById("detailSummaryGrid");
+    if (!grid) return;
+
+    if (info.isLoan) {
+      grid.innerHTML = `
+        ${summaryCard(
+          "Aylık Taksit",
+          formatMoney(debt.monthlyInstallment)
+        )}
+        ${summaryCard(
+          "Kalan Taksit",
+          String(Number(debt.remainingInstallments || 0))
+        )}
+        ${summaryCard(
+          "Ödeme Günü",
+          `Her ayın ${Number(debt.paymentDay || 0)}'i`
+        )}
+        ${summaryCard(
+          "Sonraki Ödeme",
+          formatDate(debt.nextPaymentDate || debt.dueDate)
+        )}
+      `;
+    } else {
+      grid.innerHTML = `
+        ${summaryCard("Kart Limiti", formatMoney(info.limit))}
+        ${summaryCard("Kullanılabilir", formatMoney(info.available))}
+        ${summaryCard(
+          "Hesap Kesim",
+          formatDate(debt.statementDate)
+        )}
+        ${summaryCard(
+          "Son Ödeme",
+          formatDate(debt.dueDate)
+        )}
+      `;
+    }
+  }
+
+  function summaryCard(label, value) {
+    return `
+      <article class="detail-summary-card">
+        <span>${escapeHtml(label)}</span>
+        <strong>${escapeHtml(value)}</strong>
+      </article>
+    `;
+  }
+
+  function renderChart(debt, transactions) {
+    const chart = document.getElementById("detailChart");
+    if (!chart) return;
+
+    const monthData = getLastSixMonths().map(month => {
+      const total = transactions
+        .filter(transaction => {
+          if (transaction.cardId !== debt.id) return false;
+
+          const date = parseDate(
+            transaction.createdAt || transaction.date
+          );
+
+          return Boolean(
+            date &&
+            date.getFullYear() === month.year &&
+            date.getMonth() === month.month &&
+            (
+              transaction.type === "card-payment" ||
+              transaction.type === "loan-payment"
+            )
+          );
+        })
+        .reduce(
+          (sum, transaction) =>
+            sum + Number(transaction.amount || 0),
+          0
+        );
+
+      return { ...month, total };
+    });
+
+    const max = Math.max(
+      1,
+      ...monthData.map(item => item.total)
+    );
+
+    chart.innerHTML = monthData
+      .map(item => {
+        const height = Math.max(
+          item.total > 0 ? 12 : 3,
+          Math.round((item.total / max) * 100)
+        );
+
+        return `
+          <div class="detail-chart-column">
+            <div class="detail-chart-value">
+              ${item.total > 0 ? formatCompactMoney(item.total) : ""}
+            </div>
+
+            <div class="detail-chart-bar-wrap">
+              <div
+                class="detail-chart-bar"
+                style="height:${height}%"
+              ></div>
+            </div>
+
+            <span>${item.label}</span>
+          </div>
+        `;
+      })
+      .join("");
+  }
+
+  function renderTransactions(debt, transactions) {
+    const list = document.getElementById("detailTransactionList");
+    if (!list) return;
+
+    const related = transactions
+      .filter(transaction => transaction.cardId === debt.id)
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt || b.date) -
+          new Date(a.createdAt || a.date)
+      )
+      .slice(0, 10);
+
+    list.innerHTML = "";
+
+    if (!related.length) {
+      list.innerHTML = `
+        <div class="empty-state">
+          Bu karta ait işlem bulunmuyor.
+        </div>
+      `;
+      return;
+    }
+
+    related.forEach(transaction => {
+      const isPayment =
+        transaction.type === "card-payment" ||
+        transaction.type === "loan-payment";
+
+      const isIncome = transaction.type === "income";
+
+      const item = document.createElement("article");
+      item.className = "detail-transaction-item";
+
+      item.innerHTML = `
+        <div class="detail-transaction-icon ${
+          isPayment ? "payment" : isIncome ? "income" : "expense"
+        }">
+          ${isPayment ? "✓" : isIncome ? "+" : "−"}
+        </div>
+
+        <div class="detail-transaction-info">
+          <strong>
+            ${escapeHtml(
+              transaction.name ||
+              transaction.category ||
+              "İşlem"
+            )}
+          </strong>
+
+          <span>
+            ${escapeHtml(transactionLabel(transaction))}
+          </span>
+
+          <small>
+            ${formatDateTime(
+              transaction.createdAt || transaction.date
+            )}
+          </small>
+        </div>
+
+        <strong class="detail-transaction-amount ${
+          isPayment || isIncome ? "positive" : "negative"
+        }">
+          ${isPayment || isIncome ? "+" : "-"}
+          ${formatMoney(transaction.amount)}
+        </strong>
+      `;
+
+      list.appendChild(item);
+    });
+  }
+
+  function transactionLabel(transaction) {
+    if (transaction.type === "card-payment") {
+      return transaction.paymentKind === "minimum"
+        ? "Asgari ödeme"
+        : "Kart borcu ödemesi";
+    }
+
+    if (transaction.type === "loan-payment") {
+      return "Kredi taksit ödemesi";
+    }
+
+    return transaction.category || "İşlem";
+  }
+
+  function getLastSixMonths() {
+    const now = new Date();
+    const result = [];
+
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date(
+        now.getFullYear(),
+        now.getMonth() - i,
+        1
+      );
+
+      result.push({
+        year: date.getFullYear(),
+        month: date.getMonth(),
+        label: date.toLocaleDateString("tr-TR", {
+          month: "short"
+        })
+      });
+    }
+
+    return result;
+  }
+
+  function bankTheme(bank) {
+    const value = String(bank || "")
+      .toLocaleLowerCase("tr-TR");
+
+    if (value.includes("ziraat")) return "detail-ziraat";
+    if (value.includes("garanti")) return "detail-garanti";
+    if (value.includes("akbank")) return "detail-akbank";
+    if (value.includes("qnb")) return "detail-qnb";
+    if (value.includes("iş")) return "detail-is";
+    if (value.includes("tom")) return "detail-tom";
+
+    return "detail-other";
+  }
+
+  function showPage(pageId) {
+    document.querySelectorAll(".page").forEach(page => {
+      page.classList.toggle("active", page.id === pageId);
+    });
+
+    document
+      .querySelectorAll(".bottom-navigation .nav-item")
+      .forEach(item => {
+        item.classList.toggle(
+          "active",
+          item.dataset.page === pageId
+        );
+      });
+
+    document.body.style.overflow = "";
+    document.documentElement.style.overflow = "";
+
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function parseDate(value) {
+    if (!value) return null;
+
+    const date = new Date(
+      String(value).includes("T")
+        ? value
+        : `${value}T12:00:00`
+    );
+
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  function formatMoney(value) {
+    return new Intl.NumberFormat("tr-TR", {
+      style: "currency",
+      currency: "TRY"
+    }).format(Number(value) || 0);
+  }
+
+  function formatCompactMoney(value) {
+    const amount = Number(value) || 0;
+
+    if (amount >= 1000000) {
+      return `₺${(amount / 1000000).toFixed(1)}M`;
+    }
+
+    if (amount >= 1000) {
+      return `₺${(amount / 1000).toFixed(1)}B`;
+    }
+
+    return `₺${Math.round(amount)}`;
+  }
+
+  function formatDate(value) {
+    const date = parseDate(value);
+    if (!date) return "Belirtilmedi";
+
+    return date.toLocaleDateString("tr-TR", {
+      day: "numeric",
+      month: "short",
+      year: "numeric"
+    });
+  }
+
+  function formatDateTime(value) {
+    const date = parseDate(value);
+    if (!date) return "Belirtilmedi";
+
+    return date.toLocaleString("tr-TR", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+  }
+
+  function loadJson(key) {
+    try {
+      return JSON.parse(localStorage.getItem(key) || "[]");
+    } catch {
+      return [];
+    }
+  }
+
+  function saveJson(key, value) {
+    localStorage.setItem(key, JSON.stringify(value));
+  }
+
+  function setText(id, value) {
+    const element = document.getElementById(id);
+    if (element) element.textContent = String(value);
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function installDetailStyles() {
+    if (document.getElementById("yfDetailStyles")) return;
+
+    const style = document.createElement("style");
+    style.id = "yfDetailStyles";
+
+    style.textContent = `
+      #cardsList .bank-card {
+        cursor: pointer;
+      }
+
+      .detail-hero-card {
+        position: relative;
+        overflow: hidden;
+        margin-bottom: 14px;
+        padding: 20px;
+        border: 1px solid rgba(255,255,255,.10);
+        border-radius: 25px;
+        background:
+          radial-gradient(
+            circle at 88% 12%,
+            rgba(255,255,255,.13),
+            transparent 31%
+          ),
+          linear-gradient(
+            145deg,
+            rgba(25,57,88,.98),
+            rgba(10,31,52,.98)
+          );
+        box-shadow: 0 20px 46px rgba(0,0,0,.22);
+      }
+
+      .detail-hero-card::after {
+        content: "";
+        position: absolute;
+        right: -55px;
+        bottom: -70px;
+        width: 190px;
+        height: 190px;
+        border-radius: 50%;
+        background: rgba(255,255,255,.045);
+      }
+
+      .detail-bank-head {
+        position: relative;
+        z-index: 2;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .detail-bank-logo {
+        width: 50px;
+        height: 50px;
+        flex: 0 0 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid rgba(255,255,255,.13);
+        border-radius: 16px;
+        color: #fff;
+        background: rgba(255,255,255,.12);
+        font-size: 19px;
+        font-weight: 950;
+      }
+
+      .detail-bank-name {
+        min-width: 0;
+        flex: 1;
+      }
+
+      .detail-bank-name span,
+      .detail-bank-name small {
+        display: block;
+      }
+
+      .detail-bank-name span {
+        color: rgba(224,236,248,.68);
+        font-size: 9px;
+        font-weight: 900;
+        letter-spacing: .12em;
+        text-transform: uppercase;
+      }
+
+      .detail-bank-name h2 {
+        margin: 4px 0 0;
+        color: #fff;
+        font-size: 18px;
+      }
+
+      .detail-bank-name small {
+        margin-top: 3px;
+        color: rgba(224,236,248,.72);
+        font-size: 10px;
+      }
+
+      .detail-status-badge {
+        position: relative;
+        z-index: 2;
+        min-height: 25px;
+        display: inline-flex;
+        align-items: center;
+        padding: 0 9px;
+        border-radius: 999px;
+        font-size: 8px;
+        font-weight: 900;
+      }
+
+      .detail-status-badge.active {
+        color: #78c6ff;
+        background: rgba(15,140,255,.12);
+        border: 1px solid rgba(72,171,255,.18);
+      }
+
+      .detail-status-badge.loan {
+        color: #ffd277;
+        background: rgba(255,177,72,.11);
+        border: 1px solid rgba(255,177,72,.18);
+      }
+
+      .detail-status-badge.completed {
+        color: #4ce0aa;
+        background: rgba(43,211,154,.11);
+        border: 1px solid rgba(43,211,154,.18);
+      }
+
+      .detail-main-debt {
+        position: relative;
+        z-index: 2;
+        margin-top: 25px;
+      }
+
+      .detail-main-debt span,
+      .detail-main-debt strong {
+        display: block;
+      }
+
+      .detail-main-debt span {
+        margin-bottom: 7px;
+        color: rgba(224,236,248,.68);
+        font-size: 10px;
+      }
+
+      .detail-main-debt strong {
+        color: #fff;
+        font-size: 31px;
+        letter-spacing: -.03em;
+      }
+
+      .detail-progress-track {
+        position: relative;
+        z-index: 2;
+        height: 9px;
+        margin-top: 18px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: rgba(255,255,255,.11);
+      }
+
+      .detail-progress-track > div {
+        height: 100%;
+        width: 0;
+        border-radius: inherit;
+        background: linear-gradient(90deg,#0f8cff,#52e6b2);
+        transition: width .45s ease;
+      }
+
+      .detail-progress-text {
+        position: relative;
+        z-index: 2;
+        margin-top: 9px;
+        color: rgba(224,236,248,.68);
+        font-size: 9px;
+      }
+
+      .detail-ziraat {
+        background:
+          radial-gradient(circle at 88% 12%,rgba(239,68,68,.21),transparent 31%),
+          linear-gradient(145deg,#4f1721,#201020);
+      }
+
+      .detail-garanti {
+        background:
+          radial-gradient(circle at 88% 12%,rgba(45,212,191,.19),transparent 31%),
+          linear-gradient(145deg,#0d4d45,#0a2530);
+      }
+
+      .detail-akbank {
+        background:
+          radial-gradient(circle at 88% 12%,rgba(255,78,104,.19),transparent 31%),
+          linear-gradient(145deg,#591629,#211020);
+      }
+
+      .detail-qnb {
+        background:
+          radial-gradient(circle at 88% 12%,rgba(168,85,247,.21),transparent 31%),
+          linear-gradient(145deg,#3f1d63,#18132c);
+      }
+
+      .detail-is {
+        background:
+          radial-gradient(circle at 88% 12%,rgba(59,130,246,.20),transparent 31%),
+          linear-gradient(145deg,#153f6e,#101c31);
+      }
+
+      .detail-tom {
+        background:
+          radial-gradient(circle at 88% 12%,rgba(34,197,94,.19),transparent 31%),
+          linear-gradient(145deg,#164b34,#0e2824);
+      }
+
+      .detail-other {
+        background:
+          radial-gradient(circle at 88% 12%,rgba(148,163,184,.18),transparent 31%),
+          linear-gradient(145deg,#27384b,#111d2c);
+      }
+
+      .detail-hero-card.completed {
+        background:
+          radial-gradient(circle at 88% 12%,rgba(43,211,154,.22),transparent 31%),
+          linear-gradient(145deg,#104b3c,#0b2826);
+      }
+
+      .detail-summary-grid {
+        display: grid;
+        grid-template-columns: repeat(2,minmax(0,1fr));
+        gap: 11px;
+        margin-bottom: 14px;
+      }
+
+      .detail-summary-card {
+        padding: 15px;
+        border: 1px solid rgba(255,255,255,.08);
+        border-radius: 17px;
+        background: rgba(255,255,255,.04);
+      }
+
+      .detail-summary-card span,
+      .detail-summary-card strong {
+        display: block;
+      }
+
+      .detail-summary-card span {
+        margin-bottom: 7px;
+        color: #8fa2ba;
+        font-size: 9px;
+      }
+
+      .detail-summary-card strong {
+        font-size: 12px;
+        line-height: 1.35;
+      }
+
+      .detail-action-grid {
+        display: grid;
+        grid-template-columns: repeat(3,minmax(0,1fr));
+        gap: 9px;
+      }
+
+      .detail-action-grid button {
+        min-height: 72px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        border: 1px solid rgba(72,171,255,.16);
+        border-radius: 15px;
+        color: inherit;
+        background: rgba(15,140,255,.065);
+        font: inherit;
+      }
+
+      .detail-action-grid button span {
+        font-size: 19px;
+      }
+
+      .detail-action-grid button strong {
+        font-size: 9px;
+      }
+
+      .detail-action-grid button.danger {
+        color: #ff8198;
+        border-color: rgba(255,91,122,.17);
+        background: rgba(255,91,122,.055);
+      }
+
+      .detail-chart {
+        height: 180px;
+        display: grid;
+        grid-template-columns: repeat(6,minmax(0,1fr));
+        align-items: end;
+        gap: 8px;
+      }
+
+      .detail-chart-column {
+        height: 100%;
+        min-width: 0;
+        display: grid;
+        grid-template-rows: 24px 1fr 20px;
+        align-items: end;
+        text-align: center;
+      }
+
+      .detail-chart-value {
+        overflow: hidden;
+        color: #8fa2ba;
+        font-size: 7px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .detail-chart-bar-wrap {
+        height: 100%;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        border-radius: 10px;
+        background: rgba(255,255,255,.025);
+      }
+
+      .detail-chart-bar {
+        width: 65%;
+        min-height: 3px;
+        border-radius: 8px 8px 3px 3px;
+        background: linear-gradient(180deg,#52e6b2,#0f8cff);
+      }
+
+      .detail-chart-column > span {
+        padding-top: 6px;
+        color: #7e91a6;
+        font-size: 8px;
+        text-transform: capitalize;
+      }
+
+      .detail-transaction-list {
+        display: grid;
+        gap: 9px;
+      }
+
+      .detail-transaction-item {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        padding: 12px;
+        border: 1px solid rgba(255,255,255,.07);
+        border-radius: 15px;
+        background: rgba(255,255,255,.035);
+      }
+
+      .detail-transaction-icon {
+        width: 38px;
+        height: 38px;
+        flex: 0 0 38px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 12px;
+        font-weight: 900;
+      }
+
+      .detail-transaction-icon.payment,
+      .detail-transaction-icon.income {
+        color: #4ce0aa;
+        background: rgba(43,211,154,.10);
+      }
+
+      .detail-transaction-icon.expense {
+        color: #ff8298;
+        background: rgba(255,91,122,.10);
+      }
+
+      .detail-transaction-info {
+        min-width: 0;
+        flex: 1;
+      }
+
+      .detail-transaction-info strong,
+      .detail-transaction-info span,
+      .detail-transaction-info small {
+        display: block;
+      }
+
+      .detail-transaction-info strong {
+        overflow: hidden;
+        font-size: 11px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .detail-transaction-info span {
+        margin-top: 3px;
+        color: #9aabba;
+        font-size: 9px;
+      }
+
+      .detail-transaction-info small {
+        margin-top: 4px;
+        color: #71859a;
+        font-size: 8px;
+      }
+
+      .detail-transaction-amount {
+        flex: 0 0 auto;
+        font-size: 10px;
+      }
+
+      .detail-transaction-amount.positive {
+        color: #4ce0aa;
+      }
+
+      .detail-transaction-amount.negative {
+        color: #ff8298;
+      }
+
+      @media(max-width:370px) {
+        .detail-action-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .detail-chart {
+          gap: 5px;
+        }
+
+        .detail-main-debt strong {
+          font-size: 27px;
+        }
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+});
