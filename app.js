@@ -7110,3 +7110,99 @@ document.addEventListener("DOMContentLoaded", () => {
     document.head.appendChild(style);
   }
 });
+// YF v3.2 — Canlı Profesyonel Dashboard
+document.addEventListener("DOMContentLoaded", () => {
+  const DK="yf_cards_v1", TK="yf_transactions_v1", $=id=>document.getElementById(id);
+  const load=k=>{try{return JSON.parse(localStorage.getItem(k)||"[]")}catch{return[]}};
+  const money=v=>new Intl.NumberFormat("tr-TR",{style:"currency",currency:"TRY"}).format(Number(v)||0);
+  const round=v=>Math.round((Number(v)+Number.EPSILON)*100)/100;
+  const parse=v=>{if(!v)return null;const d=new Date(String(v).includes("T")?v:`${v}T12:00:00`);return Number.isNaN(d.getTime())?null:d};
+  const currentMonth=v=>{const d=parse(v),n=new Date();return !!d&&d.getMonth()===n.getMonth()&&d.getFullYear()===n.getFullYear()};
+
+  if(!$("dashboardProPanel")){
+    const dash=$("dashboardPage");
+    if(!dash)return;
+    const ref=$("todayTasksCard")||dash.querySelector(".hero-card");
+    const p=document.createElement("section");
+    p.id="dashboardProPanel";
+    p.className="dashboard-pro-panel";
+    p.innerHTML=`
+      <div class="dashboard-pro-head">
+        <div><span>CANLI FİNANS ÖZETİ</span><h2>Genel durumun</h2></div>
+        <b id="dashboardProStatus">Güncel</b>
+      </div>
+      <div class="dashboard-pro-grid">
+        <article><span>Toplam Borç</span><strong id="dpDebt">₺0,00</strong><small>Kartlar ve krediler</small></article>
+        <article><span>Toplam Kart Limiti</span><strong id="dpLimit">₺0,00</strong><small>Sadece kredi kartları</small></article>
+        <article><span>Kullanılabilir Limit</span><strong id="dpAvailable">₺0,00</strong><small>Güncel kullanılabilir</small></article>
+        <article><span>Bu Ay Ödenen</span><strong id="dpPaidMonth">₺0,00</strong><small>Kart ve kredi ödemeleri</small></article>
+      </div>
+      <div class="dashboard-pro-progress">
+        <div><span>Borç Bitirme İlerlemesi</span><strong id="dpPercent">%0</strong></div>
+        <div class="dashboard-pro-track"><i id="dpFill"></i></div>
+        <small id="dpMotivation">İlk ödemenle ilerleme başlayacak.</small>
+      </div>
+      <button id="dpNext" class="dashboard-pro-next" type="button" disabled>
+        <span>📅</span>
+        <div><small>SIRADAKİ ÖDEME</small><strong id="dpNextTitle">Ödeme bulunmuyor</strong><em id="dpNextText">Henüz tarihli borç yok.</em></div>
+        <b>Aç</b>
+      </button>`;
+    ref?ref.insertAdjacentElement("afterend",p):dash.prepend(p);
+  }
+
+  function animate(id,target){
+    const el=$(id); if(!el)return;
+    const start=Number(el.dataset.v||0),end=Number(target||0),t0=performance.now();
+    const run=t=>{const p=Math.min(1,(t-t0)/500),v=start+(end-start)*(1-Math.pow(1-p,3));el.textContent=money(v);if(p<1)requestAnimationFrame(run);else el.dataset.v=String(end)};
+    requestAnimationFrame(run);
+  }
+
+  function refresh(){
+    const debts=load(DK),tx=load(TK),cards=debts.filter(x=>x.type!=="personal-loan");
+    const totalDebt=round(debts.reduce((s,x)=>s+Number(x.debt||0),0));
+    const totalLimit=round(cards.reduce((s,x)=>s+Number(x.limit||0),0));
+    const cardDebt=round(cards.reduce((s,x)=>s+Number(x.debt||0),0));
+    const available=round(Math.max(0,totalLimit-cardDebt));
+    const paidMonth=round(tx.filter(x=>(x.type==="card-payment"||x.type==="loan-payment")&&currentMonth(x.createdAt||x.date)).reduce((s,x)=>s+Number(x.amount||0),0));
+    const paidAll=round(tx.filter(x=>x.type==="card-payment"||x.type==="loan-payment").reduce((s,x)=>s+Number(x.amount||0),0));
+    const original=round(totalDebt+paidAll),pct=original?Math.min(100,Math.round(paidAll/original*100)):0;
+
+    animate("dpDebt",totalDebt);animate("dpLimit",totalLimit);animate("dpAvailable",available);animate("dpPaidMonth",paidMonth);
+    $("dpPercent").textContent=`%${pct}`;
+    $("dpFill").style.width=`${pct}%`;
+    $("dpMotivation").textContent=totalDebt<=0?"Tebrikler, tüm borçlar kapandı! 🎉":pct>=75?"Son düzlüktesin.":pct>=50?"Borçlarının yarısından fazlası bitti.":pct>0?"İlerleme başladı, devam et.":"İlk ödemenle ilerleme başlayacak.";
+    $("dashboardProStatus").textContent=totalDebt<=0?"Borçsuz 🎉":"Güncel";
+
+    const now=new Date();now.setHours(0,0,0,0);
+    const next=debts.filter(x=>Number(x.debt||0)>0).map(x=>{const loan=x.type==="personal-loan",d=parse(loan?(x.nextPaymentDate||x.dueDate):x.dueDate);return d?{...x,loan,d,days:Math.ceil((d-now)/86400000)}:null}).filter(Boolean).sort((a,b)=>a.d-b.d)[0];
+    const btn=$("dpNext");
+    if(!next){$("dpNextTitle").textContent="Ödeme bulunmuyor";$("dpNextText").textContent="Henüz tarihli borç yok.";btn.disabled=true;btn.dataset.id="";return}
+    const amount=next.loan?Math.min(Number(next.monthlyInstallment||0),Number(next.debt||0)):round(Number(next.statementDebt??next.debt??0)*.2);
+    $("dpNextTitle").textContent=`${next.bank} · ${next.name}`;
+    $("dpNextText").textContent=`${next.days<0?`${Math.abs(next.days)} gün gecikti`:next.days===0?"Bugün son gün":next.days===1?"Yarın son gün":`${next.days} gün kaldı`} · ${money(amount)}`;
+    btn.disabled=false;btn.dataset.id=next.id;
+  }
+
+  $("dpNext")?.addEventListener("click",()=>{
+    const id=$("dpNext").dataset.id;if(!id)return;
+    document.querySelector('[data-page="debtPaymentPage"]')?.click();
+    setTimeout(()=>{const s=$("debtPaymentCard");if(s){s.value=id;s.dispatchEvent(new Event("change",{bubbles:true}))}},250);
+  });
+
+  document.querySelectorAll('[data-page="dashboardPage"]').forEach(b=>b.addEventListener("click",()=>setTimeout(refresh,100)));
+  window.addEventListener("storage",refresh);
+  window.addEventListener("yf-refresh-dashboard",refresh);
+
+  if(!$("yfDashboardProStyles")){
+    const s=document.createElement("style");s.id="yfDashboardProStyles";s.textContent=`
+      .dashboard-pro-panel{margin:18px 0;padding:18px;border:1px solid rgba(72,171,255,.15);border-radius:24px;background:radial-gradient(circle at 95% 0,rgba(15,140,255,.12),transparent 34%),linear-gradient(145deg,rgba(18,50,80,.97),rgba(9,29,48,.97));box-shadow:0 20px 48px rgba(0,0,0,.2)}
+      .dashboard-pro-head{display:flex;justify-content:space-between;gap:12px;margin-bottom:15px}.dashboard-pro-head span{display:block;color:#64baff;font-size:9px;font-weight:900;letter-spacing:.14em}.dashboard-pro-head h2{margin:5px 0 0;font-size:20px}.dashboard-pro-head>b{height:26px;display:flex;align-items:center;padding:0 9px;border-radius:999px;color:#73c2ff;background:rgba(15,140,255,.1);border:1px solid rgba(72,171,255,.18);font-size:8px}
+      .dashboard-pro-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.dashboard-pro-grid article{padding:14px;border:1px solid rgba(255,255,255,.07);border-radius:16px;background:rgba(255,255,255,.035)}.dashboard-pro-grid span,.dashboard-pro-grid strong,.dashboard-pro-grid small{display:block}.dashboard-pro-grid span{color:#8fa2ba;font-size:9px}.dashboard-pro-grid strong{margin-top:7px;font-size:15px}.dashboard-pro-grid small{margin-top:5px;color:#71859a;font-size:7.5px}
+      .dashboard-pro-progress{margin-top:11px;padding:15px;border:1px solid rgba(43,211,154,.14);border-radius:17px;background:rgba(43,211,154,.045)}.dashboard-pro-progress>div:first-child{display:flex;justify-content:space-between}.dashboard-pro-progress span{color:#8fa2ba;font-size:9px}.dashboard-pro-progress strong{color:#61dfb1}.dashboard-pro-progress>small{display:block;margin-top:9px;color:#8fa2ba;font-size:8.5px}.dashboard-pro-track{height:9px;margin-top:13px;overflow:hidden;border-radius:999px;background:rgba(255,255,255,.08)}.dashboard-pro-track i{display:block;width:0;height:100%;border-radius:inherit;background:linear-gradient(90deg,#0f8cff,#52e6b2);transition:width .55s ease}
+      .dashboard-pro-next{width:100%;display:flex;align-items:center;gap:11px;margin-top:11px;padding:13px;border:1px solid rgba(255,177,72,.14);border-radius:17px;color:inherit;background:rgba(255,177,72,.045);text-align:left;font:inherit}.dashboard-pro-next>span{width:40px;height:40px;display:flex;align-items:center;justify-content:center;border-radius:13px;background:rgba(255,177,72,.1)}.dashboard-pro-next>div{min-width:0;flex:1}.dashboard-pro-next small,.dashboard-pro-next strong,.dashboard-pro-next em{display:block}.dashboard-pro-next small{color:#ffd073;font-size:8px}.dashboard-pro-next strong{margin-top:4px;overflow:hidden;font-size:11px;text-overflow:ellipsis;white-space:nowrap}.dashboard-pro-next em{margin-top:4px;color:#8093a8;font-size:8px;font-style:normal}.dashboard-pro-next>b{color:#72c2ff;font-size:9px}
+      @media(max-width:370px){.dashboard-pro-grid{grid-template-columns:1fr}}
+    `;document.head.appendChild(s)
+  }
+
+  refresh();
+});
