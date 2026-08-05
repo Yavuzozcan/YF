@@ -7206,3 +7206,1356 @@ document.addEventListener("DOMContentLoaded", () => {
 
   refresh();
 });
+// =========================================
+// YF v3.3 — Varlıklarım + Eski 4'lü Alanı Kaldır
+// Bu kod app.js dosyasının EN ALTINA eklenir.
+// =========================================
+
+document.addEventListener("DOMContentLoaded", () => {
+  const ASSET_KEY = "yf_assets_v1";
+  const DEBT_KEY = "yf_cards_v1";
+  const PAGE_KEY = "yf_last_open_page_v1";
+
+  const $ = id => document.getElementById(id);
+
+  installAssetStyles();
+  removeOldDashboardSummary();
+  createAssetsMenuItem();
+  createAssetsPage();
+  createAssetModal();
+  bindAssetEvents();
+  renderAssets();
+  refreshAssetDashboardCard();
+
+  // -------------------------------------------------
+  // ESKİ 4'LÜ ÖZET ALANINI KALDIR
+  // Toplam Kalan Borç / Toplam Varlık / Bu Ay Ödenen / Kart Sayısı
+  // -------------------------------------------------
+  function removeOldDashboardSummary() {
+    const ids = [
+      "totalDebt",
+      "totalAssets",
+      "monthlyPayment",
+      "cardCount"
+    ];
+
+    const cards = ids
+      .map(id => document.getElementById(id)?.closest(".summary-card"))
+      .filter(Boolean);
+
+    const parentCounts = new Map();
+
+    cards.forEach(card => {
+      const parent = card.parentElement;
+      parentCounts.set(parent, (parentCounts.get(parent) || 0) + 1);
+    });
+
+    cards.forEach(card => card.remove());
+
+    parentCounts.forEach((count, parent) => {
+      if (!parent) return;
+
+      const remainingSummaryCards =
+        parent.querySelectorAll(".summary-card").length;
+
+      if (remainingSummaryCards === 0) {
+        parent.remove();
+      }
+    });
+
+    const dashboard = $("dashboardPage");
+    if (!dashboard || $("dashboardAssetCard")) return;
+
+    const proPanel = $("dashboardProPanel");
+    const assetCard = document.createElement("section");
+    assetCard.id = "dashboardAssetCard";
+    assetCard.className = "dashboard-asset-card";
+
+    assetCard.innerHTML = `
+      <div class="dashboard-asset-head">
+        <div>
+          <span>VARLIKLARIM</span>
+          <h2>Finansal gücün</h2>
+        </div>
+
+        <button
+          id="openAssetsFromDashboard"
+          type="button"
+        >
+          Tümünü Gör
+        </button>
+      </div>
+
+      <div class="dashboard-asset-main">
+        <div>
+          <span>Toplam Varlık</span>
+          <strong id="dashboardAssetTotal">₺0,00</strong>
+        </div>
+
+        <div>
+          <span>Net Servet</span>
+          <strong id="dashboardNetWorth">₺0,00</strong>
+        </div>
+      </div>
+
+      <div class="dashboard-asset-category-row" id="dashboardAssetCategories">
+        <div>
+          <span>💵</span>
+          <strong>Nakit</strong>
+          <small>₺0,00</small>
+        </div>
+
+        <div>
+          <span>🏦</span>
+          <strong>Banka</strong>
+          <small>₺0,00</small>
+        </div>
+
+        <div>
+          <span>🥇</span>
+          <strong>Altın</strong>
+          <small>₺0,00</small>
+        </div>
+      </div>
+    `;
+
+    if (proPanel) {
+      proPanel.insertAdjacentElement("afterend", assetCard);
+    } else {
+      dashboard.appendChild(assetCard);
+    }
+  }
+
+  // -------------------------------------------------
+  // SOL MENÜYE VARLIKLAR EKLE
+  // -------------------------------------------------
+  function createAssetsMenuItem() {
+    if (document.querySelector('[data-page="assetsPage"]')) return;
+
+    const allItems = [
+      ...document.querySelectorAll(".side-menu-item")
+    ];
+
+    const goals = allItems.find(item =>
+      item.textContent
+        ?.toLocaleLowerCase("tr-TR")
+        .includes("hedefler")
+    );
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "side-menu-item";
+    button.dataset.page = "assetsPage";
+
+    button.innerHTML = `
+      <span class="side-menu-icon">💰</span>
+      <span>Varlıklar</span>
+    `;
+
+    if (goals) {
+      goals.insertAdjacentElement("afterend", button);
+    } else {
+      const container =
+        document.querySelector(".side-menu-content") ||
+        document.querySelector("#sideMenuLayer .side-menu") ||
+        document.querySelector("#sideMenuLayer");
+
+      container?.appendChild(button);
+    }
+  }
+
+  // -------------------------------------------------
+  // VARLIKLAR SAYFASI
+  // -------------------------------------------------
+  function createAssetsPage() {
+    if ($("assetsPage")) return;
+
+    const main = document.querySelector("main.app-shell");
+    if (!main) return;
+
+    const page = document.createElement("section");
+    page.id = "assetsPage";
+    page.className = "page";
+
+    page.innerHTML = `
+      <header class="top-header">
+        <div>
+          <p class="eyebrow">FİNANSAL VARLIKLAR</p>
+          <h1>Varlıklarım</h1>
+        </div>
+
+        <button
+          id="assetsBackButton"
+          class="reports-back-button"
+          type="button"
+        >
+          Ana Sayfa
+        </button>
+      </header>
+
+      <section class="asset-overview-card">
+        <div class="asset-overview-head">
+          <div>
+            <span>TOPLAM VARLIK</span>
+            <strong id="assetPageTotal">₺0,00</strong>
+          </div>
+
+          <span id="assetOverviewStatus" class="asset-overview-badge">
+            Güncel
+          </span>
+        </div>
+
+        <div class="asset-overview-grid">
+          <div>
+            <span>Toplam Borç</span>
+            <strong id="assetPageDebt">₺0,00</strong>
+          </div>
+
+          <div>
+            <span>Net Servet</span>
+            <strong id="assetPageNet">₺0,00</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="asset-summary-grid">
+        <article>
+          <span>💵 Nakit</span>
+          <strong id="assetSummaryCash">₺0,00</strong>
+        </article>
+
+        <article>
+          <span>🏦 Banka</span>
+          <strong id="assetSummaryBank">₺0,00</strong>
+        </article>
+
+        <article>
+          <span>🥇 Altın</span>
+          <strong id="assetSummaryGold">₺0,00</strong>
+        </article>
+
+        <article>
+          <span>🥈 Gümüş</span>
+          <strong id="assetSummarySilver">₺0,00</strong>
+        </article>
+
+        <article>
+          <span>🪙 Kripto</span>
+          <strong id="assetSummaryCrypto">₺0,00</strong>
+        </article>
+
+        <article>
+          <span>📈 Hisse</span>
+          <strong id="assetSummaryStock">₺0,00</strong>
+        </article>
+      </section>
+
+      <section class="content-card">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">KAYITLI VARLIKLAR</p>
+            <h2>Varlık listesi</h2>
+          </div>
+        </div>
+
+        <div id="assetList" class="asset-list"></div>
+      </section>
+
+      <section class="content-card">
+        <button id="addAssetButton" class="asset-add-button" type="button">
+          <span>＋</span>
+
+          <div>
+            <strong>Yeni Varlık Ekle</strong>
+            <small>Nakit, banka, altın, gümüş, kripto veya hisse ekle</small>
+          </div>
+        </button>
+      </section>
+    `;
+
+    main.appendChild(page);
+  }
+
+  // -------------------------------------------------
+  // VARLIK EKLEME MODALI
+  // -------------------------------------------------
+  function createAssetModal() {
+    if ($("assetModal")) return;
+
+    const modal = document.createElement("div");
+    modal.id = "assetModal";
+    modal.className = "asset-modal hidden";
+
+    modal.innerHTML = `
+      <div class="asset-modal-backdrop"></div>
+
+      <section class="asset-modal-sheet">
+        <div class="asset-modal-head">
+          <div>
+            <span>YENİ VARLIK</span>
+            <h2 id="assetModalTitle">Varlık Ekle</h2>
+          </div>
+
+          <button
+            id="closeAssetModal"
+            type="button"
+            aria-label="Kapat"
+          >
+            ×
+          </button>
+        </div>
+
+        <form id="assetForm">
+          <input id="assetId" type="hidden">
+
+          <label>
+            Varlık türü
+
+            <select id="assetType" required>
+              <option value="cash">💵 Nakit</option>
+              <option value="bank">🏦 Banka Hesabı</option>
+              <option value="gold">🥇 Altın</option>
+              <option value="silver">🥈 Gümüş</option>
+              <option value="crypto">🪙 Kripto</option>
+              <option value="stock">📈 Hisse Senedi</option>
+            </select>
+          </label>
+
+          <label>
+            Varlık adı
+
+            <input
+              id="assetName"
+              type="text"
+              placeholder="Örn. Ana hesap, Gram altın, Bitcoin"
+              required
+            >
+          </label>
+
+          <label>
+            Güncel değer
+
+            <input
+              id="assetValue"
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="0,00"
+              required
+            >
+          </label>
+
+          <label>
+            Not
+
+            <input
+              id="assetNote"
+              type="text"
+              placeholder="İsteğe bağlı"
+            >
+          </label>
+
+          <div class="asset-modal-actions">
+            <button
+              id="cancelAssetButton"
+              class="asset-secondary"
+              type="button"
+            >
+              Vazgeç
+            </button>
+
+            <button
+              class="asset-primary"
+              type="submit"
+            >
+              Kaydet
+            </button>
+          </div>
+        </form>
+      </section>
+    `;
+
+    document.body.appendChild(modal);
+  }
+
+  // -------------------------------------------------
+  // OLAYLAR
+  // -------------------------------------------------
+  function bindAssetEvents() {
+    document.addEventListener("click", event => {
+      const pageButton = event.target.closest('[data-page="assetsPage"]');
+
+      if (pageButton) {
+        closeSideMenu();
+        showPage("assetsPage");
+        localStorage.setItem(PAGE_KEY, "assetsPage");
+        renderAssets();
+      }
+    });
+
+    $("openAssetsFromDashboard")?.addEventListener("click", () => {
+      showPage("assetsPage");
+      localStorage.setItem(PAGE_KEY, "assetsPage");
+      renderAssets();
+    });
+
+    $("assetsBackButton")?.addEventListener("click", () => {
+      showPage("dashboardPage");
+      localStorage.setItem(PAGE_KEY, "dashboardPage");
+      refreshAssetDashboardCard();
+    });
+
+    $("addAssetButton")?.addEventListener("click", () => {
+      openAssetModal();
+    });
+
+    $("closeAssetModal")?.addEventListener("click", closeAssetModal);
+    $("cancelAssetButton")?.addEventListener("click", closeAssetModal);
+
+    document
+      .querySelector(".asset-modal-backdrop")
+      ?.addEventListener("click", closeAssetModal);
+
+    $("assetForm")?.addEventListener("submit", saveAsset);
+
+    window.addEventListener("storage", () => {
+      renderAssets();
+      refreshAssetDashboardCard();
+    });
+
+    document
+      .querySelectorAll('[data-page="dashboardPage"]')
+      .forEach(button => {
+        button.addEventListener("click", () => {
+          setTimeout(refreshAssetDashboardCard, 100);
+        });
+      });
+
+    const savedPage = localStorage.getItem(PAGE_KEY);
+
+    if (savedPage === "assetsPage") {
+      setTimeout(() => {
+        showPage("assetsPage");
+        renderAssets();
+      }, 350);
+    }
+  }
+
+  // -------------------------------------------------
+  // MODAL AÇ / KAPAT
+  // -------------------------------------------------
+  function openAssetModal(asset = null) {
+    const form = $("assetForm");
+    const modal = $("assetModal");
+
+    if (!form || !modal) return;
+
+    form.reset();
+
+    $("assetId").value = asset?.id || "";
+    $("assetType").value = asset?.type || "cash";
+    $("assetName").value = asset?.name || "";
+    $("assetValue").value = asset?.value || "";
+    $("assetNote").value = asset?.note || "";
+
+    $("assetModalTitle").textContent =
+      asset ? "Varlığı Düzenle" : "Varlık Ekle";
+
+    modal.classList.remove("hidden");
+    document.body.style.overflow = "hidden";
+  }
+
+  function closeAssetModal() {
+    $("assetModal")?.classList.add("hidden");
+    document.body.style.overflow = "";
+  }
+
+  // -------------------------------------------------
+  // VARLIK KAYDET
+  // -------------------------------------------------
+  function saveAsset(event) {
+    event.preventDefault();
+
+    const id = $("assetId").value;
+    const type = $("assetType").value;
+    const name = $("assetName").value.trim();
+    const value = Number($("assetValue").value);
+    const note = $("assetNote").value.trim();
+
+    if (!name) {
+      alert("Varlık adını yaz.");
+      return;
+    }
+
+    if (!Number.isFinite(value) || value < 0) {
+      alert("Güncel değeri doğru gir.");
+      return;
+    }
+
+    const assets = loadJson(ASSET_KEY);
+    const old = assets.find(item => item.id === id);
+
+    const asset = {
+      id: id || createId(),
+      type,
+      name,
+      value: roundMoney(value),
+      note,
+      createdAt: old?.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    const index = assets.findIndex(item => item.id === asset.id);
+
+    if (index >= 0) {
+      assets[index] = asset;
+    } else {
+      assets.unshift(asset);
+    }
+
+    saveJson(ASSET_KEY, assets);
+
+    closeAssetModal();
+    renderAssets();
+    refreshAssetDashboardCard();
+  }
+
+  // -------------------------------------------------
+  // VARLIKLARI ÇİZ
+  // -------------------------------------------------
+  function renderAssets() {
+    const list = $("assetList");
+    if (!list) return;
+
+    const assets = loadJson(ASSET_KEY);
+    const debts = loadJson(DEBT_KEY);
+
+    const totalAssets = roundMoney(
+      assets.reduce(
+        (sum, item) => sum + Number(item.value || 0),
+        0
+      )
+    );
+
+    const totalDebt = roundMoney(
+      debts.reduce(
+        (sum, item) => sum + Number(item.debt || 0),
+        0
+      )
+    );
+
+    const netWorth = roundMoney(totalAssets - totalDebt);
+
+    setText("assetPageTotal", formatMoney(totalAssets));
+    setText("assetPageDebt", formatMoney(totalDebt));
+    setText("assetPageNet", formatMoney(netWorth));
+
+    const status = $("assetOverviewStatus");
+
+    if (status) {
+      status.textContent =
+        netWorth >= 0 ? "Pozitif" : "Ekside";
+
+      status.className =
+        netWorth >= 0
+          ? "asset-overview-badge positive"
+          : "asset-overview-badge negative";
+    }
+
+    const totals = getCategoryTotals(assets);
+
+    setText("assetSummaryCash", formatMoney(totals.cash));
+    setText("assetSummaryBank", formatMoney(totals.bank));
+    setText("assetSummaryGold", formatMoney(totals.gold));
+    setText("assetSummarySilver", formatMoney(totals.silver));
+    setText("assetSummaryCrypto", formatMoney(totals.crypto));
+    setText("assetSummaryStock", formatMoney(totals.stock));
+
+    list.innerHTML = "";
+
+    if (!assets.length) {
+      list.innerHTML = `
+        <div class="empty-state">
+          Henüz varlık eklenmedi.
+        </div>
+      `;
+      return;
+    }
+
+    assets.forEach(asset => {
+      const card = document.createElement("article");
+      card.className = "asset-item";
+
+      card.innerHTML = `
+        <div class="asset-item-icon">
+          ${getAssetIcon(asset.type)}
+        </div>
+
+        <div class="asset-item-info">
+          <strong>${escapeHtml(asset.name)}</strong>
+          <span>${getAssetTypeLabel(asset.type)}</span>
+          ${
+            asset.note
+              ? `<small>${escapeHtml(asset.note)}</small>`
+              : ""
+          }
+        </div>
+
+        <div class="asset-item-side">
+          <strong>${formatMoney(asset.value)}</strong>
+
+          <div>
+            <button
+              type="button"
+              data-asset-edit="${asset.id}"
+            >
+              Düzenle
+            </button>
+
+            <button
+              type="button"
+              class="danger"
+              data-asset-delete="${asset.id}"
+            >
+              Sil
+            </button>
+          </div>
+        </div>
+      `;
+
+      card
+        .querySelector("[data-asset-edit]")
+        ?.addEventListener("click", () => {
+          openAssetModal(asset);
+        });
+
+      card
+        .querySelector("[data-asset-delete]")
+        ?.addEventListener("click", () => {
+          deleteAsset(asset.id);
+        });
+
+      list.appendChild(card);
+    });
+  }
+
+  // -------------------------------------------------
+  // DASHBOARD VARLIK KARTINI GÜNCELLE
+  // -------------------------------------------------
+  function refreshAssetDashboardCard() {
+    const assets = loadJson(ASSET_KEY);
+    const debts = loadJson(DEBT_KEY);
+
+    const totalAssets = roundMoney(
+      assets.reduce(
+        (sum, item) => sum + Number(item.value || 0),
+        0
+      )
+    );
+
+    const totalDebt = roundMoney(
+      debts.reduce(
+        (sum, item) => sum + Number(item.debt || 0),
+        0
+      )
+    );
+
+    const netWorth = roundMoney(totalAssets - totalDebt);
+    const totals = getCategoryTotals(assets);
+
+    setText("dashboardAssetTotal", formatMoney(totalAssets));
+    setText("dashboardNetWorth", formatMoney(netWorth));
+
+    const categoryRow = $("dashboardAssetCategories");
+
+    if (categoryRow) {
+      categoryRow.innerHTML = `
+        <div>
+          <span>💵</span>
+          <strong>Nakit</strong>
+          <small>${formatMoney(totals.cash)}</small>
+        </div>
+
+        <div>
+          <span>🏦</span>
+          <strong>Banka</strong>
+          <small>${formatMoney(totals.bank)}</small>
+        </div>
+
+        <div>
+          <span>🥇</span>
+          <strong>Altın</strong>
+          <small>${formatMoney(totals.gold)}</small>
+        </div>
+      `;
+    }
+
+    const netElement = $("dashboardNetWorth");
+
+    if (netElement) {
+      netElement.classList.toggle("positive", netWorth >= 0);
+      netElement.classList.toggle("negative", netWorth < 0);
+    }
+  }
+
+  // -------------------------------------------------
+  // VARLIK SİL
+  // -------------------------------------------------
+  function deleteAsset(id) {
+    const assets = loadJson(ASSET_KEY);
+    const asset = assets.find(item => item.id === id);
+
+    if (!asset) return;
+
+    if (!confirm(`"${asset.name}" varlığı silinsin mi?`)) {
+      return;
+    }
+
+    saveJson(
+      ASSET_KEY,
+      assets.filter(item => item.id !== id)
+    );
+
+    renderAssets();
+    refreshAssetDashboardCard();
+  }
+
+  // -------------------------------------------------
+  // YARDIMCI FONKSİYONLAR
+  // -------------------------------------------------
+  function getCategoryTotals(assets) {
+    const totals = {
+      cash: 0,
+      bank: 0,
+      gold: 0,
+      silver: 0,
+      crypto: 0,
+      stock: 0
+    };
+
+    assets.forEach(asset => {
+      if (totals[asset.type] !== undefined) {
+        totals[asset.type] += Number(asset.value || 0);
+      }
+    });
+
+    Object.keys(totals).forEach(key => {
+      totals[key] = roundMoney(totals[key]);
+    });
+
+    return totals;
+  }
+
+  function getAssetIcon(type) {
+    const icons = {
+      cash: "💵",
+      bank: "🏦",
+      gold: "🥇",
+      silver: "🥈",
+      crypto: "🪙",
+      stock: "📈"
+    };
+
+    return icons[type] || "💰";
+  }
+
+  function getAssetTypeLabel(type) {
+    const labels = {
+      cash: "Nakit",
+      bank: "Banka Hesabı",
+      gold: "Altın",
+      silver: "Gümüş",
+      crypto: "Kripto",
+      stock: "Hisse Senedi"
+    };
+
+    return labels[type] || "Varlık";
+  }
+
+  function showPage(pageId) {
+    document.querySelectorAll(".page").forEach(page => {
+      page.classList.toggle("active", page.id === pageId);
+    });
+
+    document
+      .querySelectorAll(".bottom-navigation .nav-item")
+      .forEach(item => {
+        item.classList.toggle(
+          "active",
+          item.dataset.page === pageId
+        );
+      });
+
+    document.body.style.overflow = "";
+    document.documentElement.style.overflow = "";
+
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function closeSideMenu() {
+    const layer = $("sideMenuLayer");
+
+    layer?.classList.remove("open");
+    layer?.setAttribute("aria-hidden", "true");
+
+    document.body.style.overflow = "";
+    document.documentElement.style.overflow = "";
+  }
+
+  function createId() {
+    return window.crypto?.randomUUID
+      ? crypto.randomUUID()
+      : String(Date.now() + Math.random());
+  }
+
+  function roundMoney(value) {
+    return Math.round(
+      (Number(value) + Number.EPSILON) * 100
+    ) / 100;
+  }
+
+  function formatMoney(value) {
+    return new Intl.NumberFormat("tr-TR", {
+      style: "currency",
+      currency: "TRY"
+    }).format(Number(value) || 0);
+  }
+
+  function loadJson(key) {
+    try {
+      return JSON.parse(localStorage.getItem(key) || "[]");
+    } catch {
+      return [];
+    }
+  }
+
+  function saveJson(key, value) {
+    localStorage.setItem(key, JSON.stringify(value));
+  }
+
+  function setText(id, value) {
+    const element = $(id);
+
+    if (element) {
+      element.textContent = String(value);
+    }
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  // -------------------------------------------------
+  // TASARIM
+  // -------------------------------------------------
+  function installAssetStyles() {
+    if ($("yfAssetStyles")) return;
+
+    const style = document.createElement("style");
+    style.id = "yfAssetStyles";
+
+    style.textContent = `
+      .dashboard-asset-card {
+        margin: 18px 0;
+        padding: 18px;
+        border: 1px solid rgba(43,211,154,.15);
+        border-radius: 24px;
+        background:
+          radial-gradient(
+            circle at 92% 5%,
+            rgba(43,211,154,.13),
+            transparent 34%
+          ),
+          linear-gradient(
+            145deg,
+            rgba(18,58,68,.97),
+            rgba(9,31,43,.97)
+          );
+      }
+
+      .dashboard-asset-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 15px;
+      }
+
+      .dashboard-asset-head span {
+        display: block;
+        color: #5ee7b4;
+        font-size: 9px;
+        font-weight: 900;
+        letter-spacing: .14em;
+      }
+
+      .dashboard-asset-head h2 {
+        margin: 5px 0 0;
+        font-size: 20px;
+      }
+
+      .dashboard-asset-head button {
+        min-height: 34px;
+        padding: 0 11px;
+        border: 1px solid rgba(43,211,154,.18);
+        border-radius: 11px;
+        color: #5ee7b4;
+        background: rgba(43,211,154,.08);
+        font-size: 8px;
+        font-weight: 850;
+      }
+
+      .dashboard-asset-main {
+        display: grid;
+        grid-template-columns: repeat(2,minmax(0,1fr));
+        gap: 10px;
+      }
+
+      .dashboard-asset-main > div {
+        padding: 15px;
+        border: 1px solid rgba(255,255,255,.07);
+        border-radius: 16px;
+        background: rgba(255,255,255,.035);
+      }
+
+      .dashboard-asset-main span,
+      .dashboard-asset-main strong {
+        display: block;
+      }
+
+      .dashboard-asset-main span {
+        color: #8fa2ba;
+        font-size: 9px;
+      }
+
+      .dashboard-asset-main strong {
+        margin-top: 7px;
+        font-size: 16px;
+      }
+
+      .dashboard-asset-main strong.positive {
+        color: #4ce0aa;
+      }
+
+      .dashboard-asset-main strong.negative {
+        color: #ff8298;
+      }
+
+      .dashboard-asset-category-row {
+        display: grid;
+        grid-template-columns: repeat(3,minmax(0,1fr));
+        gap: 8px;
+        margin-top: 11px;
+      }
+
+      .dashboard-asset-category-row > div {
+        padding: 11px;
+        border-radius: 14px;
+        background: rgba(255,255,255,.03);
+        text-align: center;
+      }
+
+      .dashboard-asset-category-row span,
+      .dashboard-asset-category-row strong,
+      .dashboard-asset-category-row small {
+        display: block;
+      }
+
+      .dashboard-asset-category-row span {
+        font-size: 18px;
+      }
+
+      .dashboard-asset-category-row strong {
+        margin-top: 5px;
+        font-size: 9px;
+      }
+
+      .dashboard-asset-category-row small {
+        margin-top: 4px;
+        color: #8295a9;
+        font-size: 8px;
+      }
+
+      .asset-overview-card {
+        margin-bottom: 14px;
+        padding: 20px;
+        border: 1px solid rgba(43,211,154,.17);
+        border-radius: 24px;
+        background:
+          radial-gradient(
+            circle at 90% 5%,
+            rgba(43,211,154,.15),
+            transparent 34%
+          ),
+          linear-gradient(
+            145deg,
+            rgba(17,65,65,.98),
+            rgba(8,31,41,.98)
+          );
+      }
+
+      .asset-overview-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .asset-overview-head span,
+      .asset-overview-head strong {
+        display: block;
+      }
+
+      .asset-overview-head > div > span {
+        color: #5ee7b4;
+        font-size: 9px;
+        font-weight: 900;
+        letter-spacing: .14em;
+      }
+
+      .asset-overview-head > div > strong {
+        margin-top: 8px;
+        font-size: 29px;
+      }
+
+      .asset-overview-badge {
+        height: 26px;
+        display: inline-flex !important;
+        align-items: center;
+        padding: 0 9px;
+        border-radius: 999px;
+        font-size: 8px;
+        font-weight: 850;
+      }
+
+      .asset-overview-badge.positive {
+        color: #4ce0aa;
+        background: rgba(43,211,154,.10);
+        border: 1px solid rgba(43,211,154,.18);
+      }
+
+      .asset-overview-badge.negative {
+        color: #ff8298;
+        background: rgba(255,91,122,.10);
+        border: 1px solid rgba(255,91,122,.18);
+      }
+
+      .asset-overview-grid {
+        display: grid;
+        grid-template-columns: repeat(2,minmax(0,1fr));
+        gap: 10px;
+        margin-top: 18px;
+      }
+
+      .asset-overview-grid > div {
+        padding: 13px;
+        border-radius: 15px;
+        background: rgba(255,255,255,.04);
+      }
+
+      .asset-overview-grid span,
+      .asset-overview-grid strong {
+        display: block;
+      }
+
+      .asset-overview-grid span {
+        color: #8fa2ba;
+        font-size: 9px;
+      }
+
+      .asset-overview-grid strong {
+        margin-top: 6px;
+        font-size: 13px;
+      }
+
+      .asset-summary-grid {
+        display: grid;
+        grid-template-columns: repeat(2,minmax(0,1fr));
+        gap: 10px;
+        margin-bottom: 14px;
+      }
+
+      .asset-summary-grid article {
+        padding: 15px;
+        border: 1px solid rgba(255,255,255,.08);
+        border-radius: 17px;
+        background: rgba(255,255,255,.04);
+      }
+
+      .asset-summary-grid span,
+      .asset-summary-grid strong {
+        display: block;
+      }
+
+      .asset-summary-grid span {
+        color: #8fa2ba;
+        font-size: 10px;
+      }
+
+      .asset-summary-grid strong {
+        margin-top: 7px;
+        font-size: 14px;
+      }
+
+      .asset-list {
+        display: grid;
+        gap: 10px;
+      }
+
+      .asset-item {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        padding: 13px;
+        border: 1px solid rgba(255,255,255,.07);
+        border-radius: 16px;
+        background: rgba(255,255,255,.035);
+      }
+
+      .asset-item-icon {
+        width: 42px;
+        height: 42px;
+        flex: 0 0 42px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 13px;
+        background: rgba(43,211,154,.09);
+        font-size: 19px;
+      }
+
+      .asset-item-info {
+        min-width: 0;
+        flex: 1;
+      }
+
+      .asset-item-info strong,
+      .asset-item-info span,
+      .asset-item-info small {
+        display: block;
+      }
+
+      .asset-item-info strong {
+        overflow: hidden;
+        font-size: 11px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .asset-item-info span {
+        margin-top: 4px;
+        color: #8fa2ba;
+        font-size: 9px;
+      }
+
+      .asset-item-info small {
+        margin-top: 4px;
+        color: #71859a;
+        font-size: 8px;
+      }
+
+      .asset-item-side {
+        flex: 0 0 auto;
+        text-align: right;
+      }
+
+      .asset-item-side > strong {
+        display: block;
+        font-size: 11px;
+      }
+
+      .asset-item-side > div {
+        display: flex;
+        justify-content: flex-end;
+        gap: 6px;
+        margin-top: 7px;
+      }
+
+      .asset-item-side button {
+        min-height: 28px;
+        padding: 0 8px;
+        border: 1px solid rgba(72,171,255,.16);
+        border-radius: 9px;
+        color: #72c2ff;
+        background: rgba(15,140,255,.07);
+        font-size: 7.5px;
+      }
+
+      .asset-item-side button.danger {
+        color: #ff8298;
+        border-color: rgba(255,91,122,.16);
+        background: rgba(255,91,122,.06);
+      }
+
+      .asset-add-button {
+        width: 100%;
+        min-height: 62px;
+        display: flex;
+        align-items: center;
+        gap: 13px;
+        padding: 13px;
+        border: 1px dashed rgba(43,211,154,.22);
+        border-radius: 17px;
+        color: inherit;
+        background: rgba(43,211,154,.05);
+        text-align: left;
+        font: inherit;
+      }
+
+      .asset-add-button > span {
+        width: 38px;
+        height: 38px;
+        flex: 0 0 38px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 12px;
+        color: #5ee7b4;
+        background: rgba(43,211,154,.10);
+        font-size: 21px;
+      }
+
+      .asset-add-button strong,
+      .asset-add-button small {
+        display: block;
+      }
+
+      .asset-add-button small {
+        margin-top: 4px;
+        color: #8093a8;
+        font-size: 9px;
+      }
+
+      .asset-modal {
+        position: fixed;
+        z-index: 5200;
+        inset: 0;
+      }
+
+      .asset-modal-backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(0,0,0,.74);
+        backdrop-filter: blur(5px);
+        -webkit-backdrop-filter: blur(5px);
+      }
+
+      .asset-modal-sheet {
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        max-height: 88vh;
+        overflow-y: auto;
+        padding:
+          18px
+          18px
+          calc(22px + env(safe-area-inset-bottom));
+        border-radius: 26px 26px 0 0;
+        border: 1px solid rgba(255,255,255,.10);
+        background:
+          linear-gradient(
+            180deg,
+            rgba(18,43,69,.99),
+            rgba(8,23,38,.99)
+          );
+      }
+
+      .asset-modal-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 14px;
+        margin-bottom: 16px;
+      }
+
+      .asset-modal-head span {
+        color: #5ee7b4;
+        font-size: 9px;
+        font-weight: 900;
+        letter-spacing: .14em;
+      }
+
+      .asset-modal-head h2 {
+        margin: 5px 0 0;
+        font-size: 22px;
+      }
+
+      .asset-modal-head button {
+        width: 40px;
+        height: 40px;
+        border: 1px solid rgba(255,255,255,.10);
+        border-radius: 13px;
+        color: inherit;
+        background: rgba(255,255,255,.05);
+        font-size: 25px;
+      }
+
+      #assetForm label {
+        display: grid;
+        gap: 7px;
+        margin-bottom: 13px;
+        color: #b9c8d8;
+        font-size: 11px;
+        font-weight: 750;
+      }
+
+      #assetForm input,
+      #assetForm select {
+        width: 100%;
+        min-height: 48px;
+        padding: 0 13px;
+        border: 1px solid rgba(255,255,255,.10);
+        border-radius: 14px;
+        color: inherit;
+        background: rgba(255,255,255,.055);
+        font: inherit;
+        box-sizing: border-box;
+      }
+
+      .asset-modal-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .asset-primary,
+      .asset-secondary {
+        min-height: 48px;
+        border-radius: 14px;
+        font: inherit;
+        font-weight: 850;
+      }
+
+      .asset-primary {
+        border: 0;
+        color: #06251b;
+        background: linear-gradient(135deg,#52e6b2,#25c98d);
+      }
+
+      .asset-secondary {
+        border: 1px solid rgba(255,255,255,.10);
+        color: inherit;
+        background: rgba(255,255,255,.04);
+      }
+
+      @media(max-width:370px) {
+        .dashboard-asset-main,
+        .asset-overview-grid,
+        .asset-summary-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .dashboard-asset-category-row {
+          grid-template-columns: 1fr;
+        }
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+});
+
