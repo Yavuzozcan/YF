@@ -9657,4 +9657,481 @@ document.addEventListener("DOMContentLoaded", () => {
     document.head.appendChild(style);
   }
 });
+// =========================================
+// YF v3.9 — Kartları Ödeme Aciliyetine Göre Sırala
+// app.js dosyasının EN ALTINA eklenir.
+// =========================================
+
+document.addEventListener("DOMContentLoaded", () => {
+  const DEBT_KEY = "yf_cards_v1";
+  const TX_KEY = "yf_transactions_v1";
+  const MINIMUM_RATE = 0.20;
+
+  sortDebtsByUrgency();
+
+  // Kartlar sayfasına basılmadan hemen önce sıralamayı yenile.
+  document.addEventListener(
+    "click",
+    event => {
+      const button = event.target.closest(
+        '[data-page="cardsPage"]'
+      );
+
+      if (!button) return;
+
+      sortDebtsByUrgency();
+
+      setTimeout(() => {
+        sortVisibleCards();
+        addUrgencyBadges();
+      }, 220);
+    },
+    true
+  );
+
+  window.addEventListener("pageshow", () => {
+    sortDebtsByUrgency();
+
+    setTimeout(() => {
+      sortVisibleCards();
+      addUrgencyBadges();
+    }, 250);
+  });
+
+  window.addEventListener("storage", () => {
+    sortDebtsByUrgency();
+
+    setTimeout(() => {
+      sortVisibleCards();
+      addUrgencyBadges();
+    }, 180);
+  });
+
+  function sortDebtsByUrgency() {
+    const debts = loadJson(DEBT_KEY);
+    const transactions = loadJson(TX_KEY);
+
+    if (!debts.length) return;
+
+    const sorted = [...debts].sort((first, second) => {
+      const a = getSortInfo(first, transactions);
+      const b = getSortInfo(second, transactions);
+
+      if (a.group !== b.group) {
+        return a.group - b.group;
+      }
+
+      if (a.days !== b.days) {
+        return a.days - b.days;
+      }
+
+      return String(first.bank || "").localeCompare(
+        String(second.bank || ""),
+        "tr"
+      );
+    });
+
+    const changed = sorted.some(
+      (item, index) => item.id !== debts[index]?.id
+    );
+
+    if (changed) {
+      localStorage.setItem(
+        DEBT_KEY,
+        JSON.stringify(sorted)
+      );
+    }
+  }
+
+  function getSortInfo(item, transactions) {
+    const debt = Number(item.debt || 0);
+
+    if (debt <= 0) {
+      return {
+        group: 9,
+        days: 999999,
+        status: "closed"
+      };
+    }
+
+    if (item.type === "personal-loan") {
+      const paymentDate =
+        item.nextPaymentDate || item.dueDate;
+
+      return {
+        group: 2,
+        days: getDaysLeft(paymentDate),
+        status: getDateStatus(paymentDate)
+      };
+    }
+
+    const minimumInfo = getMinimumInfo(
+      item,
+      transactions
+    );
+
+    // Asgarisi tamamlanmamış kredi kartları en üstte.
+    if (minimumInfo.remaining > 0) {
+      return {
+        group: 1,
+        days: getDaysLeft(item.dueDate),
+        status: getDateStatus(item.dueDate)
+      };
+    }
+
+    // Asgarisi ödenen kartlar daha aşağıya iner.
+    return {
+      group: 3,
+      days: getDaysLeft(item.dueDate),
+      status: "paid"
+    };
+  }
+
+  function getMinimumInfo(card, transactions) {
+    const statementDebt = Math.max(
+      0,
+      Number(
+        card.statementDebt !== undefined
+          ? card.statementDebt
+          : card.debt || 0
+      )
+    );
+
+    const minimum = roundMoney(
+      statementDebt * MINIMUM_RATE
+    );
+
+    const cycle =
+      card.statementCycle ||
+      cycleKey(card.dueDate);
+
+    const paid = roundMoney(
+      transactions
+        .filter(transaction => {
+          if (
+            transaction.type !== "card-payment" ||
+            transaction.cardId !== card.id
+          ) {
+            return false;
+          }
+
+          if (transaction.statementCycle) {
+            return transaction.statementCycle === cycle;
+          }
+
+          return isSameMonth(
+            transaction.createdAt || transaction.date,
+            card.dueDate
+          );
+        })
+        .reduce(
+          (sum, transaction) =>
+            sum + Number(transaction.amount || 0),
+          0
+        )
+    );
+
+    return {
+      minimum,
+      paid,
+      remaining: roundMoney(
+        Math.max(0, minimum - paid)
+      )
+    };
+  }
+
+  // Görünen kartları da localStorage sırasına göre diz.
+  function sortVisibleCards() {
+    const list = document.getElementById("cardsList");
+    if (!list) return;
+
+    const debts = loadJson(DEBT_KEY);
+    const cards = [
+      ...list.querySelectorAll(".bank-card")
+    ];
+
+    if (!cards.length) return;
+
+    const used = new Set();
+
+    debts.forEach(debt => {
+      const match = cards.find((card, index) => {
+        if (used.has(index)) return false;
+
+        const text = String(card.textContent || "")
+          .toLocaleLowerCase("tr-TR");
+
+        const bank = String(debt.bank || "")
+          .toLocaleLowerCase("tr-TR");
+
+        const name = String(debt.name || "")
+          .toLocaleLowerCase("tr-TR");
+
+        return text.includes(bank) && text.includes(name);
+      });
+
+      if (!match) return;
+
+      const index = cards.indexOf(match);
+      used.add(index);
+      list.appendChild(match);
+    });
+  }
+
+  function addUrgencyBadges() {
+    const list = document.getElementById("cardsList");
+    if (!list) return;
+
+    const debts = loadJson(DEBT_KEY);
+    const transactions = loadJson(TX_KEY);
+
+    const cards = [
+      ...list.querySelectorAll(".bank-card")
+    ];
+
+    cards.forEach(cardElement => {
+      cardElement
+        .querySelector(".yf-card-urgency-badge")
+        ?.remove();
+
+      const text = String(cardElement.textContent || "")
+        .toLocaleLowerCase("tr-TR");
+
+      const debt = debts.find(item => {
+        const bank = String(item.bank || "")
+          .toLocaleLowerCase("tr-TR");
+
+        const name = String(item.name || "")
+          .toLocaleLowerCase("tr-TR");
+
+        return text.includes(bank) && text.includes(name);
+      });
+
+      if (!debt || Number(debt.debt || 0) <= 0) {
+        return;
+      }
+
+      const badge = document.createElement("span");
+      badge.className = "yf-card-urgency-badge";
+
+      if (debt.type === "personal-loan") {
+        const days = getDaysLeft(
+          debt.nextPaymentDate || debt.dueDate
+        );
+
+        badge.textContent = urgencyText(
+          days,
+          "Taksit"
+        );
+
+        badge.classList.add(
+          urgencyClass(days)
+        );
+      } else {
+        const info = getMinimumInfo(
+          debt,
+          transactions
+        );
+
+        if (info.remaining <= 0) {
+          badge.textContent = "Asgari ödendi ✓";
+          badge.classList.add("paid");
+        } else {
+          const days = getDaysLeft(debt.dueDate);
+
+          badge.textContent = urgencyText(
+            days,
+            "Asgari"
+          );
+
+          badge.classList.add(
+            urgencyClass(days)
+          );
+        }
+      }
+
+      const header =
+        cardElement.querySelector(".bank-card-header") ||
+        cardElement.firstElementChild;
+
+      header?.insertAdjacentElement(
+        "afterend",
+        badge
+      );
+    });
+
+    installStyles();
+  }
+
+  function urgencyText(days, prefix) {
+    if (days < 0) {
+      return `${prefix} ${Math.abs(days)} gün gecikti`;
+    }
+
+    if (days === 0) {
+      return `${prefix} bugün`;
+    }
+
+    if (days === 1) {
+      return `${prefix} yarın`;
+    }
+
+    return `${prefix} ${days} gün sonra`;
+  }
+
+  function urgencyClass(days) {
+    if (days < 0) return "overdue";
+    if (days <= 1) return "today";
+    if (days <= 7) return "warning";
+    return "upcoming";
+  }
+
+  function getDateStatus(value) {
+    const days = getDaysLeft(value);
+
+    if (days < 0) return "overdue";
+    if (days === 0) return "today";
+    return "upcoming";
+  }
+
+  function getDaysLeft(value) {
+    if (!value) return 999999;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const date = new Date(`${value}T00:00:00`);
+
+    if (Number.isNaN(date.getTime())) {
+      return 999999;
+    }
+
+    date.setHours(0, 0, 0, 0);
+
+    return Math.ceil(
+      (date - today) / 86400000
+    );
+  }
+
+  function cycleKey(value) {
+    const match = String(value || "").match(
+      /^(\d{4})-(\d{2})/
+    );
+
+    if (match) {
+      return `${match[1]}-${match[2]}`;
+    }
+
+    const now = new Date();
+
+    return `${now.getFullYear()}-${String(
+      now.getMonth() + 1
+    ).padStart(2, "0")}`;
+  }
+
+  function isSameMonth(firstValue, secondValue) {
+    if (!firstValue || !secondValue) return false;
+
+    const first = new Date(
+      String(firstValue).includes("T")
+        ? firstValue
+        : `${firstValue}T12:00:00`
+    );
+
+    const second = new Date(
+      `${secondValue}T12:00:00`
+    );
+
+    if (
+      Number.isNaN(first.getTime()) ||
+      Number.isNaN(second.getTime())
+    ) {
+      return false;
+    }
+
+    return (
+      first.getMonth() === second.getMonth() &&
+      first.getFullYear() === second.getFullYear()
+    );
+  }
+
+  function roundMoney(value) {
+    return Math.round(
+      (Number(value) + Number.EPSILON) * 100
+    ) / 100;
+  }
+
+  function loadJson(key) {
+    try {
+      return JSON.parse(
+        localStorage.getItem(key) || "[]"
+      );
+    } catch {
+      return [];
+    }
+  }
+
+  function installStyles() {
+    if (
+      document.getElementById(
+        "yfCardUrgencySortStyles"
+      )
+    ) {
+      return;
+    }
+
+    const style = document.createElement("style");
+    style.id = "yfCardUrgencySortStyles";
+
+    style.textContent = `
+      .yf-card-urgency-badge {
+        display: inline-flex;
+        align-items: center;
+        min-height: 27px;
+        margin: 9px 0 2px;
+        padding: 0 10px;
+        border-radius: 999px;
+        font-size: 9px;
+        font-weight: 900;
+      }
+
+      .yf-card-urgency-badge.overdue {
+        color: #ff8298;
+        background: rgba(255,91,122,.11);
+        border: 1px solid rgba(255,91,122,.21);
+      }
+
+      .yf-card-urgency-badge.today {
+        color: #ffd073;
+        background: rgba(255,177,72,.11);
+        border: 1px solid rgba(255,177,72,.21);
+      }
+
+      .yf-card-urgency-badge.warning {
+        color: #ffd073;
+        background: rgba(255,177,72,.09);
+        border: 1px solid rgba(255,177,72,.17);
+      }
+
+      .yf-card-urgency-badge.upcoming {
+        color: #72c2ff;
+        background: rgba(15,140,255,.09);
+        border: 1px solid rgba(72,171,255,.17);
+      }
+
+      .yf-card-urgency-badge.paid {
+        color: #4ce0aa;
+        background: rgba(43,211,154,.09);
+        border: 1px solid rgba(43,211,154,.17);
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+
+  setTimeout(() => {
+    sortVisibleCards();
+    addUrgencyBadges();
+  }, 300);
+});
 
