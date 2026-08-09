@@ -10644,3 +10644,351 @@ document.addEventListener("DOMContentLoaded", () => {
     document.head.appendChild(style);
   }
 });
+
+// =========================================
+// YF v4.1 — AYNI BANKADAKİ KREDİLERİ ID İLE AYIR
+// Aynı bankadaki birden fazla kredi artık karışmaz.
+// =========================================
+
+document.addEventListener("DOMContentLoaded", () => {
+  const DEBT_KEY = "yf_cards_v1";
+  const TX_KEY = "yf_transactions_v1";
+
+  const loadJson = key => {
+    try {
+      return JSON.parse(localStorage.getItem(key) || "[]");
+    } catch {
+      return [];
+    }
+  };
+
+  let running = false;
+
+  refreshIndependentDebtCards();
+
+  document.addEventListener(
+    "click",
+    event => {
+      const pageButton = event.target.closest(
+        '[data-page="cardsPage"]'
+      );
+
+      if (!pageButton) return;
+
+      setTimeout(refreshIndependentDebtCards, 320);
+      setTimeout(refreshIndependentDebtCards, 700);
+    },
+    true
+  );
+
+  window.addEventListener("pageshow", () => {
+    setTimeout(refreshIndependentDebtCards, 350);
+  });
+
+  window.addEventListener("storage", () => {
+    setTimeout(refreshIndependentDebtCards, 260);
+  });
+
+  function refreshIndependentDebtCards() {
+    if (running) return;
+
+    const list = document.getElementById("cardsList");
+    if (!list) return;
+
+    running = true;
+
+    try {
+      const debts = loadJson(DEBT_KEY);
+      const txs = loadJson(TX_KEY);
+
+      // Önce her kaydı kendi tarihine göre sırala.
+      const sortedDebts = [...debts].sort((a, b) => {
+        const aInfo = getIndependentSortInfo(a, txs);
+        const bInfo = getIndependentSortInfo(b, txs);
+
+        if (aInfo.group !== bInfo.group) {
+          return aInfo.group - bInfo.group;
+        }
+
+        if (aInfo.days !== bInfo.days) {
+          return aInfo.days - bInfo.days;
+        }
+
+        return String(a.id || "").localeCompare(
+          String(b.id || "")
+        );
+      });
+
+      const orderChanged = sortedDebts.some(
+        (item, index) => item.id !== debts[index]?.id
+      );
+
+      if (orderChanged) {
+        localStorage.setItem(
+          DEBT_KEY,
+          JSON.stringify(sortedDebts)
+        );
+      }
+
+      // Ekrandaki kartlar renderMixedDebts ile localStorage sırasına göre üretiliyor.
+      // Bu yüzden isim/banka aramak yerine görünür sıra + ID kullanıyoruz.
+      const visibleCards = [
+        ...list.querySelectorAll(".bank-card")
+      ];
+
+      const effectiveDebts = orderChanged
+        ? sortedDebts
+        : debts;
+
+      visibleCards.forEach((cardEl, index) => {
+        const debt = effectiveDebts[index];
+        if (!debt) return;
+
+        cardEl.dataset.yfDebtId = debt.id || "";
+
+        // Eski yanlış rozetleri kaldır.
+        cardEl
+          .querySelectorAll(".yf-card-urgency-badge")
+          .forEach(el => el.remove());
+
+        addIndependentBadge(cardEl, debt, txs);
+      });
+
+      // Eğer DOM eski sıradaysa ID'ye göre fiziksel olarak da sırala.
+      const byId = new Map(
+        visibleCards.map(card => [
+          card.dataset.yfDebtId,
+          card
+        ])
+      );
+
+      effectiveDebts.forEach(debt => {
+        const cardEl = byId.get(debt.id);
+        if (cardEl) {
+          list.appendChild(cardEl);
+        }
+      });
+    } finally {
+      running = false;
+    }
+  }
+
+  function getIndependentSortInfo(item, txs) {
+    if (Number(item.debt || 0) <= 0) {
+      return {
+        group: 9,
+        days: 999999
+      };
+    }
+
+    if (item.type === "personal-loan") {
+      return {
+        group: 2,
+        days: daysLeft(
+          item.nextPaymentDate || item.dueDate
+        )
+      };
+    }
+
+    const minimum = getMinimumInfo(item, txs);
+
+    if (minimum.remaining > 0) {
+      return {
+        group: 1,
+        days: daysLeft(item.dueDate)
+      };
+    }
+
+    return {
+      group: 3,
+      days: daysLeft(item.dueDate)
+    };
+  }
+
+  function addIndependentBadge(cardEl, debt, txs) {
+    if (Number(debt.debt || 0) <= 0) return;
+
+    const badge = document.createElement("span");
+    badge.className = "yf-card-urgency-badge";
+
+    if (debt.type === "personal-loan") {
+      const paymentDate =
+        debt.nextPaymentDate || debt.dueDate;
+
+      const days = daysLeft(paymentDate);
+
+      badge.textContent = loanBadgeText(days);
+      badge.classList.add(urgencyClass(days));
+    } else {
+      const minimum = getMinimumInfo(debt, txs);
+
+      if (minimum.remaining <= 0) {
+        badge.textContent = "Asgari ödendi ✓";
+        badge.classList.add("paid");
+      } else {
+        const days = daysLeft(debt.dueDate);
+
+        badge.textContent = cardBadgeText(days);
+        badge.classList.add(urgencyClass(days));
+      }
+    }
+
+    const header =
+      cardEl.querySelector(".bank-card-header") ||
+      cardEl.firstElementChild;
+
+    header?.insertAdjacentElement(
+      "afterend",
+      badge
+    );
+  }
+
+  function getMinimumInfo(card, txs) {
+    const statementDebt = Math.max(
+      0,
+      Number(
+        card.statementDebt !== undefined
+          ? card.statementDebt
+          : card.debt || 0
+      )
+    );
+
+    const minimum = roundMoney(
+      statementDebt * 0.20
+    );
+
+    const cycle =
+      card.statementCycle ||
+      cycleKey(card.dueDate);
+
+    const paid = roundMoney(
+      txs
+        .filter(tx => {
+          if (
+            tx.type !== "card-payment" ||
+            tx.cardId !== card.id
+          ) {
+            return false;
+          }
+
+          if (tx.statementCycle) {
+            return tx.statementCycle === cycle;
+          }
+
+          return isSameMonth(
+            tx.createdAt || tx.date,
+            card.dueDate
+          );
+        })
+        .reduce(
+          (sum, tx) =>
+            sum + Number(tx.amount || 0),
+          0
+        )
+    );
+
+    return {
+      minimum,
+      paid,
+      remaining: roundMoney(
+        Math.max(0, minimum - paid)
+      )
+    };
+  }
+
+  function loanBadgeText(days) {
+    if (days === 999999) return "Taksit tarihi yok";
+    if (days < 0) {
+      return `Taksit ${Math.abs(days)} gün gecikti`;
+    }
+    if (days === 0) return "Taksit bugün";
+    if (days === 1) return "Taksit yarın";
+    return `Taksit ${days} gün sonra`;
+  }
+
+  function cardBadgeText(days) {
+    if (days === 999999) return "Son ödeme tarihi yok";
+    if (days < 0) {
+      return `Asgari ${Math.abs(days)} gün gecikti`;
+    }
+    if (days === 0) return "Asgari bugün";
+    if (days === 1) return "Asgari yarın";
+    return `Asgari ${days} gün sonra`;
+  }
+
+  function urgencyClass(days) {
+    if (days < 0) return "overdue";
+    if (days <= 1) return "today";
+    if (days <= 7) return "warning";
+    return "upcoming";
+  }
+
+  function daysLeft(value) {
+    if (!value) return 999999;
+
+    const date = new Date(
+      String(value).includes("T")
+        ? value
+        : `${value}T00:00:00`
+    );
+
+    if (Number.isNaN(date.getTime())) {
+      return 999999;
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    date.setHours(0, 0, 0, 0);
+
+    return Math.ceil(
+      (date - today) / 86400000
+    );
+  }
+
+  function cycleKey(value) {
+    const match = String(value || "").match(
+      /^(\d{4})-(\d{2})/
+    );
+
+    if (match) {
+      return `${match[1]}-${match[2]}`;
+    }
+
+    return "";
+  }
+
+  function isSameMonth(firstValue, secondValue) {
+    if (!firstValue || !secondValue) return false;
+
+    const first = new Date(
+      String(firstValue).includes("T")
+        ? firstValue
+        : `${firstValue}T12:00:00`
+    );
+
+    const second = new Date(
+      String(secondValue).includes("T")
+        ? secondValue
+        : `${secondValue}T12:00:00`
+    );
+
+    if (
+      Number.isNaN(first.getTime()) ||
+      Number.isNaN(second.getTime())
+    ) {
+      return false;
+    }
+
+    return (
+      first.getMonth() === second.getMonth() &&
+      first.getFullYear() === second.getFullYear()
+    );
+  }
+
+  function roundMoney(value) {
+    return Math.round(
+      (Number(value) + Number.EPSILON) * 100
+    ) / 100;
+  }
+});
