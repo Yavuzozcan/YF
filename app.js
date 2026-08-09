@@ -9219,6 +9219,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }, true);
   }
 });
+
 // =========================================
 // YF v3.8 — Borç Geçmişi + Geliri Varlıklara Yansıt
 // app.js dosyasının EN ALTINA eklenir.
@@ -9657,6 +9658,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.head.appendChild(style);
   }
 });
+
 // =========================================
 // YF v3.9 — Kartları Ödeme Aciliyetine Göre Sırala
 // app.js dosyasının EN ALTINA eklenir.
@@ -10135,3 +10137,510 @@ document.addEventListener("DOMContentLoaded", () => {
   }, 300);
 });
 
+// =========================================
+// YF v4.0 — Otomatik Ekstre / Son Ödeme Döngüsü
+// Kart asgarisi tamamlanınca dönem bir ay ileri alınır.
+// =========================================
+
+document.addEventListener("DOMContentLoaded", () => {
+  const DEBT_KEY = "yf_cards_v1";
+  const TX_KEY = "yf_transactions_v1";
+  const MINIMUM_RATE = 0.20;
+
+  let midnightTimer = null;
+
+  normalizeFixedDays();
+  checkCardCycleRollovers();
+  refreshCardDateCountdowns();
+  scheduleMidnightRefresh();
+
+  document.addEventListener("click", event => {
+    const pageButton = event.target.closest("[data-page]");
+    if (!pageButton) return;
+
+    setTimeout(() => {
+      checkCardCycleRollovers();
+      refreshCardDateCountdowns();
+    }, 250);
+  });
+
+  document
+    .getElementById("debtPaymentForm")
+    ?.addEventListener("submit", () => {
+      // Ödeme kaydı diğer kodlar tarafından oluşturulduktan sonra kontrol et.
+      setTimeout(() => {
+        checkCardCycleRollovers();
+        refreshCardDateCountdowns();
+      }, 450);
+
+      setTimeout(() => {
+        checkCardCycleRollovers();
+        refreshCardDateCountdowns();
+      }, 1200);
+    });
+
+  window.addEventListener("storage", () => {
+    checkCardCycleRollovers();
+    refreshCardDateCountdowns();
+  });
+
+  window.addEventListener("pageshow", () => {
+    checkCardCycleRollovers();
+    refreshCardDateCountdowns();
+    scheduleMidnightRefresh();
+  });
+
+  window.addEventListener("yf-refresh-dashboard", () => {
+    checkCardCycleRollovers();
+    refreshCardDateCountdowns();
+  });
+
+  function normalizeFixedDays() {
+    const debts = loadJson(DEBT_KEY);
+    let changed = false;
+
+    debts.forEach(card => {
+      if (card.type === "personal-loan") return;
+
+      const statementDay = dayOf(card.statementDate);
+      const dueDay = dayOf(card.dueDate);
+
+      if (statementDay && card.statementDay !== statementDay) {
+        card.statementDay = statementDay;
+        changed = true;
+      }
+
+      if (dueDay && card.dueDay !== dueDay) {
+        card.dueDay = dueDay;
+        changed = true;
+      }
+    });
+
+    if (changed) saveJson(DEBT_KEY, debts);
+  }
+
+  function checkCardCycleRollovers() {
+    const debts = loadJson(DEBT_KEY);
+    const transactions = loadJson(TX_KEY);
+
+    let changed = false;
+
+    debts.forEach(card => {
+      if (card.type === "personal-loan") return;
+      if (!card.statementDate || !card.dueDate) return;
+
+      const oldCycle =
+        card.statementCycle || cycleKey(card.dueDate);
+
+      const statementDebt = Math.max(
+        0,
+        Number(
+          card.statementDebt !== undefined
+            ? card.statementDebt
+            : card.debt || 0
+        )
+      );
+
+      const minimum = roundMoney(
+        statementDebt * MINIMUM_RATE
+      );
+
+      // Borç/ekstre yoksa otomatik dönem atlama yapma.
+      if (minimum <= 0) return;
+
+      const paid = roundMoney(
+        transactions
+          .filter(tx => {
+            if (
+              tx.type !== "card-payment" ||
+              tx.cardId !== card.id
+            ) {
+              return false;
+            }
+
+            if (tx.statementCycle) {
+              return tx.statementCycle === oldCycle;
+            }
+
+            // Eski işlemlerde dönem bilgisi yoksa,
+            // ödemenin mevcut son ödeme ayına yakınlığını kullan.
+            return isPaymentForCycle(
+              tx.createdAt || tx.date,
+              card.statementDate,
+              card.dueDate
+            );
+          })
+          .reduce(
+            (sum, tx) => sum + Number(tx.amount || 0),
+            0
+          )
+      );
+
+      if (paid + 0.009 < minimum) return;
+
+      // Aynı dönem ikinci kez ileri alınmasın.
+      if (card.lastAutoRolledCycle === oldCycle) return;
+
+      const oldStatementDate = card.statementDate;
+      const oldDueDate = card.dueDate;
+
+      const nextStatementDate = addOneMonthFixedDay(
+        oldStatementDate,
+        Number(card.statementDay || dayOf(oldStatementDate))
+      );
+
+      const nextDueDate = addOneMonthFixedDay(
+        oldDueDate,
+        Number(card.dueDay || dayOf(oldDueDate))
+      );
+
+      if (!nextStatementDate || !nextDueDate) return;
+
+      // Dönem bilgisiz eski ödeme kayıtlarını eski döneme sabitle.
+      transactions.forEach(tx => {
+        if (
+          tx.type === "card-payment" &&
+          tx.cardId === card.id &&
+          !tx.statementCycle &&
+          isPaymentForCycle(
+            tx.createdAt || tx.date,
+            oldStatementDate,
+            oldDueDate
+          )
+        ) {
+          tx.statementCycle = oldCycle;
+        }
+      });
+
+      card.lastAutoRolledCycle = oldCycle;
+      card.statementDate = nextStatementDate;
+      card.dueDate = nextDueDate;
+      card.statementCycle = cycleKey(nextDueDate);
+
+      // Yeni dönem başlangıç borcu: ödeme sonrası güncel kalan borç.
+      card.statementDebt = roundMoney(
+        Math.max(0, Number(card.debt || 0))
+      );
+
+      card.updatedAt = new Date().toISOString();
+      changed = true;
+    });
+
+    if (changed) {
+      saveJson(DEBT_KEY, debts);
+      saveJson(TX_KEY, transactions);
+
+      window.dispatchEvent(
+        new CustomEvent("yf-refresh-payment-cards")
+      );
+
+      window.dispatchEvent(
+        new CustomEvent("yf-refresh-upcoming-payments")
+      );
+
+      setTimeout(refreshCardDateCountdowns, 120);
+    }
+  }
+
+  function refreshCardDateCountdowns() {
+    const list = document.getElementById("cardsList");
+    if (!list) return;
+
+    const debts = loadJson(DEBT_KEY).filter(
+      item => item.type !== "personal-loan"
+    );
+
+    const cardElements = [
+      ...list.querySelectorAll(".bank-card")
+    ];
+
+    cardElements.forEach(cardElement => {
+      cardElement
+        .querySelector(".yf-cycle-countdown")
+        ?.remove();
+
+      const text = String(cardElement.textContent || "")
+        .toLocaleLowerCase("tr-TR");
+
+      const card = debts.find(item => {
+        const bank = String(item.bank || "")
+          .toLocaleLowerCase("tr-TR");
+
+        const name = String(item.name || "")
+          .toLocaleLowerCase("tr-TR");
+
+        return text.includes(bank) && text.includes(name);
+      });
+
+      if (!card) return;
+      if (!card.statementDate || !card.dueDate) return;
+
+      const statementDays = daysLeft(card.statementDate);
+      const dueDays = daysLeft(card.dueDate);
+
+      const box = document.createElement("div");
+      box.className = "yf-cycle-countdown";
+
+      box.innerHTML = `
+        <div>
+          <span>Ekstre Kesimi</span>
+          <strong>${escapeHtml(
+            countdownText(statementDays, "ekstre")
+          )}</strong>
+        </div>
+
+        <div>
+          <span>Son Ödeme</span>
+          <strong class="${dueClass(dueDays)}">${escapeHtml(
+            countdownText(dueDays, "ödeme")
+          )}</strong>
+        </div>
+      `;
+
+      const dates =
+        cardElement.querySelector(".bank-card-dates");
+
+      if (dates) {
+        dates.insertAdjacentElement("beforebegin", box);
+      } else {
+        cardElement.appendChild(box);
+      }
+    });
+
+    installStyles();
+  }
+
+  function countdownText(days, type) {
+    if (days === 999999) return "Tarih yok";
+
+    if (days < 0) {
+      return type === "ödeme"
+        ? `${Math.abs(days)} gün geçti`
+        : `${Math.abs(days)} gün önce kesildi`;
+    }
+
+    if (days === 0) {
+      return type === "ödeme"
+        ? "Bugün son gün"
+        : "Bugün kesiliyor";
+    }
+
+    if (days === 1) return "Yarın";
+
+    return `${days} gün kaldı`;
+  }
+
+  function dueClass(days) {
+    if (days < 0) return "overdue";
+    if (days <= 2) return "urgent";
+    if (days <= 7) return "warning";
+    return "";
+  }
+
+  function isPaymentForCycle(value, statementDate, dueDate) {
+    const payment = parseDate(value);
+    const statement = parseDate(statementDate);
+    const due = parseDate(dueDate);
+
+    if (!payment || !statement || !due) return false;
+
+    // Ekstre kesiminden 7 gün öncesinden son ödeme gününün
+    // 7 gün sonrasına kadar yapılan ödeme bu döneme ait kabul edilir.
+    const start = new Date(statement);
+    start.setDate(start.getDate() - 7);
+    start.setHours(0, 0, 0, 0);
+
+    const end = new Date(due);
+    end.setDate(end.getDate() + 7);
+    end.setHours(23, 59, 59, 999);
+
+    return payment >= start && payment <= end;
+  }
+
+  function addOneMonthFixedDay(value, fixedDay) {
+    const date = parseDate(value);
+    if (!date) return "";
+
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+
+    const targetYear =
+      month > 11 ? year + 1 : year;
+
+    const targetMonth =
+      month > 11 ? 0 : month;
+
+    const lastDay = new Date(
+      targetYear,
+      targetMonth + 1,
+      0
+    ).getDate();
+
+    const day = Math.min(
+      Math.max(1, Number(fixedDay || date.getDate())),
+      lastDay
+    );
+
+    return [
+      targetYear,
+      String(targetMonth + 1).padStart(2, "0"),
+      String(day).padStart(2, "0")
+    ].join("-");
+  }
+
+  function daysLeft(value) {
+    const date = parseDate(value);
+    if (!date) return 999999;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    date.setHours(0, 0, 0, 0);
+
+    return Math.ceil(
+      (date - today) / 86400000
+    );
+  }
+
+  function dayOf(value) {
+    const date = parseDate(value);
+    return date ? date.getDate() : 0;
+  }
+
+  function parseDate(value) {
+    if (!value) return null;
+
+    const date = new Date(
+      String(value).includes("T")
+        ? value
+        : `${value}T12:00:00`
+    );
+
+    return Number.isNaN(date.getTime())
+      ? null
+      : date;
+  }
+
+  function cycleKey(value) {
+    const match = String(value || "").match(
+      /^(\d{4})-(\d{2})/
+    );
+
+    if (match) {
+      return `${match[1]}-${match[2]}`;
+    }
+
+    return "";
+  }
+
+  function roundMoney(value) {
+    return Math.round(
+      (Number(value) + Number.EPSILON) * 100
+    ) / 100;
+  }
+
+  function loadJson(key) {
+    try {
+      return JSON.parse(
+        localStorage.getItem(key) || "[]"
+      );
+    } catch {
+      return [];
+    }
+  }
+
+  function saveJson(key, value) {
+    localStorage.setItem(
+      key,
+      JSON.stringify(value)
+    );
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function scheduleMidnightRefresh() {
+    if (midnightTimer) {
+      clearTimeout(midnightTimer);
+    }
+
+    const now = new Date();
+    const next = new Date(now);
+
+    next.setHours(24, 0, 2, 0);
+
+    midnightTimer = setTimeout(() => {
+      checkCardCycleRollovers();
+      refreshCardDateCountdowns();
+      scheduleMidnightRefresh();
+    }, Math.max(1000, next - now));
+  }
+
+  function installStyles() {
+    if (
+      document.getElementById(
+        "yfAutoCycleStyles"
+      )
+    ) {
+      return;
+    }
+
+    const style = document.createElement("style");
+    style.id = "yfAutoCycleStyles";
+
+    style.textContent = `
+      .yf-cycle-countdown {
+        display: grid;
+        grid-template-columns: repeat(2,minmax(0,1fr));
+        gap: 9px;
+        margin: 12px 0;
+      }
+
+      .yf-cycle-countdown > div {
+        padding: 11px;
+        border: 1px solid rgba(255,255,255,.07);
+        border-radius: 13px;
+        background: rgba(255,255,255,.035);
+      }
+
+      .yf-cycle-countdown span,
+      .yf-cycle-countdown strong {
+        display: block;
+      }
+
+      .yf-cycle-countdown span {
+        color: #8fa2ba;
+        font-size: 8.5px;
+      }
+
+      .yf-cycle-countdown strong {
+        margin-top: 5px;
+        color: #72c2ff;
+        font-size: 10px;
+      }
+
+      .yf-cycle-countdown strong.warning {
+        color: #ffd073;
+      }
+
+      .yf-cycle-countdown strong.urgent,
+      .yf-cycle-countdown strong.overdue {
+        color: #ff8298;
+      }
+
+      @media(max-width:370px) {
+        .yf-cycle-countdown {
+          grid-template-columns: 1fr;
+        }
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+});
