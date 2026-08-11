@@ -15233,10 +15233,10 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // =================================================
-  // 2) SABİT BİLDİRİM MERKEZİ
+  // 2) BİLDİRİM MERKEZİ v2 — SADECE ANA SAYFA
   // =================================================
   function createFixedNotificationCenter() {
-    // Eski/yanlış bildirim elemanları varsa temizle.
+    // Eski bildirim elemanlarını temizle.
     $("yfNotificationButton")?.remove();
     $("yfNotificationLayer")?.remove();
 
@@ -15249,7 +15249,7 @@ document.addEventListener("DOMContentLoaded", () => {
     button.type = "button";
 
     button.className =
-      "yf-v51-notification-button";
+      "yf-v52-notification-button hidden";
 
     button.setAttribute(
       "aria-label",
@@ -15276,22 +15276,22 @@ document.addEventListener("DOMContentLoaded", () => {
       "yfNotificationLayer";
 
     layer.className =
-      "yf-v51-notification-layer hidden";
+      "yf-v52-notification-layer hidden";
 
     layer.innerHTML = `
       <div
-        class="yf-v51-notification-backdrop"
+        class="yf-v52-notification-backdrop"
       ></div>
 
       <section
-        class="yf-v51-notification-sheet"
+        class="yf-v52-notification-sheet"
       >
         <div
-          class="yf-v51-notification-handle"
+          class="yf-v52-notification-handle"
         ></div>
 
         <header
-          class="yf-v51-notification-header"
+          class="yf-v52-notification-header"
         >
           <div>
             <span>BİLDİRİM MERKEZİ</span>
@@ -15307,10 +15307,10 @@ document.addEventListener("DOMContentLoaded", () => {
         </header>
 
         <div
-          class="yf-v51-notification-summary"
+          class="yf-v52-notification-summary"
         >
           <div>
-            <span>Önemli</span>
+            <span>Acil</span>
             <strong
               id="yfNotificationUrgent"
             >
@@ -15337,17 +15337,20 @@ document.addEventListener("DOMContentLoaded", () => {
           </div>
         </div>
 
-        <button
-          id="yfNotificationMarkAll"
-          class="yf-v51-mark-all"
-          type="button"
+        <div
+          class="yf-v52-notification-actions"
         >
-          Tümünü okundu yap
-        </button>
+          <button
+            id="yfNotificationMarkAll"
+            type="button"
+          >
+            Tümünü okundu yap
+          </button>
+        </div>
 
         <div
           id="yfNotificationList"
-          class="yf-v51-notification-list"
+          class="yf-v52-notification-list"
         ></div>
       </section>
     `;
@@ -15357,6 +15360,10 @@ document.addEventListener("DOMContentLoaded", () => {
     button.addEventListener(
       "click",
       () => {
+        if (!isDashboardActive()) {
+          return;
+        }
+
         refreshNotifications();
 
         layer.classList.remove(
@@ -15370,7 +15377,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     layer
       .querySelector(
-        ".yf-v51-notification-backdrop"
+        ".yf-v52-notification-backdrop"
       )
       ?.addEventListener(
         "click",
@@ -15386,10 +15393,68 @@ document.addEventListener("DOMContentLoaded", () => {
     $("yfNotificationMarkAll")
       ?.addEventListener(
         "click",
-        markAllRead
+        dismissAllNotifications
       );
 
+    // Sayfa değişince zil görünürlüğünü anında kontrol et.
+    document.addEventListener(
+      "click",
+      event => {
+        const pageButton =
+          event.target.closest(
+            "[data-page]"
+          );
+
+        if (!pageButton) return;
+
+        setTimeout(
+          updateNotificationVisibility,
+          50
+        );
+
+        setTimeout(
+          updateNotificationVisibility,
+          200
+        );
+      },
+      true
+    );
+
+    updateNotificationVisibility();
     refreshNotifications();
+  }
+
+  function updateNotificationVisibility() {
+    const button =
+      $("yfNotificationButton");
+
+    if (!button) return;
+
+    const show =
+      isDashboardActive();
+
+    button.classList.toggle(
+      "hidden",
+      !show
+    );
+
+    // Başka sayfaya geçildiyse açık panel de kapanır.
+    if (!show) {
+      closeNotifications();
+    }
+  }
+
+  function isDashboardActive() {
+    const dashboard =
+      $("dashboardPage");
+
+    if (!dashboard) {
+      return false;
+    }
+
+    return dashboard.classList.contains(
+      "active"
+    );
   }
 
   function refreshNotifications() {
@@ -15398,44 +15463,44 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (!list) return;
 
-    const notifications =
-      buildNotifications();
+    updateNotificationVisibility();
 
-    const readMap =
-      loadReadMap();
+    const dismissed =
+      loadDismissedNotifications();
 
-    const enriched =
-      notifications.map(item => ({
-        ...item,
-        read:
-          Boolean(
-            readMap[item.id]
-          )
-      }));
-
-    const unread =
-      enriched.filter(
-        item => !item.read
-      );
+    const active =
+      buildNotifications()
+        .filter(
+          item =>
+            !dismissed[item.id]
+        )
+        .sort(
+          sortNotifications
+        );
 
     const urgent =
-      enriched.filter(
+      active.filter(
         item =>
-          item.kind === "overdue" ||
-          item.kind === "today" ||
-          item.kind === "tomorrow"
+          item.kind ===
+            "overdue" ||
+          item.kind ===
+            "today" ||
+          item.kind ===
+            "tomorrow"
       );
 
     const upcoming =
-      enriched.filter(
+      active.filter(
         item =>
-          item.kind === "upcoming"
+          item.kind ===
+          "upcoming"
       );
 
     const completed =
-      enriched.filter(
+      active.filter(
         item =>
-          item.kind === "completed"
+          item.kind ===
+          "completed"
       );
 
     setText(
@@ -15458,30 +15523,33 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (count) {
       count.textContent =
-        unread.length > 99
+        active.length > 99
           ? "99+"
-          : String(unread.length);
+          : String(
+              active.length
+            );
 
       count.classList.toggle(
         "hidden",
-        unread.length === 0
+        active.length === 0
       );
     }
 
     list.innerHTML = "";
 
-    if (!enriched.length) {
+    if (!active.length) {
       list.innerHTML = `
         <div
-          class="yf-v51-notification-empty"
+          class="yf-v52-notification-empty"
         >
           <span>✓</span>
+
           <strong>
-            Şimdilik önemli bir uyarı yok
+            Bildirim yok
           </strong>
+
           <small>
-            Yaklaşan kart ve kredi
-            ödemeleri burada görünecek.
+            Şu anda okunmamış finans uyarısı bulunmuyor.
           </small>
         </div>
       `;
@@ -15489,69 +15557,85 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    enriched
-      .sort(sortNotifications)
-      .forEach(item => {
-        const row =
-          document.createElement(
-            "button"
-          );
+    active.forEach(item => {
+      const row =
+        document.createElement(
+          "article"
+        );
 
-        row.type = "button";
+      row.className =
+        `yf-v52-notification-row ${item.kind}`;
 
-        row.className =
-          `yf-v51-notification-row ` +
-          `${item.kind} ` +
-          `${item.read ? "read" : "unread"}`;
+      row.innerHTML = `
+        <span
+          class="yf-v52-notification-icon"
+        >
+          ${item.icon}
+        </span>
 
-        row.innerHTML = `
-          <span
-            class="yf-v51-notification-icon"
-          >
-            ${item.icon}
-          </span>
+        <div
+          class="yf-v52-notification-main"
+        >
+          <strong>
+            ${escapeHtml(
+              item.title
+            )}
+          </strong>
 
-          <span
-            class="yf-v51-notification-main"
-          >
-            <strong>
-              ${escapeHtml(item.title)}
-            </strong>
+          <small>
+            ${escapeHtml(
+              item.message
+            )}
+          </small>
 
-            <small>
-              ${escapeHtml(item.message)}
-            </small>
+          <em>
+            ${escapeHtml(
+              item.timeText
+            )}
+          </em>
+        </div>
 
-            <em>
-              ${escapeHtml(item.timeText)}
-            </em>
-          </span>
-
+        <div
+          class="yf-v52-notification-row-actions"
+        >
           ${
-            item.read
+            item.kind ===
+            "completed"
               ? ""
-              : '<i class="yf-v51-notification-dot"></i>'
+              : `
+                <button
+                  type="button"
+                  data-open-notification-debt="${escapeHtml(
+                    String(
+                      item.debtId
+                    )
+                  )}"
+                >
+                  Aç
+                </button>
+              `
           }
-        `;
 
-        row.addEventListener(
+          <button
+            type="button"
+            class="read"
+            data-dismiss-notification="${escapeHtml(
+              item.id
+            )}"
+          >
+            Okundu
+          </button>
+        </div>
+      `;
+
+      row
+        .querySelector(
+          "[data-open-notification-debt]"
+        )
+        ?.addEventListener(
           "click",
           () => {
-            markRead(item.id);
             closeNotifications();
-
-            if (
-              item.kind ===
-              "completed"
-            ) {
-              document
-                .querySelector(
-                  '[data-page="cardsPage"]'
-                )
-                ?.click();
-
-              return;
-            }
 
             document
               .querySelector(
@@ -15559,31 +15643,49 @@ document.addEventListener("DOMContentLoaded", () => {
               )
               ?.click();
 
-            setTimeout(() => {
-              const select =
-                $("debtPaymentCard");
+            setTimeout(
+              () => {
+                const select =
+                  $("debtPaymentCard");
 
-              if (!select) return;
+                if (!select) {
+                  return;
+                }
 
-              select.value =
-                String(
-                  item.debtId
+                select.value =
+                  String(
+                    item.debtId
+                  );
+
+                select.dispatchEvent(
+                  new Event(
+                    "change",
+                    {
+                      bubbles: true
+                    }
+                  )
                 );
-
-              select.dispatchEvent(
-                new Event(
-                  "change",
-                  {
-                    bubbles: true
-                  }
-                )
-              );
-            }, 280);
+              },
+              280
+            );
           }
         );
 
-        list.appendChild(row);
-      });
+      row
+        .querySelector(
+          "[data-dismiss-notification]"
+        )
+        ?.addEventListener(
+          "click",
+          () => {
+            dismissNotification(
+              item.id
+            );
+          }
+        );
+
+      list.appendChild(row);
+    });
   }
 
   function buildNotifications() {
@@ -15597,7 +15699,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     debts.forEach(debt => {
       if (
-        Number(debt.debt || 0) <= 0
+        Number(
+          debt.debt || 0
+        ) <= 0
       ) {
         return;
       }
@@ -15615,7 +15719,10 @@ document.addEventListener("DOMContentLoaded", () => {
         const days =
           daysLeft(date);
 
-        if (days > 14) return;
+        // Çok uzak bildirimleri gösterme.
+        if (days > 14) {
+          return;
+        }
 
         let kind =
           "upcoming";
@@ -15624,14 +15731,22 @@ document.addEventListener("DOMContentLoaded", () => {
           "Kredi taksiti yaklaşıyor";
 
         if (days < 0) {
-          kind = "overdue";
+          kind =
+            "overdue";
+
           title =
             "Kredi taksiti gecikti";
-        } else if (days === 0) {
-          kind = "today";
+        } else if (
+          days === 0
+        ) {
+          kind =
+            "today";
+
           title =
             "Kredi taksiti bugün";
-        } else if (days === 1) {
+        } else if (
+          days === 1
+        ) {
           kind =
             "tomorrow";
 
@@ -15654,7 +15769,9 @@ document.addEventListener("DOMContentLoaded", () => {
               debt.monthlyInstallment
             )}`,
           timeText:
-            timeText(days)
+            notificationTimeText(
+              days
+            )
         });
 
         return;
@@ -15666,12 +15783,20 @@ document.addEventListener("DOMContentLoaded", () => {
           transactions
         );
 
+      // Asgari tamamlandıysa bir başarı bildirimi üret.
       if (
         info.remaining <= 0
       ) {
+        const cycle =
+          debt.lastAutoRolledCycle ||
+          debt.statementCycle ||
+          cycleKey(
+            debt.dueDate
+          );
+
         result.push({
           id:
-            `paid-${debt.id}-${debt.statementCycle || ""}`,
+            `card-completed-${debt.id}-${cycle}`,
           debtId:
             debt.id,
           kind:
@@ -15689,14 +15814,20 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      if (!debt.dueDate) return;
+      if (
+        !debt.dueDate
+      ) {
+        return;
+      }
 
       const days =
         daysLeft(
           debt.dueDate
         );
 
-      if (days > 14) return;
+      if (days > 14) {
+        return;
+      }
 
       let kind =
         "upcoming";
@@ -15705,14 +15836,22 @@ document.addEventListener("DOMContentLoaded", () => {
         "Kart asgarisi yaklaşıyor";
 
       if (days < 0) {
-        kind = "overdue";
+        kind =
+          "overdue";
+
         title =
           "Kart ödemesi gecikti";
-      } else if (days === 0) {
-        kind = "today";
+      } else if (
+        days === 0
+      ) {
+        kind =
+          "today";
+
         title =
           "Kart son ödeme günü bugün";
-      } else if (days === 1) {
+      } else if (
+        days === 1
+      ) {
         kind =
           "tomorrow";
 
@@ -15735,11 +15874,106 @@ document.addEventListener("DOMContentLoaded", () => {
             info.remaining
           )} kaldı`,
         timeText:
-          timeText(days)
+          notificationTimeText(
+            days
+          )
       });
+
+      // Ekstre kesimine 3 gün kaldıysa ayrı uyarı.
+      if (
+        debt.statementDate
+      ) {
+        const statementDays =
+          daysLeft(
+            debt.statementDate
+          );
+
+        if (
+          statementDays >= 0 &&
+          statementDays <= 3
+        ) {
+          result.push({
+            id:
+              `statement-${debt.id}-${debt.statementDate}`,
+            debtId:
+              debt.id,
+            kind:
+              statementDays === 0
+                ? "today"
+                : "upcoming",
+            icon:
+              "📄",
+            title:
+              statementDays === 0
+                ? "Ekstre bugün kesiliyor"
+                : "Ekstre kesimi yaklaşıyor",
+            message:
+              `${debt.bank} · ` +
+              `${debt.name}`,
+            timeText:
+              notificationTimeText(
+                statementDays
+              )
+          });
+        }
+      }
     });
 
     return result;
+  }
+
+  function dismissNotification(
+    id
+  ) {
+    const map =
+      loadDismissedNotifications();
+
+    map[id] =
+      Date.now();
+
+    localStorage.setItem(
+      READ_KEY,
+      JSON.stringify(
+        map
+      )
+    );
+
+    // Okundu dediği anda gerçekten listeden kaldır.
+    refreshNotifications();
+  }
+
+  function dismissAllNotifications() {
+    const map =
+      loadDismissedNotifications();
+
+    buildNotifications()
+      .forEach(
+        item => {
+          map[item.id] =
+            Date.now();
+        }
+      );
+
+    localStorage.setItem(
+      READ_KEY,
+      JSON.stringify(
+        map
+      )
+    );
+
+    refreshNotifications();
+  }
+
+  function loadDismissedNotifications() {
+    try {
+      return JSON.parse(
+        localStorage.getItem(
+          READ_KEY
+        ) || "{}"
+      );
+    } catch {
+      return {};
+    }
   }
 
   function closeNotifications() {
@@ -15750,51 +15984,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     document.body.style.overflow =
       "";
-  }
-
-  function markRead(id) {
-    const map =
-      loadReadMap();
-
-    map[id] =
-      Date.now();
-
-    localStorage.setItem(
-      READ_KEY,
-      JSON.stringify(map)
-    );
-
-    refreshNotifications();
-  }
-
-  function markAllRead() {
-    const map =
-      loadReadMap();
-
-    buildNotifications()
-      .forEach(item => {
-        map[item.id] =
-          Date.now();
-      });
-
-    localStorage.setItem(
-      READ_KEY,
-      JSON.stringify(map)
-    );
-
-    refreshNotifications();
-  }
-
-  function loadReadMap() {
-    try {
-      return JSON.parse(
-        localStorage.getItem(
-          READ_KEY
-        ) || "{}"
-      );
-    } catch {
-      return {};
-    }
   }
 
   function sortNotifications(
@@ -15809,15 +15998,22 @@ document.addEventListener("DOMContentLoaded", () => {
       completed: 4
     };
 
-    return (
-      (priority[a.kind] ?? 9) -
-      (priority[b.kind] ?? 9)
-    );
+    const first =
+      priority[a.kind] ?? 9;
+
+    const second =
+      priority[b.kind] ?? 9;
+
+    return first - second;
   }
 
-  function timeText(days) {
+  function notificationTimeText(
+    days
+  ) {
     if (days < 0) {
-      return `${Math.abs(days)} gün gecikmiş`;
+      return `${Math.abs(
+        days
+      )} gün gecikmiş`;
     }
 
     if (days === 0) {
@@ -16301,6 +16497,294 @@ document.addEventListener("DOMContentLoaded", () => {
 
       body.light-theme
       .yf-v51-notification-sheet {
+        color: #102033;
+        background: #f7f9fb;
+      }
+
+      .yf-v52-notification-button {
+        position: fixed !important;
+        z-index: 9500 !important;
+        top: calc(14px + env(safe-area-inset-top));
+        right: 58px;
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid rgba(255,255,255,.11);
+        border-radius: 13px;
+        color: inherit;
+        background: rgba(14,31,45,.94);
+        box-shadow: 0 8px 25px rgba(0,0,0,.24);
+        font: inherit;
+      }
+
+      .yf-v52-notification-button.hidden {
+        display: none !important;
+      }
+
+      .yf-v52-notification-button > span {
+        font-size: 17px;
+      }
+
+      .yf-v52-notification-button > strong {
+        position: absolute;
+        top: -5px;
+        right: -5px;
+        min-width: 18px;
+        height: 18px;
+        padding: 0 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 2px solid #101b26;
+        border-radius: 999px;
+        color: #fff;
+        background: #e95c5c;
+        font-size: 8px;
+      }
+
+      .yf-v52-notification-layer {
+        position: fixed;
+        z-index: 9999;
+        inset: 0;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+      }
+
+      .yf-v52-notification-layer.hidden {
+        display: none !important;
+      }
+
+      .yf-v52-notification-backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(0,0,0,.65);
+        backdrop-filter: blur(4px);
+      }
+
+      .yf-v52-notification-sheet {
+        position: relative;
+        width: min(100%,520px);
+        max-height: 88vh;
+        overflow-y: auto;
+        padding: 10px 16px 26px;
+        border-radius: 25px 25px 0 0;
+        border: 1px solid rgba(255,255,255,.09);
+        color: #fff;
+        background: #101b26;
+        box-shadow: 0 -25px 65px rgba(0,0,0,.4);
+      }
+
+      .yf-v52-notification-handle {
+        width: 44px;
+        height: 4px;
+        margin: 0 auto 15px;
+        border-radius: 999px;
+        background: rgba(255,255,255,.16);
+      }
+
+      .yf-v52-notification-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+      }
+
+      .yf-v52-notification-header span {
+        color: #4ce0aa;
+        font-size: 8px;
+        font-weight: 900;
+        letter-spacing: .14em;
+      }
+
+      .yf-v52-notification-header h2 {
+        margin: 5px 0 0;
+        font-size: 21px;
+      }
+
+      .yf-v52-notification-header button {
+        width: 36px;
+        height: 36px;
+        border: 0;
+        border-radius: 11px;
+        color: #a8b7c7;
+        background: rgba(255,255,255,.05);
+        font-size: 21px;
+      }
+
+      .yf-v52-notification-summary {
+        display: grid;
+        grid-template-columns: repeat(3,minmax(0,1fr));
+        gap: 8px;
+        margin-top: 15px;
+      }
+
+      .yf-v52-notification-summary > div {
+        padding: 11px;
+        border-radius: 14px;
+        background: rgba(255,255,255,.035);
+      }
+
+      .yf-v52-notification-summary span,
+      .yf-v52-notification-summary strong {
+        display: block;
+      }
+
+      .yf-v52-notification-summary span {
+        color: #8295a9;
+        font-size: 8px;
+      }
+
+      .yf-v52-notification-summary strong {
+        margin-top: 5px;
+        font-size: 17px;
+      }
+
+      .yf-v52-notification-actions {
+        display: flex;
+        justify-content: flex-end;
+        margin: 11px 0 7px;
+      }
+
+      .yf-v52-notification-actions button {
+        border: 0;
+        color: #91a4b8;
+        background: transparent;
+        font-size: 8px;
+        font-weight: 800;
+      }
+
+      .yf-v52-notification-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .yf-v52-notification-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px;
+        border: 1px solid rgba(255,255,255,.07);
+        border-radius: 15px;
+        background: rgba(255,255,255,.03);
+      }
+
+      .yf-v52-notification-row.overdue {
+        border-color: rgba(233,92,92,.25);
+      }
+
+      .yf-v52-notification-row.today,
+      .yf-v52-notification-row.tomorrow {
+        border-color: rgba(255,177,72,.24);
+      }
+
+      .yf-v52-notification-row.completed {
+        border-color: rgba(76,224,170,.18);
+      }
+
+      .yf-v52-notification-icon {
+        width: 39px;
+        height: 39px;
+        flex: 0 0 39px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 12px;
+        background: rgba(255,255,255,.055);
+        font-size: 16px;
+      }
+
+      .yf-v52-notification-main {
+        min-width: 0;
+        flex: 1;
+      }
+
+      .yf-v52-notification-main strong,
+      .yf-v52-notification-main small,
+      .yf-v52-notification-main em {
+        display: block;
+      }
+
+      .yf-v52-notification-main strong {
+        font-size: 10px;
+      }
+
+      .yf-v52-notification-main small {
+        margin-top: 4px;
+        color: #94a5b7;
+        font-size: 8px;
+      }
+
+      .yf-v52-notification-main em {
+        margin-top: 5px;
+        color: #6f8498;
+        font-size: 7px;
+        font-style: normal;
+      }
+
+      .yf-v52-notification-row-actions {
+        display: grid;
+        gap: 5px;
+        flex: 0 0 auto;
+      }
+
+      .yf-v52-notification-row-actions button {
+        min-width: 52px;
+        min-height: 27px;
+        padding: 0 7px;
+        border: 1px solid rgba(72,171,255,.16);
+        border-radius: 8px;
+        color: #72c2ff;
+        background: rgba(15,140,255,.07);
+        font-size: 7px;
+        font-weight: 800;
+      }
+
+      .yf-v52-notification-row-actions button.read {
+        color: #4ce0aa;
+        border-color: rgba(43,211,154,.16);
+        background: rgba(43,211,154,.06);
+      }
+
+      .yf-v52-notification-empty {
+        padding: 28px 16px;
+        border: 1px dashed rgba(255,255,255,.09);
+        border-radius: 16px;
+        text-align: center;
+      }
+
+      .yf-v52-notification-empty span,
+      .yf-v52-notification-empty strong,
+      .yf-v52-notification-empty small {
+        display: block;
+      }
+
+      .yf-v52-notification-empty span {
+        font-size: 20px;
+      }
+
+      .yf-v52-notification-empty strong {
+        margin-top: 8px;
+        font-size: 11px;
+      }
+
+      .yf-v52-notification-empty small {
+        margin-top: 6px;
+        color: #8295a9;
+        font-size: 8px;
+      }
+
+      body.light-theme
+      .yf-v52-notification-button {
+        color: #102033;
+        background: rgba(255,255,255,.96);
+        border-color: rgba(20,73,112,.10);
+      }
+
+      body.light-theme
+      .yf-v52-notification-sheet {
         color: #102033;
         background: #f7f9fb;
       }
