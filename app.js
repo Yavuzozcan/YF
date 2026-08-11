@@ -15169,520 +15169,272 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // =========================================
-// YF v5.7 — FİNANS TAKVİMİ v1.0 DÜZELTİLMİŞ
-// Gerçek side-menu-content + main.app-shell yapısına göre.
+// YF v5.8 — MEVCUT TAKVİMİ FİNANS TAKVİMİNE YÜKSELT
+// Yeni menü eklemez; çalışan Takvim menüsünü geliştirir.
 // =========================================
 document.addEventListener("DOMContentLoaded", () => {
   const CK = "yf_cards_v1";
   const TK = "yf_transactions_v1";
   const $ = id => document.getElementById(id);
 
-  let viewDate = new Date();
-  viewDate.setDate(1);
-  let selectedDate = null;
-
-  installStyles();
-  createMenuItem();
-  createPage();
+  upgradeCalendarMenu();
+  upgradeCalendarPage();
 
   document.addEventListener("click", event => {
-    const menuBtn = event.target.closest("#financeCalendarMenuButton");
-    if (!menuBtn) return;
+    const calendarButton =
+      event.target.closest('[data-page="calendarPage"]');
 
-    event.preventDefault();
-    event.stopPropagation();
-    event.stopImmediatePropagation();
+    if (!calendarButton) return;
 
-    showFinanceCalendar();
+    setTimeout(() => {
+      upgradeCalendarMenu();
+      upgradeCalendarPage();
+      refreshFinanceSummary();
+    }, 120);
   }, true);
 
   window.addEventListener("storage", () => {
-    if ($("financeCalendarPage")?.classList.contains("active")) {
-      render();
-    }
+    refreshFinanceSummary();
   });
 
-  function createMenuItem() {
-    if ($("financeCalendarMenuButton")) return;
+  window.addEventListener("pageshow", () => {
+    upgradeCalendarMenu();
+    upgradeCalendarPage();
+    refreshFinanceSummary();
+  });
 
-    const menu =
-      document.querySelector(".side-menu-content") ||
-      document.querySelector(".side-menu");
+  function upgradeCalendarMenu() {
+    const button =
+      document.querySelector('[data-page="calendarPage"]');
 
-    if (!menu) return;
+    if (!button) return;
 
-    const existingCalendar =
-      document.querySelector('.side-menu-item[data-page="calendarPage"]');
+    const icon =
+      button.querySelector(".side-menu-icon");
 
-    const btn = document.createElement("button");
-    btn.id = "financeCalendarMenuButton";
-    btn.type = "button";
-    btn.className = "side-menu-item";
+    const labels =
+      [...button.querySelectorAll("span")];
 
-    btn.innerHTML = `
-      <span class="side-menu-icon">🗓️</span>
-      <span>Finans Takvimi</span>
-    `;
+    if (icon) {
+      icon.textContent = "🗓️";
+    }
 
-    if (existingCalendar) {
-      existingCalendar.insertAdjacentElement("afterend", btn);
-    } else {
-      menu.appendChild(btn);
+    const label =
+      labels.find(span =>
+        !span.classList.contains("side-menu-icon")
+      );
+
+    if (label) {
+      label.textContent = "Finans Takvimi";
     }
   }
 
-  function createPage() {
-    if ($("financeCalendarPage")) return;
+  function upgradeCalendarPage() {
+    const page = $("calendarPage");
+    if (!page) return;
 
-    const main = document.querySelector("main.app-shell");
-    if (!main) return;
+    const eyebrow =
+      page.querySelector(".top-header .eyebrow");
 
-    const page = document.createElement("section");
-    page.id = "financeCalendarPage";
-    page.className = "page";
+    const title =
+      page.querySelector(".top-header h1");
 
-    page.innerHTML = `
-      <header class="top-header yf-finance-calendar-header">
-        <div>
-          <p class="eyebrow">Finans Merkezi</p>
-          <h1>Finans Takvimi</h1>
-        </div>
+    if (eyebrow) {
+      eyebrow.textContent = "FİNANS MERKEZİ";
+    }
 
-        <button
-          id="financeCalendarHomeButton"
-          class="reports-back-button"
-          type="button"
-        >
-          Ana Sayfa
-        </button>
-      </header>
+    if (title) {
+      title.textContent = "Finans Takvimi";
+    }
 
-      <section class="yf-finance-month-summary">
+    if (!$("financeCalendarSummaryV58")) {
+      const existingSummary =
+        page.querySelector(".calendar-summary-grid");
+
+      if (existingSummary) {
+        existingSummary.style.display = "none";
+      }
+
+      const summary =
+        document.createElement("section");
+
+      summary.id =
+        "financeCalendarSummaryV58";
+
+      summary.className =
+        "yf-v58-finance-summary";
+
+      summary.innerHTML = `
         <article>
           <span>Planlanan</span>
-          <strong id="financeCalendarPlanned">₺0,00</strong>
+          <strong id="yfV58Planned">₺0,00</strong>
+          <small>Bu ay kart + kredi</small>
         </article>
 
         <article>
           <span>Ödenen</span>
-          <strong id="financeCalendarPaid">₺0,00</strong>
+          <strong id="yfV58Paid">₺0,00</strong>
+          <small>Bu ay yapılan ödeme</small>
         </article>
 
         <article>
           <span>Kalan</span>
-          <strong id="financeCalendarRemaining">₺0,00</strong>
+          <strong id="yfV58Remaining">₺0,00</strong>
+          <small>Ay sonuna kadar</small>
         </article>
-      </section>
+      `;
 
-      <section class="yf-finance-calendar-card">
-        <div class="yf-finance-calendar-nav">
-          <button id="financeCalendarPrev" type="button">‹</button>
+      const header =
+        page.querySelector(".top-header");
 
-          <div>
-            <small>AYLIK GÖRÜNÜM</small>
-            <strong id="financeCalendarMonthLabel">—</strong>
-          </div>
-
-          <button id="financeCalendarNext" type="button">›</button>
-        </div>
-
-        <div class="yf-finance-weekdays">
-          <span>Pzt</span>
-          <span>Sal</span>
-          <span>Çar</span>
-          <span>Per</span>
-          <span>Cum</span>
-          <span>Cmt</span>
-          <span>Paz</span>
-        </div>
-
-        <div id="financeCalendarGrid" class="yf-finance-calendar-grid"></div>
-      </section>
-
-      <div class="yf-finance-calendar-legend">
-        <span><i class="income"></i>Gelir</span>
-        <span><i class="payment"></i>Ödeme</span>
-        <span><i class="statement"></i>Ekstre</span>
-        <span><i class="overdue"></i>Gecikmiş</span>
-      </div>
-
-      <section class="yf-finance-day-detail">
-        <div class="yf-finance-day-detail-head">
-          <div>
-            <small>GÜN DETAYI</small>
-            <h2 id="financeCalendarDayTitle">Bir gün seç</h2>
-          </div>
-
-          <strong id="financeCalendarDayNet">—</strong>
-        </div>
-
-        <div id="financeCalendarDayList">
-          <div class="empty-state">Takvimden bir güne dokun.</div>
-        </div>
-      </section>
-    `;
-
-    main.appendChild(page);
-
-    $("financeCalendarHomeButton")?.addEventListener("click", () => {
-      document.querySelector('[data-page="dashboardPage"]')?.click();
-    });
-
-    $("financeCalendarPrev")?.addEventListener("click", () => {
-      viewDate.setMonth(viewDate.getMonth() - 1);
-      selectedDate = null;
-      render();
-    });
-
-    $("financeCalendarNext")?.addEventListener("click", () => {
-      viewDate.setMonth(viewDate.getMonth() + 1);
-      selectedDate = null;
-      render();
-    });
-  }
-
-  function showFinanceCalendar() {
-    document
-      .querySelectorAll(".page")
-      .forEach(page => {
-        page.classList.toggle(
-          "active",
-          page.id === "financeCalendarPage"
-        );
-      });
-
-    document
-      .querySelectorAll(".bottom-navigation .nav-item")
-      .forEach(item => {
-        item.classList.remove("active");
-      });
-
-    const layer = $("sideMenuLayer");
-    layer?.classList.remove("open");
-    layer?.setAttribute("aria-hidden", "true");
-
-    document.body.style.overflow = "";
-    document.documentElement.style.overflow = "";
-
-    localStorage.setItem(
-      "yf_last_open_page_v1",
-      "financeCalendarPage"
-    );
-
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth"
-    });
-
-    render();
-  }
-
-  function render() {
-    const year = viewDate.getFullYear();
-    const month = viewDate.getMonth();
-
-    const monthLabel =
-      new Intl.DateTimeFormat(
-        "tr-TR",
-        {
-          month: "long",
-          year: "numeric"
-        }
-      ).format(viewDate);
-
-    setText(
-      "financeCalendarMonthLabel",
-      capitalize(monthLabel)
-    );
-
-    const events = buildEvents(year, month);
-
-    renderSummary(events);
-    renderGrid(year, month, events);
-
-    if (
-      selectedDate &&
-      selectedDate.getFullYear() === year &&
-      selectedDate.getMonth() === month
-    ) {
-      renderDayDetail(
-        selectedDate,
-        events
+      header?.insertAdjacentElement(
+        "afterend",
+        summary
       );
-    } else {
-      setText(
-        "financeCalendarDayTitle",
-        "Bir gün seç"
-      );
-
-      setText(
-        "financeCalendarDayNet",
-        "—"
-      );
-
-      const list =
-        $("financeCalendarDayList");
-
-      if (list) {
-        list.innerHTML =
-          '<div class="empty-state">Takvimden bir güne dokun.</div>';
-      }
     }
+
+    if (!$("yfV58FinanceInfo")) {
+      const info =
+        document.createElement("section");
+
+      info.id =
+        "yfV58FinanceInfo";
+
+      info.className =
+        "content-card yf-v58-finance-info";
+
+      info.innerHTML = `
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">TAKVİMDE NELER VAR?</p>
+            <h2>Finans hareketleri</h2>
+          </div>
+        </div>
+
+        <div class="yf-v58-info-grid">
+          <span>💳 Kart son ödemeleri</span>
+          <span>📄 Ekstre kesimleri</span>
+          <span>🏦 Kredi taksitleri</span>
+          <span>💵 Gelir ve maaş</span>
+          <span>✓ Yapılan ödemeler</span>
+        </div>
+      `;
+
+      const mainCard =
+        page.querySelector(".calendar-main-card");
+
+      mainCard?.insertAdjacentElement(
+        "beforebegin",
+        info
+      );
+    }
+
+    refreshFinanceSummary();
   }
 
-  function buildEvents(year, month) {
+  function refreshFinanceSummary() {
+    const page = $("calendarPage");
+    if (!page) return;
+
+    const monthTitle =
+      $("calendarMonthTitle")?.textContent || "";
+
+    const target =
+      parseTurkishMonthLabel(monthTitle);
+
+    if (!target) {
+      return;
+    }
+
     const debts = load(CK);
-    const txs = load(TK);
-    const events = [];
+    const transactions = load(TK);
+
+    let planned = 0;
+    let paid = 0;
 
     debts.forEach(debt => {
-      if (
-        Number(debt.debt || 0) <= 0
-      ) {
-        return;
-      }
+      if (Number(debt.debt || 0) <= 0) return;
 
-      if (
-        debt.type === "personal-loan"
-      ) {
+      if (debt.type === "personal-loan") {
         const date =
           parseDate(
             debt.nextPaymentDate ||
             debt.dueDate
           );
 
-        if (inMonth(date, year, month)) {
-          events.push({
-            date,
-            kind:
-              date < today()
-                ? "overdue"
-                : "payment",
-            debtId: debt.id,
-            title:
-              `${debt.bank} · ${debt.name}`,
-            subtitle:
-              "İhtiyaç kredisi taksiti",
-            amount:
-              Math.min(
-                Number(
-                  debt.monthlyInstallment ||
-                  0
-                ),
-                Number(debt.debt || 0)
-              ),
-            direction: -1,
-            actionable: true,
-            planned: true
-          });
+        if (
+          date &&
+          date.getFullYear() === target.year &&
+          date.getMonth() === target.month
+        ) {
+          planned += Math.min(
+            Number(debt.monthlyInstallment || 0),
+            Number(debt.debt || 0)
+          );
         }
 
         return;
-      }
-
-      const statement =
-        parseDate(debt.statementDate);
-
-      if (
-        inMonth(
-          statement,
-          year,
-          month
-        )
-      ) {
-        events.push({
-          date: statement,
-          kind: "statement",
-          debtId: debt.id,
-          title:
-            `${debt.bank} · ${debt.name}`,
-          subtitle:
-            "Ekstre kesim günü",
-          amount: 0,
-          direction: 0,
-          actionable: false
-        });
       }
 
       const due =
         parseDate(debt.dueDate);
 
       if (
-        inMonth(
-          due,
-          year,
-          month
-        )
+        due &&
+        due.getFullYear() === target.year &&
+        due.getMonth() === target.month
       ) {
         const statementDebt =
           Math.max(
             0,
             Number(
-              debt.statementDebt !==
-              undefined
+              debt.statementDebt !== undefined
                 ? debt.statementDebt
                 : debt.debt || 0
             )
           );
 
-        const minimum =
+        planned +=
           statementDebt * 0.20;
-
-        events.push({
-          date: due,
-          kind:
-            due < today()
-              ? "overdue"
-              : "payment",
-          debtId: debt.id,
-          title:
-            `${debt.bank} · ${debt.name}`,
-          subtitle:
-            "Kart son ödeme · Asgari",
-          amount:
-            minimum,
-          direction: -1,
-          actionable: true,
-          planned: true
-        });
       }
     });
 
-    txs.forEach(tx => {
+    transactions.forEach(tx => {
       const date =
         parseDate(
-          tx.date ||
-          tx.createdAt
+          tx.createdAt ||
+          tx.date
         );
 
       if (
-        !inMonth(
-          date,
-          year,
-          month
-        )
+        !date ||
+        date.getFullYear() !== target.year ||
+        date.getMonth() !== target.month
       ) {
         return;
       }
 
-      const amount =
-        Number(tx.amount || 0);
-
       if (
-        tx.type === "income"
-      ) {
-        events.push({
-          date,
-          kind: "income",
-          title:
-            tx.name ||
-            tx.category ||
-            "Gelir",
-          subtitle: "Gelir",
-          amount,
-          direction: 1,
-          transaction: true
-        });
-      }
-
-      if (
-        tx.type === "card-payment"
-      ) {
-        const card =
-          debts.find(
-            item =>
-              String(item.id) ===
-              String(tx.cardId)
-          );
-
-        events.push({
-          date,
-          kind: "paid",
-          title:
-            card
-              ? `${card.bank} · ${card.name}`
-              : "Kredi kartı ödemesi",
-          subtitle:
-            "Kart ödemesi yapıldı",
-          amount,
-          direction: -1,
-          transaction: true
-        });
-      }
-
-      if (
+        tx.type === "card-payment" ||
         tx.type === "loan-payment"
       ) {
-        const loan =
-          debts.find(
-            item =>
-              String(item.id) ===
-              String(tx.cardId)
-          );
-
-        events.push({
-          date,
-          kind: "paid",
-          title:
-            loan
-              ? `${loan.bank} · ${loan.name}`
-              : "Kredi ödemesi",
-          subtitle:
-            "Kredi taksiti ödendi",
-          amount,
-          direction: -1,
-          transaction: true
-        });
+        paid +=
+          Number(tx.amount || 0);
       }
     });
 
-    return events;
-  }
-
-  function renderSummary(events) {
-    const planned =
-      events
-        .filter(
-          event =>
-            event.planned
-        )
-        .reduce(
-          (sum, event) =>
-            sum +
-            Number(
-              event.amount || 0
-            ),
-          0
-        );
-
-    const paid =
-      events
-        .filter(
-          event =>
-            event.transaction &&
-            event.kind === "paid"
-        )
-        .reduce(
-          (sum, event) =>
-            sum +
-            Number(
-              event.amount || 0
-            ),
-          0
-        );
-
     setText(
-      "financeCalendarPlanned",
+      "yfV58Planned",
       money(planned)
     );
 
     setText(
-      "financeCalendarPaid",
+      "yfV58Paid",
       money(paid)
     );
 
     setText(
-      "financeCalendarRemaining",
+      "yfV58Remaining",
       money(
         Math.max(
           0,
@@ -15692,372 +15444,56 @@ document.addEventListener("DOMContentLoaded", () => {
     );
   }
 
-  function renderGrid(
-    year,
-    month,
-    events
-  ) {
-    const grid =
-      $("financeCalendarGrid");
+  function parseTurkishMonthLabel(value) {
+    const text =
+      String(value || "")
+        .trim()
+        .toLocaleLowerCase("tr-TR");
 
-    if (!grid) return;
+    const months = {
+      ocak: 0,
+      şubat: 1,
+      mart: 2,
+      nisan: 3,
+      mayıs: 4,
+      haziran: 5,
+      temmuz: 6,
+      ağustos: 7,
+      eylül: 8,
+      ekim: 9,
+      kasım: 10,
+      aralık: 11
+    };
 
-    grid.innerHTML = "";
+    for (
+      const [name, month]
+      of Object.entries(months)
+    ) {
+      if (!text.includes(name)) {
+        continue;
+      }
 
-    const first =
-      new Date(
-        year,
+      const yearMatch =
+        text.match(/\b(20\d{2})\b/);
+
+      return {
         month,
-        1
-      );
-
-    const daysInMonth =
-      new Date(
-        year,
-        month + 1,
-        0
-      ).getDate();
-
-    const offset =
-      (first.getDay() + 6) % 7;
-
-    for (
-      let i = 0;
-      i < offset;
-      i++
-    ) {
-      const blank =
-        document.createElement(
-          "div"
-        );
-
-      blank.className =
-        "yf-finance-calendar-cell blank";
-
-      grid.appendChild(blank);
+        year:
+          yearMatch
+            ? Number(yearMatch[1])
+            : new Date().getFullYear()
+      };
     }
 
-    for (
-      let day = 1;
-      day <= daysInMonth;
-      day++
-    ) {
-      const date =
-        new Date(
-          year,
-          month,
-          day
-        );
-
-      const dayEvents =
-        events.filter(
-          event =>
-            sameDay(
-              event.date,
-              date
-            )
-        );
-
-      const cell =
-        document.createElement(
-          "button"
-        );
-
-      cell.type = "button";
-      cell.className =
-        "yf-finance-calendar-cell";
-
-      if (
-        sameDay(
-          date,
-          today()
-        )
-      ) {
-        cell.classList.add(
-          "today"
-        );
-      }
-
-      if (
-        selectedDate &&
-        sameDay(
-          selectedDate,
-          date
-        )
-      ) {
-        cell.classList.add(
-          "selected"
-        );
-      }
-
-      if (
-        dayEvents.some(
-          event =>
-            event.kind ===
-            "overdue"
-        )
-      ) {
-        cell.classList.add(
-          "overdue"
-        );
-      }
-
-      const kinds =
-        [
-          ...new Set(
-            dayEvents.map(
-              event =>
-                event.kind
-            )
-          )
-        ].slice(
-          0,
-          4
-        );
-
-      cell.innerHTML = `
-        <strong>${day}</strong>
-
-        <div class="yf-finance-day-dots">
-          ${kinds
-            .map(
-              kind =>
-                `<i class="${kind}"></i>`
-            )
-            .join("")}
-        </div>
-
-        ${
-          dayEvents.length
-            ? `<small>${dayEvents.length}</small>`
-            : ""
-        }
-      `;
-
-      cell.addEventListener(
-        "click",
-        () => {
-          selectedDate =
-            date;
-
-          render();
-        }
-      );
-
-      grid.appendChild(cell);
-    }
+    return null;
   }
 
-  function renderDayDetail(
-    date,
-    events
-  ) {
-    const list =
-      $("financeCalendarDayList");
-
-    if (!list) return;
-
-    const dayEvents =
-      events.filter(
-        event =>
-          sameDay(
-            event.date,
-            date
-          )
-      );
-
-    setText(
-      "financeCalendarDayTitle",
-      new Intl.DateTimeFormat(
-        "tr-TR",
-        {
-          day: "numeric",
-          month: "long",
-          year: "numeric"
-        }
-      ).format(date)
-    );
-
-    const net =
-      dayEvents.reduce(
-        (sum, event) =>
-          sum +
-          (
-            Number(
-              event.amount || 0
-            ) *
-            Number(
-              event.direction || 0
-            )
-          ),
-        0
-      );
-
-    setText(
-      "financeCalendarDayNet",
-      dayEvents.length
-        ? `Net ${signedMoney(net)}`
-        : "—"
-    );
-
-    if (!dayEvents.length) {
-      list.innerHTML =
-        '<div class="empty-state">Bu güne ait finans hareketi yok.</div>';
-
-      return;
-    }
-
-    list.innerHTML = "";
-
-    dayEvents.forEach(
-      event => {
-        const row =
-          document.createElement(
-            "article"
-          );
-
-        row.className =
-          `yf-finance-calendar-event ${event.kind}`;
-
-        row.innerHTML = `
-          <span class="yf-finance-event-icon">
-            ${icon(event.kind)}
-          </span>
-
-          <div class="yf-finance-event-main">
-            <strong>
-              ${escapeHtml(
-                event.title
-              )}
-            </strong>
-
-            <small>
-              ${escapeHtml(
-                event.subtitle
-              )}
-            </small>
-          </div>
-
-          <div class="yf-finance-event-side">
-            ${
-              event.amount
-                ? `
-                  <strong>
-                    ${
-                      event.direction >
-                      0
-                        ? "+"
-                        : event.direction <
-                          0
-                          ? "−"
-                          : ""
-                    }${money(
-                      event.amount
-                    )}
-                  </strong>
-                `
-                : ""
-            }
-
-            ${
-              event.actionable
-                ? `
-                  <button
-                    type="button"
-                    data-finance-pay="${escapeHtml(
-                      String(
-                        event.debtId
-                      )
-                    )}"
-                  >
-                    Borç Öde
-                  </button>
-                `
-                : ""
-            }
-          </div>
-        `;
-
-        row
-          .querySelector(
-            "[data-finance-pay]"
-          )
-          ?.addEventListener(
-            "click",
-            () => {
-              openDebtPayment(
-                event.debtId
-              );
-            }
-          );
-
-        list.appendChild(row);
-      }
-    );
-  }
-
-  function openDebtPayment(
-    debtId
-  ) {
-    const button =
-      document.querySelector(
-        '[data-page="debtPaymentPage"]'
-      );
-
-    if (!button) return;
-
-    button.click();
-
-    setTimeout(
-      () => {
-        const select =
-          $("debtPaymentCard");
-
-        if (!select) return;
-
-        select.value =
-          String(
-            debtId
-          );
-
-        select.dispatchEvent(
-          new Event(
-            "change",
-            {
-              bubbles: true
-            }
-          )
-        );
-      },
-      260
-    );
-  }
-
-  function today() {
-    const date =
-      new Date();
-
-    date.setHours(
-      0,
-      0,
-      0,
-      0
-    );
-
-    return date;
-  }
-
-  function parseDate(
-    value
-  ) {
-    if (!value) {
-      return null;
-    }
+  function parseDate(value) {
+    if (!value) return null;
 
     const date =
       new Date(
-        String(value)
-          .includes("T")
+        String(value).includes("T")
           ? value
           : `${value}T12:00:00`
       );
@@ -16069,89 +15505,30 @@ document.addEventListener("DOMContentLoaded", () => {
       : date;
   }
 
-  function inMonth(
-    date,
-    year,
-    month
-  ) {
-    return Boolean(
-      date &&
-      date.getFullYear() ===
-        year &&
-      date.getMonth() ===
-        month
-    );
-  }
-
-  function sameDay(
-    first,
-    second
-  ) {
-    return Boolean(
-      first &&
-      second &&
-      first.getFullYear() ===
-        second.getFullYear() &&
-      first.getMonth() ===
-        second.getMonth() &&
-      first.getDate() ===
-        second.getDate()
-    );
-  }
-
-  function load(
-    key
-  ) {
+  function load(key) {
     try {
       return JSON.parse(
-        localStorage.getItem(
-          key
-        ) || "[]"
+        localStorage.getItem(key) || "[]"
       );
     } catch {
       return [];
     }
   }
 
-  function money(
-    value
-  ) {
+  function money(value) {
     return new Intl.NumberFormat(
       "tr-TR",
       {
-        style:
-          "currency",
-        currency:
-          "TRY"
+        style: "currency",
+        currency: "TRY"
       }
     ).format(
       Number(value) || 0
     );
   }
 
-  function signedMoney(
-    value
-  ) {
-    const amount =
-      Number(value) || 0;
-
-    return `${
-      amount > 0
-        ? "+"
-        : amount < 0
-          ? "−"
-          : ""
-    }${money(
-      Math.abs(amount)
-    )}`;
-  }
-
-  function setText(
-    id,
-    value
-  ) {
-    const element =
-      $(id);
+  function setText(id, value) {
+    const element = $(id);
 
     if (element) {
       element.textContent =
@@ -16159,349 +15536,87 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  function capitalize(
-    value
-  ) {
-    const text =
-      String(value || "");
-
-    return text
-      ? text.charAt(0)
-          .toLocaleUpperCase(
-            "tr-TR"
-          ) +
-          text.slice(1)
-      : text;
-  }
-
-  function icon(
-    kind
-  ) {
-    return {
-      income: "💵",
-      payment: "💳",
-      paid: "✓",
-      statement: "📄",
-      overdue: "!"
-    }[kind] || "•";
-  }
-
-  function escapeHtml(
-    value
-  ) {
-    return String(
-      value ?? ""
-    )
-      .replaceAll(
-        "&",
-        "&amp;"
-      )
-      .replaceAll(
-        "<",
-        "&lt;"
-      )
-      .replaceAll(
-        ">",
-        "&gt;"
-      )
-      .replaceAll(
-        '"',
-        "&quot;"
-      )
-      .replaceAll(
-        "'",
-        "&#039;"
-      );
-  }
+  installStyles();
 
   function installStyles() {
-    if (
-      $("yfFinanceCalendarV57Styles")
-    ) {
-      return;
-    }
+    if ($("yfV58CalendarStyles")) return;
 
     const style =
-      document.createElement(
-        "style"
-      );
+      document.createElement("style");
 
     style.id =
-      "yfFinanceCalendarV57Styles";
+      "yfV58CalendarStyles";
 
     style.textContent = `
-      #financeCalendarPage{
-        padding-bottom:90px
+      .yf-v58-finance-summary {
+        display: grid;
+        grid-template-columns:
+          repeat(3,minmax(0,1fr));
+        gap: 8px;
+        margin-bottom: 12px;
       }
 
-      .yf-finance-month-summary{
-        display:grid;
-        grid-template-columns:repeat(3,minmax(0,1fr));
-        gap:8px;
-        margin-bottom:12px
+      .yf-v58-finance-summary article {
+        padding: 12px;
+        border: 1px solid rgba(255,255,255,.06);
+        border-radius: 14px;
+        background: rgba(255,255,255,.025);
       }
 
-      .yf-finance-month-summary article{
-        padding:12px;
-        border:1px solid rgba(255,255,255,.06);
-        border-radius:14px;
-        background:rgba(255,255,255,.025)
+      .yf-v58-finance-summary span,
+      .yf-v58-finance-summary strong,
+      .yf-v58-finance-summary small {
+        display: block;
       }
 
-      .yf-finance-month-summary span,
-      .yf-finance-month-summary strong{
-        display:block
+      .yf-v58-finance-summary span {
+        color: #8194a8;
+        font-size: 8px;
       }
 
-      .yf-finance-month-summary span{
-        color:#8194a8;
-        font-size:8px
+      .yf-v58-finance-summary strong {
+        margin-top: 5px;
+        font-size: 12px;
       }
 
-      .yf-finance-month-summary strong{
-        margin-top:5px;
-        font-size:11px
+      .yf-v58-finance-summary article:first-child strong {
+        color: #ffd073;
       }
 
-      .yf-finance-calendar-card,
-      .yf-finance-day-detail{
-        padding:13px;
-        border:1px solid rgba(255,255,255,.06);
-        border-radius:18px;
-        background:rgba(255,255,255,.025)
+      .yf-v58-finance-summary article:nth-child(2) strong {
+        color: #4ce0aa;
       }
 
-      .yf-finance-calendar-nav{
-        display:flex;
-        align-items:center;
-        justify-content:space-between;
-        gap:10px;
-        margin-bottom:10px
+      .yf-v58-finance-summary small {
+        margin-top: 5px;
+        color: #718599;
+        font-size: 7px;
       }
 
-      .yf-finance-calendar-nav>div{
-        text-align:center
+      .yf-v58-finance-info {
+        margin-bottom: 12px;
       }
 
-      .yf-finance-calendar-nav small,
-      .yf-finance-day-detail-head small{
-        display:block;
-        color:#48d9a4;
-        font-size:7px;
-        font-weight:900;
-        letter-spacing:.11em
+      .yf-v58-info-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
       }
 
-      .yf-finance-calendar-nav strong{
-        display:block;
-        margin-top:3px;
-        font-size:12px
+      .yf-v58-info-grid span {
+        padding: 7px 9px;
+        border-radius: 999px;
+        color: #91a4b8;
+        background: rgba(255,255,255,.04);
+        font-size: 7px;
       }
 
-      .yf-finance-calendar-nav button{
-        width:34px;
-        height:34px;
-        border:0;
-        border-radius:10px;
-        color:inherit;
-        background:rgba(255,255,255,.045);
-        font-size:20px
-      }
-
-      .yf-finance-weekdays,
-      .yf-finance-calendar-grid{
-        display:grid;
-        grid-template-columns:repeat(7,minmax(0,1fr));
-        gap:4px
-      }
-
-      .yf-finance-weekdays{
-        margin-bottom:5px
-      }
-
-      .yf-finance-weekdays span{
-        padding:5px 0;
-        color:#718599;
-        text-align:center;
-        font-size:7px
-      }
-
-      .yf-finance-calendar-cell{
-        min-width:0;
-        min-height:54px;
-        padding:6px 3px;
-        border:1px solid transparent;
-        border-radius:10px;
-        color:inherit;
-        background:rgba(255,255,255,.018);
-        font:inherit
-      }
-
-      .yf-finance-calendar-cell.blank{
-        background:transparent
-      }
-
-      .yf-finance-calendar-cell>strong{
-        display:block;
-        font-size:9px
-      }
-
-      .yf-finance-calendar-cell>small{
-        display:block;
-        margin-top:4px;
-        color:#718599;
-        font-size:6px
-      }
-
-      .yf-finance-calendar-cell.today{
-        border-color:rgba(72,217,164,.55)
-      }
-
-      .yf-finance-calendar-cell.selected{
-        border-color:#48d9a4;
-        background:rgba(72,217,164,.09)
-      }
-
-      .yf-finance-calendar-cell.overdue{
-        border-color:rgba(235,91,91,.55)
-      }
-
-      .yf-finance-day-dots{
-        min-height:5px;
-        display:flex;
-        justify-content:center;
-        gap:2px;
-        margin-top:5px
-      }
-
-      .yf-finance-day-dots i,
-      .yf-finance-calendar-legend i{
-        width:5px;
-        height:5px;
-        display:inline-block;
-        border-radius:50%
-      }
-
-      .yf-finance-day-dots .income,
-      .yf-finance-calendar-legend .income{
-        background:#48d9a4
-      }
-
-      .yf-finance-day-dots .payment,
-      .yf-finance-day-dots .paid,
-      .yf-finance-calendar-legend .payment{
-        background:#59aaf5
-      }
-
-      .yf-finance-day-dots .statement,
-      .yf-finance-calendar-legend .statement{
-        background:#9b83f4
-      }
-
-      .yf-finance-day-dots .overdue,
-      .yf-finance-calendar-legend .overdue{
-        background:#eb5b5b
-      }
-
-      .yf-finance-calendar-legend{
-        display:flex;
-        flex-wrap:wrap;
-        gap:12px;
-        padding:10px 4px;
-        color:#718599;
-        font-size:7px
-      }
-
-      .yf-finance-calendar-legend span{
-        display:flex;
-        align-items:center;
-        gap:5px
-      }
-
-      .yf-finance-day-detail{
-        margin-top:2px
-      }
-
-      .yf-finance-day-detail-head{
-        display:flex;
-        align-items:flex-start;
-        justify-content:space-between;
-        gap:10px;
-        margin-bottom:10px
-      }
-
-      .yf-finance-day-detail-head h2{
-        margin:3px 0 0;
-        font-size:13px
-      }
-
-      .yf-finance-day-detail-head>strong{
-        font-size:10px
-      }
-
-      #financeCalendarDayList{
-        display:grid;
-        gap:7px
-      }
-
-      .yf-finance-calendar-event{
-        display:flex;
-        align-items:center;
-        gap:9px;
-        padding:10px;
-        border-radius:12px;
-        background:rgba(255,255,255,.025)
-      }
-
-      .yf-finance-event-icon{
-        width:32px;
-        height:32px;
-        flex:0 0 32px;
-        display:flex;
-        align-items:center;
-        justify-content:center;
-        border-radius:10px;
-        background:rgba(255,255,255,.045);
-        font-size:12px
-      }
-
-      .yf-finance-event-main{
-        min-width:0;
-        flex:1
-      }
-
-      .yf-finance-event-main strong,
-      .yf-finance-event-main small{
-        display:block
-      }
-
-      .yf-finance-event-main strong{
-        font-size:9px
-      }
-
-      .yf-finance-event-main small{
-        margin-top:3px;
-        color:#8093a6;
-        font-size:7px
-      }
-
-      .yf-finance-event-side{
-        text-align:right
-      }
-
-      .yf-finance-event-side>strong{
-        display:block;
-        font-size:8px
-      }
-
-      .yf-finance-event-side button{
-        margin-top:5px;
-        padding:5px 7px;
-        border:1px solid rgba(72,217,164,.18);
-        border-radius:8px;
-        color:#48d9a4;
-        background:rgba(72,217,164,.06);
-        font-size:7px
+      body.light-theme
+      .yf-v58-finance-summary article {
+        border-color:
+          rgba(20,73,112,.08);
+        background:
+          rgba(20,73,112,.025);
       }
     `;
 
