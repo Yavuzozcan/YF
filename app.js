@@ -14124,3 +14124,494 @@ document.addEventListener("DOMContentLoaded", () => {
     document.head.appendChild(style);
   }
 });
+
+// =========================================
+// YF v4.7 — KREDİLERİ KREDİ GİBİ GÖSTER
+// İhtiyaç kredilerinde kart alanlarını kaldırır.
+// Gerçek ID + type üzerinden görünümü düzeltir.
+// =========================================
+
+document.addEventListener("DOMContentLoaded", () => {
+  const DEBT_KEY = "yf_cards_v1";
+  const TX_KEY = "yf_transactions_v1";
+
+  refreshDebtVisualTypes();
+
+  document.addEventListener(
+    "click",
+    event => {
+      const pageButton = event.target.closest(
+        '[data-page="cardsPage"]'
+      );
+
+      if (!pageButton) return;
+
+      setTimeout(refreshDebtVisualTypes, 180);
+      setTimeout(refreshDebtVisualTypes, 550);
+      setTimeout(refreshDebtVisualTypes, 1000);
+    },
+    true
+  );
+
+  window.addEventListener("pageshow", () => {
+    setTimeout(refreshDebtVisualTypes, 250);
+  });
+
+  window.addEventListener("storage", () => {
+    setTimeout(refreshDebtVisualTypes, 180);
+  });
+
+  window.addEventListener("yf-refresh-dashboard", () => {
+    setTimeout(refreshDebtVisualTypes, 180);
+  });
+
+  function refreshDebtVisualTypes() {
+    const list = document.getElementById("cardsList");
+    if (!list) return;
+
+    const debts = loadJson(DEBT_KEY);
+    const transactions = loadJson(TX_KEY);
+
+    const debtMap = new Map(
+      debts.map(item => [
+        String(item.id),
+        item
+      ])
+    );
+
+    const cards = [
+      ...list.querySelectorAll(".bank-card")
+    ];
+
+    cards.forEach(cardElement => {
+      const id = getExactDebtId(cardElement);
+      if (!id) return;
+
+      const debt = debtMap.get(String(id));
+      if (!debt) return;
+
+      cardElement.dataset.yfDebtId = String(id);
+
+      if (debt.type === "personal-loan") {
+        renderAsLoan(
+          cardElement,
+          debt,
+          transactions
+        );
+      } else {
+        renderAsCreditCard(
+          cardElement
+        );
+      }
+    });
+
+    installStyles();
+  }
+
+  // -----------------------------------------
+  // İHTİYAÇ KREDİSİ GÖRÜNÜMÜ
+  // -----------------------------------------
+  function renderAsLoan(
+    cardElement,
+    loan,
+    transactions
+  ) {
+    cardElement.classList.add(
+      "loan-bank-card",
+      "yf-v47-loan"
+    );
+
+    // Kredi kartına ait alanları tamamen kaldır.
+    cardElement
+      .querySelectorAll(
+        ".credit-type-badge, " +
+        ".card-minimum-status, " +
+        ".bank-card-details, " +
+        ".yf-cycle-countdown, " +
+        ".yf-v46-countdown"
+      )
+      .forEach(node => node.remove());
+
+    // Eski v4.7 kredi alanlarını tekrar üretmeden önce temizle.
+    cardElement
+      .querySelectorAll(
+        ".yf-v47-loan-type, " +
+        ".yf-v47-loan-installments, " +
+        ".yf-v47-loan-progress-wrap, " +
+        ".yf-v47-loan-dates"
+      )
+      .forEach(node => node.remove());
+
+    const header =
+      cardElement.querySelector(
+        ".bank-card-header"
+      );
+
+    const debtAmount =
+      cardElement.querySelector(
+        ".bank-card-debt"
+      );
+
+    const recordedPaid = roundMoney(
+      transactions
+        .filter(tx =>
+          tx.type === "loan-payment" &&
+          String(tx.cardId) ===
+            String(loan.id)
+        )
+        .reduce(
+          (sum, tx) =>
+            sum + Number(tx.amount || 0),
+          0
+        )
+    );
+
+    const currentDebt =
+      roundMoney(
+        Number(loan.debt || 0)
+      );
+
+    const originalDebt =
+      roundMoney(
+        Math.max(
+          Number(loan.originalDebt || 0),
+          currentDebt + recordedPaid,
+          currentDebt
+        )
+      );
+
+    const effectivePaid =
+      roundMoney(
+        Math.max(
+          recordedPaid,
+          originalDebt - currentDebt
+        )
+      );
+
+    const percent =
+      originalDebt > 0
+        ? Math.min(
+            100,
+            Math.max(
+              0,
+              Math.round(
+                (effectivePaid /
+                  originalDebt) * 100
+              )
+            )
+          )
+        : 0;
+
+    const typeBadge =
+      document.createElement("span");
+
+    typeBadge.className =
+      "loan-type-badge yf-v47-loan-type";
+
+    typeBadge.textContent =
+      "🏦 İhtiyaç Kredisi";
+
+    if (header) {
+      header.insertAdjacentElement(
+        "afterend",
+        typeBadge
+      );
+    }
+
+    const installmentBox =
+      document.createElement("div");
+
+    installmentBox.className =
+      "loan-installment-box yf-v47-loan-installments";
+
+    installmentBox.innerHTML = `
+      <div>
+        <span>Aylık taksit</span>
+        <strong>${formatMoney(
+          loan.monthlyInstallment
+        )}</strong>
+      </div>
+
+      <div>
+        <span>Kalan taksit</span>
+        <strong>${Number(
+          loan.remainingInstallments || 0
+        )}</strong>
+      </div>
+    `;
+
+    const progressWrap =
+      document.createElement("div");
+
+    progressWrap.className =
+      "yf-v47-loan-progress-wrap";
+
+    progressWrap.innerHTML = `
+      <div class="card-minimum-status-track">
+        <div style="width:${percent}%"></div>
+      </div>
+
+      <small class="loan-progress-text">
+        Toplam ilerleme: %${percent}
+      </small>
+
+      <div class="yf-v47-loan-progress-detail">
+        <div>
+          <span>Ödenen</span>
+          <strong>${formatMoney(
+            effectivePaid
+          )}</strong>
+        </div>
+
+        <div>
+          <span>Kalan</span>
+          <strong>${formatMoney(
+            currentDebt
+          )}</strong>
+        </div>
+      </div>
+    `;
+
+    const dates =
+      document.createElement("div");
+
+    dates.className =
+      "bank-card-dates yf-v47-loan-dates";
+
+    dates.innerHTML = `
+      <div>
+        <span>Ödeme günü</span>
+        <strong>
+          ${
+            Number(loan.paymentDay || 0) > 0
+              ? `Her ayın ${Number(
+                  loan.paymentDay
+                )}'i`
+              : "Belirtilmedi"
+          }
+        </strong>
+      </div>
+
+      <div>
+        <span>Sonraki ödeme</span>
+        <strong>${formatDate(
+          loan.nextPaymentDate ||
+          loan.dueDate
+        )}</strong>
+      </div>
+    `;
+
+    if (debtAmount) {
+      debtAmount.insertAdjacentElement(
+        "afterend",
+        installmentBox
+      );
+
+      installmentBox.insertAdjacentElement(
+        "afterend",
+        progressWrap
+      );
+
+      progressWrap.insertAdjacentElement(
+        "afterend",
+        dates
+      );
+    } else {
+      cardElement.append(
+        installmentBox,
+        progressWrap,
+        dates
+      );
+    }
+  }
+
+  // -----------------------------------------
+  // KREDİ KARTLARINDA KREDİ ARTIKLARINI TEMİZLE
+  // -----------------------------------------
+  function renderAsCreditCard(
+    cardElement
+  ) {
+    cardElement.classList.remove(
+      "loan-bank-card",
+      "yf-v47-loan"
+    );
+
+    cardElement
+      .querySelectorAll(
+        ".yf-v47-loan-type, " +
+        ".yf-v47-loan-installments, " +
+        ".yf-v47-loan-progress-wrap, " +
+        ".yf-v47-loan-dates"
+      )
+      .forEach(node => node.remove());
+  }
+
+  // -----------------------------------------
+  // GERÇEK ID
+  // -----------------------------------------
+  function getExactDebtId(cardElement) {
+    const loanEdit =
+      cardElement.querySelector(
+        "[data-loan-edit]"
+      );
+
+    if (loanEdit?.dataset.loanEdit) {
+      return String(
+        loanEdit.dataset.loanEdit
+      );
+    }
+
+    const cardEdit =
+      cardElement.querySelector(
+        "[data-card-edit]"
+      );
+
+    if (cardEdit?.dataset.cardEdit) {
+      return String(
+        cardEdit.dataset.cardEdit
+      );
+    }
+
+    const oldEdit =
+      cardElement.querySelector(
+        "[data-edit]"
+      );
+
+    if (oldEdit?.dataset.edit) {
+      return String(
+        oldEdit.dataset.edit
+      );
+    }
+
+    return String(
+      cardElement.dataset.yfDebtId || ""
+    );
+  }
+
+  function formatMoney(value) {
+    return new Intl.NumberFormat(
+      "tr-TR",
+      {
+        style: "currency",
+        currency: "TRY"
+      }
+    ).format(Number(value) || 0);
+  }
+
+  function formatDate(value) {
+    if (!value) {
+      return "Tamamlandı";
+    }
+
+    const date = new Date(
+      String(value).includes("T")
+        ? value
+        : `${value}T12:00:00`
+    );
+
+    if (
+      Number.isNaN(date.getTime())
+    ) {
+      return "Belirtilmedi";
+    }
+
+    return date.toLocaleDateString(
+      "tr-TR",
+      {
+        day: "numeric",
+        month: "long",
+        year: "numeric"
+      }
+    );
+  }
+
+  function roundMoney(value) {
+    return Math.round(
+      (Number(value) +
+        Number.EPSILON) * 100
+    ) / 100;
+  }
+
+  function loadJson(key) {
+    try {
+      return JSON.parse(
+        localStorage.getItem(key) ||
+        "[]"
+      );
+    } catch {
+      return [];
+    }
+  }
+
+  function installStyles() {
+    if (
+      document.getElementById(
+        "yfV47LoanVisualStyles"
+      )
+    ) {
+      return;
+    }
+
+    const style =
+      document.createElement("style");
+
+    style.id =
+      "yfV47LoanVisualStyles";
+
+    style.textContent = `
+      .yf-v47-loan {
+        border-color:
+          rgba(255,193,74,.24) !important;
+      }
+
+      .yf-v47-loan-installments {
+        margin-top: 14px;
+      }
+
+      .yf-v47-loan-progress-wrap {
+        margin-top: 12px;
+      }
+
+      .yf-v47-loan-progress-wrap
+      .loan-progress-text {
+        display: block;
+        margin-top: 8px;
+        color: #8fa2ba;
+        font-size: 10px;
+      }
+
+      .yf-v47-loan-progress-detail {
+        display: grid;
+        grid-template-columns:
+          repeat(2,minmax(0,1fr));
+        gap: 8px;
+        margin-top: 9px;
+      }
+
+      .yf-v47-loan-progress-detail > div {
+        padding: 9px 10px;
+        border-radius: 11px;
+        background:
+          rgba(255,255,255,.035);
+      }
+
+      .yf-v47-loan-progress-detail span,
+      .yf-v47-loan-progress-detail strong {
+        display: block;
+      }
+
+      .yf-v47-loan-progress-detail span {
+        color: #8fa2ba;
+        font-size: 8px;
+      }
+
+      .yf-v47-loan-progress-detail strong {
+        margin-top: 4px;
+        color: #fff;
+        font-size: 10px;
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+});
