@@ -14690,3 +14690,1100 @@ document.addEventListener("DOMContentLoaded", () => {
       .replaceAll("'", "&#039;");
   }
 });
+
+// =========================================
+// YF v5.0 — BİLDİRİM MERKEZİ v1.0
+// Kart, kredi ve finans uyarılarını tek merkezde toplar.
+// =========================================
+
+document.addEventListener("DOMContentLoaded", () => {
+  const DEBT_KEY = "yf_cards_v1";
+  const TX_KEY = "yf_transactions_v1";
+  const READ_KEY = "yf_notification_read_v1";
+
+  installNotificationStyles();
+  createNotificationButton();
+  createNotificationPanel();
+
+  refreshNotifications();
+
+  document.addEventListener(
+    "click",
+    event => {
+      const pageButton = event.target.closest("[data-page]");
+
+      if (pageButton) {
+        setTimeout(refreshNotifications, 100);
+        setTimeout(refreshNotifications, 400);
+      }
+    },
+    true
+  );
+
+  window.addEventListener("pageshow", refreshNotifications);
+  window.addEventListener("storage", refreshNotifications);
+  window.addEventListener("yf-refresh-dashboard", refreshNotifications);
+  window.addEventListener("yf-refresh-upcoming-payments", refreshNotifications);
+
+  // Gün değişiminde sayaçlar/bildirimler otomatik güncellensin.
+  setInterval(() => {
+    refreshNotifications();
+  }, 60000);
+
+  function createNotificationButton() {
+    if (document.getElementById("yfNotificationButton")) return;
+
+    const button = document.createElement("button");
+    button.id = "yfNotificationButton";
+    button.type = "button";
+    button.className = "yf-notification-button";
+    button.setAttribute("aria-label", "Bildirimler");
+
+    button.innerHTML = `
+      <span class="yf-notification-bell">🔔</span>
+      <span
+        id="yfNotificationCount"
+        class="yf-notification-count hidden"
+      >
+        0
+      </span>
+    `;
+
+    const profile =
+      document.querySelector(".profile-button") ||
+      document.querySelector(".profile-btn") ||
+      document.querySelector('[data-page="profilePage"]');
+
+    const topbar =
+      document.querySelector(".topbar") ||
+      document.querySelector(".app-header") ||
+      document.querySelector("header");
+
+    if (profile?.parentElement) {
+      profile.insertAdjacentElement("beforebegin", button);
+    } else if (topbar) {
+      topbar.appendChild(button);
+    } else {
+      document.body.appendChild(button);
+      button.classList.add("yf-notification-floating");
+    }
+
+    button.addEventListener("click", () => {
+      openNotificationPanel();
+    });
+  }
+
+  function createNotificationPanel() {
+    if (document.getElementById("yfNotificationLayer")) return;
+
+    const layer = document.createElement("div");
+    layer.id = "yfNotificationLayer";
+    layer.className = "yf-notification-layer hidden";
+
+    layer.innerHTML = `
+      <div class="yf-notification-backdrop"></div>
+
+      <section class="yf-notification-sheet">
+        <div class="yf-notification-handle"></div>
+
+        <header class="yf-notification-header">
+          <div>
+            <span>BİLDİRİM MERKEZİ</span>
+            <h2>Finans Uyarıları</h2>
+          </div>
+
+          <button
+            id="yfNotificationClose"
+            class="yf-notification-close"
+            type="button"
+          >
+            ×
+          </button>
+        </header>
+
+        <div class="yf-notification-summary">
+          <div>
+            <span>Önemli</span>
+            <strong id="yfNotificationUrgent">0</strong>
+          </div>
+
+          <div>
+            <span>Yaklaşan</span>
+            <strong id="yfNotificationUpcoming">0</strong>
+          </div>
+
+          <div>
+            <span>Tamamlanan</span>
+            <strong id="yfNotificationCompleted">0</strong>
+          </div>
+        </div>
+
+        <div class="yf-notification-actions">
+          <button
+            id="yfNotificationMarkAll"
+            type="button"
+          >
+            Tümünü okundu yap
+          </button>
+        </div>
+
+        <div
+          id="yfNotificationList"
+          class="yf-notification-list"
+        ></div>
+      </section>
+    `;
+
+    document.body.appendChild(layer);
+
+    layer
+      .querySelector(".yf-notification-backdrop")
+      ?.addEventListener("click", closeNotificationPanel);
+
+    document
+      .getElementById("yfNotificationClose")
+      ?.addEventListener("click", closeNotificationPanel);
+
+    document
+      .getElementById("yfNotificationMarkAll")
+      ?.addEventListener("click", markAllRead);
+  }
+
+  function refreshNotifications() {
+    const list = document.getElementById("yfNotificationList");
+    if (!list) return;
+
+    const notifications = buildNotifications();
+    const readMap = loadReadMap();
+
+    const enriched = notifications.map(item => ({
+      ...item,
+      read: Boolean(readMap[item.id])
+    }));
+
+    const unread = enriched.filter(item => !item.read);
+    const urgent = enriched.filter(
+      item =>
+        item.kind === "overdue" ||
+        item.kind === "today" ||
+        item.kind === "tomorrow"
+    );
+
+    const upcoming = enriched.filter(
+      item => item.kind === "upcoming"
+    );
+
+    const completed = enriched.filter(
+      item => item.kind === "completed"
+    );
+
+    setText("yfNotificationUrgent", urgent.length);
+    setText("yfNotificationUpcoming", upcoming.length);
+    setText("yfNotificationCompleted", completed.length);
+
+    const count = document.getElementById("yfNotificationCount");
+
+    if (count) {
+      count.textContent =
+        unread.length > 99 ? "99+" : String(unread.length);
+
+      count.classList.toggle(
+        "hidden",
+        unread.length === 0
+      );
+    }
+
+    list.innerHTML = "";
+
+    if (!enriched.length) {
+      list.innerHTML = `
+        <div class="yf-notification-empty">
+          <span>✓</span>
+          <strong>Şimdilik önemli bir uyarı yok</strong>
+          <small>
+            Kart ve kredi tarihleri yaklaştığında burada görünecek.
+          </small>
+        </div>
+      `;
+      return;
+    }
+
+    enriched
+      .sort(sortNotifications)
+      .forEach(item => {
+        list.appendChild(
+          createNotificationRow(item)
+        );
+      });
+  }
+
+  function buildNotifications() {
+    const debts = loadJson(DEBT_KEY);
+    const transactions = loadJson(TX_KEY);
+    const result = [];
+
+    debts.forEach(debt => {
+      if (Number(debt.debt || 0) <= 0) return;
+
+      if (debt.type === "personal-loan") {
+        buildLoanNotification(
+          result,
+          debt
+        );
+
+        return;
+      }
+
+      buildCardNotifications(
+        result,
+        debt,
+        transactions
+      );
+    });
+
+    return result;
+  }
+
+  // -------------------------------------------------
+  // KREDİ BİLDİRİMLERİ
+  // -------------------------------------------------
+  function buildLoanNotification(result, loan) {
+    const date =
+      loan.nextPaymentDate || loan.dueDate;
+
+    if (!date) return;
+
+    const days = daysLeft(date);
+
+    // 14 günden uzak kredileri bildirim merkezinde göstermiyoruz.
+    if (days > 14) return;
+
+    let kind = "upcoming";
+    let title = "Kredi taksiti yaklaşıyor";
+    let message =
+      `${loan.bank} · ${loan.name} — ` +
+      `${formatMoney(loan.monthlyInstallment)} taksit`;
+
+    if (days < 0) {
+      kind = "overdue";
+      title = "Kredi taksiti gecikti";
+      message += ` · ${Math.abs(days)} gün gecikmiş`;
+    } else if (days === 0) {
+      kind = "today";
+      title = "Kredi taksiti bugün";
+      message += " · bugün ödenmeli";
+    } else if (days === 1) {
+      kind = "tomorrow";
+      title = "Kredi taksiti yarın";
+      message += " · yarın son gün";
+    } else {
+      message += ` · ${days} gün kaldı`;
+    }
+
+    result.push({
+      id:
+        `loan-${loan.id}-${date}-${kind}`,
+      debtId: loan.id,
+      debtType: "personal-loan",
+      kind,
+      icon: "🏦",
+      title,
+      message,
+      date,
+      days
+    });
+  }
+
+  // -------------------------------------------------
+  // KREDİ KARTI BİLDİRİMLERİ
+  // -------------------------------------------------
+  function buildCardNotifications(
+    result,
+    card,
+    transactions
+  ) {
+    const waitingNextStatement =
+      Boolean(
+        card.lastAutoRolledCycle &&
+        parseDate(card.statementDate) &&
+        parseDate(card.statementDate) >
+          startOfDay(new Date())
+      );
+
+    if (waitingNextStatement) {
+      result.push({
+        id:
+          `card-paid-${card.id}-${card.lastAutoRolledCycle}`,
+        debtId: card.id,
+        debtType: "credit-card",
+        kind: "completed",
+        icon: "✓",
+        title: "Asgari ödeme tamamlandı",
+        message:
+          `${card.bank} · ${card.name} — ` +
+          `son dönem asgarisi ödendi`,
+        date: card.statementDate,
+        days: 999
+      });
+
+      return;
+    }
+
+    const minimum = getMinimumInfo(
+      card,
+      transactions
+    );
+
+    if (minimum.remaining <= 0) {
+      result.push({
+        id:
+          `card-paid-${card.id}-${minimum.cycle}`,
+        debtId: card.id,
+        debtType: "credit-card",
+        kind: "completed",
+        icon: "✓",
+        title: "Asgari ödeme tamamlandı",
+        message:
+          `${card.bank} · ${card.name} — ` +
+          `${formatMoney(minimum.minimum)} ödendi`,
+        date: card.dueDate,
+        days: 999
+      });
+
+      return;
+    }
+
+    if (!card.dueDate) return;
+
+    const days = daysLeft(card.dueDate);
+
+    if (days > 14) return;
+
+    let kind = "upcoming";
+    let title = "Kart asgarisi yaklaşıyor";
+    let message =
+      `${card.bank} · ${card.name} — ` +
+      `${formatMoney(minimum.remaining)} kaldı`;
+
+    if (days < 0) {
+      kind = "overdue";
+      title = "Kart ödemesi gecikti";
+      message += ` · ${Math.abs(days)} gün gecikmiş`;
+    } else if (days === 0) {
+      kind = "today";
+      title = "Kart son ödeme günü bugün";
+      message += " · bugün son gün";
+    } else if (days === 1) {
+      kind = "tomorrow";
+      title = "Kart son ödeme günü yarın";
+      message += " · yarın son gün";
+    } else {
+      message += ` · ${days} gün kaldı`;
+    }
+
+    result.push({
+      id:
+        `card-${card.id}-${card.dueDate}-${kind}`,
+      debtId: card.id,
+      debtType: "credit-card",
+      kind,
+      icon: "💳",
+      title,
+      message,
+      date: card.dueDate,
+      days
+    });
+
+    // Ekstre kesimine 3 gün veya daha az kaldıysa ayrı bilgi.
+    if (card.statementDate) {
+      const statementDays =
+        daysLeft(card.statementDate);
+
+      if (
+        statementDays >= 0 &&
+        statementDays <= 3
+      ) {
+        result.push({
+          id:
+            `statement-${card.id}-${card.statementDate}`,
+          debtId: card.id,
+          debtType: "credit-card",
+          kind:
+            statementDays === 0
+              ? "today"
+              : "upcoming",
+          icon: "📄",
+          title:
+            statementDays === 0
+              ? "Ekstre bugün kesiliyor"
+              : "Ekstre kesimi yaklaşıyor",
+          message:
+            `${card.bank} · ${card.name} — ` +
+            (
+              statementDays === 0
+                ? "bugün ekstre kesim günü"
+                : `${statementDays} gün kaldı`
+            ),
+          date: card.statementDate,
+          days: statementDays
+        });
+      }
+    }
+  }
+
+  function getMinimumInfo(
+    card,
+    transactions
+  ) {
+    const statementDebt = Math.max(
+      0,
+      Number(
+        card.statementDebt !== undefined
+          ? card.statementDebt
+          : card.debt || 0
+      )
+    );
+
+    const minimum = roundMoney(
+      statementDebt * 0.20
+    );
+
+    const cycle =
+      card.statementCycle ||
+      cycleKey(card.dueDate);
+
+    const paid = roundMoney(
+      transactions
+        .filter(tx => {
+          if (
+            tx.type !== "card-payment" ||
+            String(tx.cardId) !==
+              String(card.id)
+          ) {
+            return false;
+          }
+
+          if (tx.statementCycle) {
+            return tx.statementCycle === cycle;
+          }
+
+          return isSameMonth(
+            tx.createdAt || tx.date,
+            card.dueDate
+          );
+        })
+        .reduce(
+          (sum, tx) =>
+            sum + Number(tx.amount || 0),
+          0
+        )
+    );
+
+    return {
+      cycle,
+      minimum,
+      paid,
+      remaining: roundMoney(
+        Math.max(0, minimum - paid)
+      )
+    };
+  }
+
+  // -------------------------------------------------
+  // BİLDİRİM SATIRI
+  // -------------------------------------------------
+  function createNotificationRow(item) {
+    const row = document.createElement("button");
+    row.type = "button";
+
+    row.className =
+      `yf-notification-row ${item.kind} ` +
+      `${item.read ? "read" : "unread"}`;
+
+    row.innerHTML = `
+      <span class="yf-notification-row-icon">
+        ${item.icon}
+      </span>
+
+      <span class="yf-notification-row-main">
+        <strong>${escapeHtml(item.title)}</strong>
+        <small>${escapeHtml(item.message)}</small>
+        <em>${notificationTimeText(item)}</em>
+      </span>
+
+      ${
+        item.read
+          ? ""
+          : '<span class="yf-notification-dot"></span>'
+      }
+    `;
+
+    row.addEventListener("click", () => {
+      markRead(item.id);
+      closeNotificationPanel();
+
+      if (item.kind === "completed") {
+        document
+          .querySelector('[data-page="cardsPage"]')
+          ?.click();
+
+        return;
+      }
+
+      document
+        .querySelector('[data-page="debtPaymentPage"]')
+        ?.click();
+
+      setTimeout(() => {
+        const select =
+          document.getElementById("debtPaymentCard");
+
+        if (!select) return;
+
+        select.value = String(item.debtId);
+
+        select.dispatchEvent(
+          new Event("change", {
+            bubbles: true
+          })
+        );
+      }, 280);
+    });
+
+    return row;
+  }
+
+  function notificationTimeText(item) {
+    if (item.kind === "completed") {
+      return "Tamamlandı";
+    }
+
+    if (item.days < 0) {
+      return `${Math.abs(item.days)} gün gecikmiş`;
+    }
+
+    if (item.days === 0) {
+      return "Bugün";
+    }
+
+    if (item.days === 1) {
+      return "Yarın";
+    }
+
+    return `${item.days} gün sonra`;
+  }
+
+  // -------------------------------------------------
+  // OKUNDU DURUMU
+  // -------------------------------------------------
+  function markRead(id) {
+    const map = loadReadMap();
+
+    map[id] = Date.now();
+
+    localStorage.setItem(
+      READ_KEY,
+      JSON.stringify(map)
+    );
+
+    refreshNotifications();
+  }
+
+  function markAllRead() {
+    const map = loadReadMap();
+
+    buildNotifications().forEach(item => {
+      map[item.id] = Date.now();
+    });
+
+    localStorage.setItem(
+      READ_KEY,
+      JSON.stringify(map)
+    );
+
+    refreshNotifications();
+  }
+
+  function loadReadMap() {
+    try {
+      return JSON.parse(
+        localStorage.getItem(READ_KEY) ||
+        "{}"
+      );
+    } catch {
+      return {};
+    }
+  }
+
+  // -------------------------------------------------
+  // PANEL
+  // -------------------------------------------------
+  function openNotificationPanel() {
+    refreshNotifications();
+
+    document
+      .getElementById("yfNotificationLayer")
+      ?.classList.remove("hidden");
+
+    document.body.style.overflow = "hidden";
+  }
+
+  function closeNotificationPanel() {
+    document
+      .getElementById("yfNotificationLayer")
+      ?.classList.add("hidden");
+
+    document.body.style.overflow = "";
+  }
+
+  // -------------------------------------------------
+  // YARDIMCILAR
+  // -------------------------------------------------
+  function sortNotifications(a, b) {
+    const priority = {
+      overdue: 0,
+      today: 1,
+      tomorrow: 2,
+      upcoming: 3,
+      completed: 4
+    };
+
+    const priorityDiff =
+      (priority[a.kind] ?? 9) -
+      (priority[b.kind] ?? 9);
+
+    if (priorityDiff !== 0) {
+      return priorityDiff;
+    }
+
+    return Number(a.days || 0) -
+      Number(b.days || 0);
+  }
+
+  function daysLeft(value) {
+    const date = parseDate(value);
+
+    if (!date) return 999999;
+
+    const today =
+      startOfDay(new Date());
+
+    date.setHours(0, 0, 0, 0);
+
+    return Math.ceil(
+      (date - today) / 86400000
+    );
+  }
+
+  function parseDate(value) {
+    if (!value) return null;
+
+    const date = new Date(
+      String(value).includes("T")
+        ? value
+        : `${value}T12:00:00`
+    );
+
+    return Number.isNaN(date.getTime())
+      ? null
+      : date;
+  }
+
+  function startOfDay(value) {
+    const date = new Date(value);
+    date.setHours(0, 0, 0, 0);
+    return date;
+  }
+
+  function cycleKey(value) {
+    const match =
+      String(value || "").match(
+        /^(\d{4})-(\d{2})/
+      );
+
+    return match
+      ? `${match[1]}-${match[2]}`
+      : "";
+  }
+
+  function isSameMonth(
+    firstValue,
+    secondValue
+  ) {
+    const first = parseDate(firstValue);
+    const second = parseDate(secondValue);
+
+    if (!first || !second) return false;
+
+    return (
+      first.getMonth() === second.getMonth() &&
+      first.getFullYear() ===
+        second.getFullYear()
+    );
+  }
+
+  function roundMoney(value) {
+    return Math.round(
+      (Number(value) +
+        Number.EPSILON) * 100
+    ) / 100;
+  }
+
+  function formatMoney(value) {
+    return new Intl.NumberFormat(
+      "tr-TR",
+      {
+        style: "currency",
+        currency: "TRY"
+      }
+    ).format(Number(value) || 0);
+  }
+
+  function setText(id, value) {
+    const element =
+      document.getElementById(id);
+
+    if (element) {
+      element.textContent =
+        String(value);
+    }
+  }
+
+  function loadJson(key) {
+    try {
+      return JSON.parse(
+        localStorage.getItem(key) ||
+        "[]"
+      );
+    } catch {
+      return [];
+    }
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  // -------------------------------------------------
+  // TASARIM
+  // -------------------------------------------------
+  function installNotificationStyles() {
+    if (
+      document.getElementById(
+        "yfNotificationStylesV50"
+      )
+    ) {
+      return;
+    }
+
+    const style =
+      document.createElement("style");
+
+    style.id =
+      "yfNotificationStylesV50";
+
+    style.textContent = `
+      .yf-notification-button {
+        position: relative;
+        width: 38px;
+        height: 38px;
+        flex: 0 0 38px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid rgba(255,255,255,.08);
+        border-radius: 12px;
+        color: inherit;
+        background: rgba(255,255,255,.035);
+        font: inherit;
+      }
+
+      .yf-notification-floating {
+        position: fixed;
+        z-index: 70;
+        top: 18px;
+        right: 68px;
+      }
+
+      .yf-notification-bell {
+        font-size: 16px;
+      }
+
+      .yf-notification-count {
+        position: absolute;
+        top: -5px;
+        right: -5px;
+        min-width: 18px;
+        height: 18px;
+        padding: 0 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 2px solid #101b26;
+        border-radius: 999px;
+        color: #fff;
+        background: #e95c5c;
+        font-size: 8px;
+        font-weight: 900;
+      }
+
+      .yf-notification-layer {
+        position: fixed;
+        z-index: 9999;
+        inset: 0;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+      }
+
+      .yf-notification-layer.hidden {
+        display: none !important;
+      }
+
+      .yf-notification-backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(0,0,0,.62);
+        backdrop-filter: blur(4px);
+      }
+
+      .yf-notification-sheet {
+        position: relative;
+        width: min(100%,520px);
+        max-height: 88vh;
+        overflow: auto;
+        padding: 10px 16px 24px;
+        border: 1px solid rgba(255,255,255,.08);
+        border-radius: 25px 25px 0 0;
+        background: #101b26;
+        box-shadow: 0 -22px 60px rgba(0,0,0,.34);
+      }
+
+      .yf-notification-handle {
+        width: 44px;
+        height: 4px;
+        margin: 0 auto 15px;
+        border-radius: 999px;
+        background: rgba(255,255,255,.15);
+      }
+
+      .yf-notification-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .yf-notification-header > div > span {
+        color: #4ce0aa;
+        font-size: 8px;
+        font-weight: 900;
+        letter-spacing: .14em;
+      }
+
+      .yf-notification-header h2 {
+        margin: 5px 0 0;
+        font-size: 21px;
+      }
+
+      .yf-notification-close {
+        width: 36px;
+        height: 36px;
+        border: 0;
+        border-radius: 11px;
+        color: #a8b7c7;
+        background: rgba(255,255,255,.05);
+        font-size: 21px;
+      }
+
+      .yf-notification-summary {
+        display: grid;
+        grid-template-columns: repeat(3,minmax(0,1fr));
+        gap: 8px;
+        margin-top: 16px;
+      }
+
+      .yf-notification-summary > div {
+        padding: 11px;
+        border: 1px solid rgba(255,255,255,.06);
+        border-radius: 14px;
+        background: rgba(255,255,255,.025);
+      }
+
+      .yf-notification-summary span,
+      .yf-notification-summary strong {
+        display: block;
+      }
+
+      .yf-notification-summary span {
+        color: #8295a9;
+        font-size: 8px;
+      }
+
+      .yf-notification-summary strong {
+        margin-top: 5px;
+        font-size: 17px;
+      }
+
+      .yf-notification-actions {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 11px;
+      }
+
+      .yf-notification-actions button {
+        border: 0;
+        color: #91a4b8;
+        background: transparent;
+        font-size: 8px;
+        font-weight: 800;
+      }
+
+      .yf-notification-list {
+        display: grid;
+        gap: 8px;
+        margin-top: 7px;
+      }
+
+      .yf-notification-row {
+        position: relative;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        padding: 12px;
+        border: 1px solid rgba(255,255,255,.06);
+        border-radius: 15px;
+        color: inherit;
+        background: rgba(255,255,255,.025);
+        text-align: left;
+        font: inherit;
+      }
+
+      .yf-notification-row.unread {
+        background: rgba(255,255,255,.045);
+      }
+
+      .yf-notification-row.overdue {
+        border-color: rgba(233,92,92,.22);
+      }
+
+      .yf-notification-row.today,
+      .yf-notification-row.tomorrow {
+        border-color: rgba(255,177,72,.20);
+      }
+
+      .yf-notification-row.completed {
+        border-color: rgba(76,224,170,.15);
+      }
+
+      .yf-notification-row-icon {
+        width: 39px;
+        height: 39px;
+        flex: 0 0 39px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 12px;
+        background: rgba(255,255,255,.05);
+        font-size: 16px;
+      }
+
+      .yf-notification-row-main {
+        min-width: 0;
+        flex: 1;
+      }
+
+      .yf-notification-row-main strong,
+      .yf-notification-row-main small,
+      .yf-notification-row-main em {
+        display: block;
+      }
+
+      .yf-notification-row-main strong {
+        font-size: 10px;
+      }
+
+      .yf-notification-row-main small {
+        margin-top: 4px;
+        color: #94a5b7;
+        font-size: 8px;
+        line-height: 1.45;
+      }
+
+      .yf-notification-row-main em {
+        margin-top: 5px;
+        color: #6f8498;
+        font-size: 7px;
+        font-style: normal;
+      }
+
+      .yf-notification-dot {
+        width: 7px;
+        height: 7px;
+        flex: 0 0 7px;
+        border-radius: 50%;
+        background: #4ce0aa;
+      }
+
+      .yf-notification-empty {
+        padding: 30px 18px;
+        border: 1px dashed rgba(255,255,255,.08);
+        border-radius: 16px;
+        text-align: center;
+      }
+
+      .yf-notification-empty span,
+      .yf-notification-empty strong,
+      .yf-notification-empty small {
+        display: block;
+      }
+
+      .yf-notification-empty span {
+        width: 42px;
+        height: 42px;
+        margin: 0 auto 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 13px;
+        color: #4ce0aa;
+        background: rgba(76,224,170,.08);
+        font-size: 17px;
+      }
+
+      .yf-notification-empty strong {
+        font-size: 11px;
+      }
+
+      .yf-notification-empty small {
+        margin-top: 6px;
+        color: #8295a9;
+        font-size: 8px;
+        line-height: 1.5;
+      }
+
+      body.light-theme .yf-notification-sheet {
+        color: #102033;
+        background: #f7f9fb;
+      }
+
+      body.light-theme .yf-notification-count {
+        border-color: #f7f9fb;
+      }
+
+      body.light-theme .yf-notification-row,
+      body.light-theme .yf-notification-summary > div {
+        background: rgba(20,73,112,.035);
+        border-color: rgba(20,73,112,.07);
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+});
