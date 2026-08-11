@@ -14692,101 +14692,607 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // =========================================
-// YF v5.0 — BİLDİRİM MERKEZİ v1.0
-// Kart, kredi ve finans uyarılarını tek merkezde toplar.
+// YF v5.1 — ASGARİ PANELİ GERİ GETİR + SABİT BİLDİRİM MERKEZİ
+// v5.0 kullanılmaz.
+// Taban: çalışan v4.9
 // =========================================
 
 document.addEventListener("DOMContentLoaded", () => {
   const DEBT_KEY = "yf_cards_v1";
   const TX_KEY = "yf_transactions_v1";
-  const READ_KEY = "yf_notification_read_v1";
+  const READ_KEY = "yf_notification_read_v2";
 
-  installNotificationStyles();
-  createNotificationButton();
-  createNotificationPanel();
+  const $ = id => document.getElementById(id);
 
-  refreshNotifications();
+  installV51Styles();
+  repairMinimumPanel();
+  createFixedNotificationCenter();
+
+  setTimeout(refreshMinimumPanel, 120);
+  setTimeout(refreshNotifications, 150);
 
   document.addEventListener(
-    "click",
+    "change",
     event => {
-      const pageButton = event.target.closest("[data-page]");
-
-      if (pageButton) {
-        setTimeout(refreshNotifications, 100);
-        setTimeout(refreshNotifications, 400);
+      if (event.target?.id === "debtPaymentCard") {
+        setTimeout(refreshMinimumPanel, 30);
       }
     },
     true
   );
 
-  window.addEventListener("pageshow", refreshNotifications);
-  window.addEventListener("storage", refreshNotifications);
-  window.addEventListener("yf-refresh-dashboard", refreshNotifications);
-  window.addEventListener("yf-refresh-upcoming-payments", refreshNotifications);
+  document.addEventListener(
+    "click",
+    event => {
+      const minimumButton =
+        event.target.closest("#payMinimumButton");
 
-  // Gün değişiminde sayaçlar/bildirimler otomatik güncellensin.
-  setInterval(() => {
+      if (minimumButton) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+
+        payExactMinimum();
+        return;
+      }
+
+      const pageButton =
+        event.target.closest("[data-page]");
+
+      if (pageButton) {
+        setTimeout(refreshMinimumPanel, 120);
+        setTimeout(refreshNotifications, 150);
+      }
+    },
+    true
+  );
+
+  window.addEventListener("pageshow", () => {
+    refreshMinimumPanel();
     refreshNotifications();
-  }, 60000);
+  });
 
-  function createNotificationButton() {
-    if (document.getElementById("yfNotificationButton")) return;
+  window.addEventListener("storage", () => {
+    refreshMinimumPanel();
+    refreshNotifications();
+  });
 
-    const button = document.createElement("button");
-    button.id = "yfNotificationButton";
-    button.type = "button";
-    button.className = "yf-notification-button";
-    button.setAttribute("aria-label", "Bildirimler");
+  window.addEventListener(
+    "yf-refresh-dashboard",
+    () => {
+      setTimeout(refreshMinimumPanel, 100);
+      setTimeout(refreshNotifications, 100);
+    }
+  );
 
-    button.innerHTML = `
-      <span class="yf-notification-bell">🔔</span>
-      <span
-        id="yfNotificationCount"
-        class="yf-notification-count hidden"
-      >
-        0
-      </span>
-    `;
+  // =================================================
+  // 1) ASGARİ ÖDEME PANELİ ONARIMI
+  // =================================================
+  function repairMinimumPanel() {
+    const form = $("debtPaymentForm");
+    const summary =
+      document.querySelector(
+        "#debtPaymentPage .debt-payment-summary"
+      );
 
-    const profile =
-      document.querySelector(".profile-button") ||
-      document.querySelector(".profile-btn") ||
-      document.querySelector('[data-page="profilePage"]');
+    if (!form || !summary) return;
 
-    const topbar =
-      document.querySelector(".topbar") ||
-      document.querySelector(".app-header") ||
-      document.querySelector("header");
+    let panel = $("smartMinimumPanel");
 
-    if (profile?.parentElement) {
-      profile.insertAdjacentElement("beforebegin", button);
-    } else if (topbar) {
-      topbar.appendChild(button);
-    } else {
-      document.body.appendChild(button);
-      button.classList.add("yf-notification-floating");
+    // Panel hiç yoksa yeniden kur.
+    if (!panel) {
+      panel = document.createElement("section");
+      panel.id = "smartMinimumPanel";
+      panel.className = "smart-minimum-panel";
+
+      panel.innerHTML = `
+        <div class="smart-minimum-head">
+          <div>
+            <span>Otomatik Asgari (%20)</span>
+            <strong id="smartMinimumAmount">₺0,00</strong>
+          </div>
+
+          <span
+            id="smartMinimumBadge"
+            class="smart-minimum-badge waiting"
+          >
+            Kart seç
+          </span>
+        </div>
+
+        <div class="smart-minimum-grid">
+          <div>
+            <span>Bu dönem ödendi</span>
+            <strong id="smartPaidAmount">₺0,00</strong>
+          </div>
+
+          <div>
+            <span>Kalan asgari</span>
+            <strong id="smartRemainingAmount">₺0,00</strong>
+          </div>
+        </div>
+
+        <div class="smart-minimum-track">
+          <div id="smartMinimumProgress"></div>
+        </div>
+
+        <small id="smartMinimumText">
+          Kart seçildiğinde otomatik hesaplanır.
+        </small>
+
+        <button
+          id="payMinimumButton"
+          class="smart-minimum-button"
+          type="button"
+          disabled
+        >
+          ⚡ Kalan Asgariyi Öde
+        </button>
+      `;
+
+      summary.insertAdjacentElement(
+        "afterend",
+        panel
+      );
     }
 
-    button.addEventListener("click", () => {
-      openNotificationPanel();
-    });
+    refreshMinimumPanel();
   }
 
-  function createNotificationPanel() {
-    if (document.getElementById("yfNotificationLayer")) return;
+  function refreshMinimumPanel() {
+    repairPanelOnlyIfNeeded();
 
-    const layer = document.createElement("div");
-    layer.id = "yfNotificationLayer";
-    layer.className = "yf-notification-layer hidden";
+    const panel = $("smartMinimumPanel");
+    const select = $("debtPaymentCard");
+
+    if (!panel || !select) return;
+
+    const debt = loadJson(DEBT_KEY).find(
+      item =>
+        String(item.id) ===
+        String(select.value)
+    );
+
+    const amountEl =
+      $("smartMinimumAmount");
+
+    const paidEl =
+      $("smartPaidAmount");
+
+    const remainingEl =
+      $("smartRemainingAmount");
+
+    const badge =
+      $("smartMinimumBadge");
+
+    const fill =
+      $("smartMinimumProgress");
+
+    const text =
+      $("smartMinimumText");
+
+    const button =
+      $("payMinimumButton");
+
+    if (!debt) {
+      panel.classList.remove("hidden");
+
+      setMoneyElement(amountEl, 0);
+      setMoneyElement(paidEl, 0);
+      setMoneyElement(remainingEl, 0);
+
+      if (badge) {
+        badge.textContent = "Kart seç";
+        badge.className =
+          "smart-minimum-badge waiting";
+      }
+
+      if (fill) {
+        fill.style.width = "0%";
+      }
+
+      if (text) {
+        text.textContent =
+          "Kart seçildiğinde otomatik hesaplanır.";
+      }
+
+      if (button) {
+        button.disabled = true;
+      }
+
+      return;
+    }
+
+    // İhtiyaç kredisinde asgari paneli kesinlikle görünmez.
+    if (debt.type === "personal-loan") {
+      panel.classList.add("hidden");
+      return;
+    }
+
+    panel.classList.remove("hidden");
+
+    const info = getMinimumInfo(
+      debt,
+      loadJson(TX_KEY)
+    );
+
+    setMoneyElement(
+      amountEl,
+      info.minimum
+    );
+
+    setMoneyElement(
+      paidEl,
+      info.paid
+    );
+
+    setMoneyElement(
+      remainingEl,
+      info.remaining
+    );
+
+    if (fill) {
+      fill.style.width =
+        `${info.percent}%`;
+    }
+
+    if (text) {
+      text.textContent =
+        `${formatMoney(info.paid)} / ` +
+        `${formatMoney(info.minimum)} · ` +
+        `%${info.percent}`;
+    }
+
+    if (info.remaining <= 0) {
+      if (badge) {
+        badge.textContent =
+          "Asgari ödendi ✓";
+
+        badge.className =
+          "smart-minimum-badge completed";
+      }
+
+      if (button) {
+        button.disabled = true;
+      }
+    } else if (info.paid > 0) {
+      if (badge) {
+        badge.textContent =
+          "Kısmen ödendi";
+
+        badge.className =
+          "smart-minimum-badge partial";
+      }
+
+      if (button) {
+        button.disabled = false;
+      }
+    } else {
+      if (badge) {
+        badge.textContent =
+          "Asgari bekliyor";
+
+        badge.className =
+          "smart-minimum-badge waiting";
+      }
+
+      if (button) {
+        button.disabled = false;
+      }
+    }
+  }
+
+  function repairPanelOnlyIfNeeded() {
+    if ($("smartMinimumPanel")) return;
+
+    const summary =
+      document.querySelector(
+        "#debtPaymentPage .debt-payment-summary"
+      );
+
+    if (!summary) return;
+
+    const panel =
+      document.createElement("section");
+
+    panel.id = "smartMinimumPanel";
+    panel.className =
+      "smart-minimum-panel";
+
+    panel.innerHTML = `
+      <div class="smart-minimum-head">
+        <div>
+          <span>Otomatik Asgari (%20)</span>
+          <strong id="smartMinimumAmount">₺0,00</strong>
+        </div>
+
+        <span
+          id="smartMinimumBadge"
+          class="smart-minimum-badge waiting"
+        >
+          Kart seç
+        </span>
+      </div>
+
+      <div class="smart-minimum-grid">
+        <div>
+          <span>Bu dönem ödendi</span>
+          <strong id="smartPaidAmount">₺0,00</strong>
+        </div>
+
+        <div>
+          <span>Kalan asgari</span>
+          <strong id="smartRemainingAmount">₺0,00</strong>
+        </div>
+      </div>
+
+      <div class="smart-minimum-track">
+        <div id="smartMinimumProgress"></div>
+      </div>
+
+      <small id="smartMinimumText">
+        Kart seçildiğinde otomatik hesaplanır.
+      </small>
+
+      <button
+        id="payMinimumButton"
+        class="smart-minimum-button"
+        type="button"
+        disabled
+      >
+        ⚡ Kalan Asgariyi Öde
+      </button>
+    `;
+
+    summary.insertAdjacentElement(
+      "afterend",
+      panel
+    );
+  }
+
+  function payExactMinimum() {
+    const select =
+      $("debtPaymentCard");
+
+    const amountInput =
+      $("debtPaymentAmount");
+
+    const form =
+      $("debtPaymentForm");
+
+    if (
+      !select ||
+      !amountInput ||
+      !form
+    ) {
+      return;
+    }
+
+    const card =
+      loadJson(DEBT_KEY).find(
+        item =>
+          String(item.id) ===
+          String(select.value)
+      );
+
+    if (
+      !card ||
+      card.type === "personal-loan"
+    ) {
+      return;
+    }
+
+    const info =
+      getMinimumInfo(
+        card,
+        loadJson(TX_KEY)
+      );
+
+    if (info.remaining <= 0) {
+      return;
+    }
+
+    amountInput.value =
+      Math.min(
+        Number(info.remaining),
+        Number(card.debt || 0)
+      ).toFixed(2);
+
+    form.requestSubmit();
+  }
+
+  function getMinimumInfo(
+    card,
+    transactions
+  ) {
+    // Yeni döneme geçti ama yeni ekstre daha kesilmediyse
+    // eski dönem ödemesini tamamlanmış göster.
+    const statementDate =
+      parseDate(card.statementDate);
+
+    const waitingNextStatement =
+      Boolean(
+        card.lastAutoRolledCycle &&
+        statementDate &&
+        statementDate >
+          startOfDay(new Date())
+      );
+
+    if (waitingNextStatement) {
+      const oldPaid =
+        roundMoney(
+          transactions
+            .filter(tx =>
+              tx.type ===
+                "card-payment" &&
+              String(tx.cardId) ===
+                String(card.id) &&
+              tx.statementCycle ===
+                card.lastAutoRolledCycle
+            )
+            .reduce(
+              (sum, tx) =>
+                sum +
+                Number(tx.amount || 0),
+              0
+            )
+        );
+
+      return {
+        minimum: oldPaid,
+        paid: oldPaid,
+        remaining: 0,
+        percent: 100
+      };
+    }
+
+    const statementDebt =
+      Math.max(
+        0,
+        Number(
+          card.statementDebt !==
+          undefined
+            ? card.statementDebt
+            : card.debt || 0
+        )
+      );
+
+    const minimum =
+      roundMoney(
+        statementDebt * 0.20
+      );
+
+    const cycle =
+      card.statementCycle ||
+      cycleKey(card.dueDate);
+
+    const paid =
+      roundMoney(
+        transactions
+          .filter(tx => {
+            if (
+              tx.type !==
+                "card-payment" ||
+              String(tx.cardId) !==
+                String(card.id)
+            ) {
+              return false;
+            }
+
+            if (
+              tx.statementCycle
+            ) {
+              return (
+                tx.statementCycle ===
+                cycle
+              );
+            }
+
+            return isSameMonth(
+              tx.createdAt ||
+                tx.date,
+              card.dueDate
+            );
+          })
+          .reduce(
+            (sum, tx) =>
+              sum +
+              Number(tx.amount || 0),
+            0
+          )
+      );
+
+    const remaining =
+      roundMoney(
+        Math.max(
+          0,
+          minimum - paid
+        )
+      );
+
+    const percent =
+      minimum > 0
+        ? Math.min(
+            100,
+            Math.max(
+              0,
+              Math.round(
+                (paid / minimum) *
+                  100
+              )
+            )
+          )
+        : 100;
+
+    return {
+      minimum,
+      paid,
+      remaining,
+      percent
+    };
+  }
+
+  // =================================================
+  // 2) SABİT BİLDİRİM MERKEZİ
+  // =================================================
+  function createFixedNotificationCenter() {
+    // Eski/yanlış bildirim elemanları varsa temizle.
+    $("yfNotificationButton")?.remove();
+    $("yfNotificationLayer")?.remove();
+
+    const button =
+      document.createElement("button");
+
+    button.id =
+      "yfNotificationButton";
+
+    button.type = "button";
+
+    button.className =
+      "yf-v51-notification-button";
+
+    button.setAttribute(
+      "aria-label",
+      "Bildirimler"
+    );
+
+    button.innerHTML = `
+      <span>🔔</span>
+
+      <strong
+        id="yfNotificationCount"
+        class="hidden"
+      >
+        0
+      </strong>
+    `;
+
+    document.body.appendChild(button);
+
+    const layer =
+      document.createElement("div");
+
+    layer.id =
+      "yfNotificationLayer";
+
+    layer.className =
+      "yf-v51-notification-layer hidden";
 
     layer.innerHTML = `
-      <div class="yf-notification-backdrop"></div>
+      <div
+        class="yf-v51-notification-backdrop"
+      ></div>
 
-      <section class="yf-notification-sheet">
-        <div class="yf-notification-handle"></div>
+      <section
+        class="yf-v51-notification-sheet"
+      >
+        <div
+          class="yf-v51-notification-handle"
+        ></div>
 
-        <header class="yf-notification-header">
+        <header
+          class="yf-v51-notification-header"
+        >
           <div>
             <span>BİLDİRİM MERKEZİ</span>
             <h2>Finans Uyarıları</h2>
@@ -14794,98 +15300,167 @@ document.addEventListener("DOMContentLoaded", () => {
 
           <button
             id="yfNotificationClose"
-            class="yf-notification-close"
             type="button"
           >
             ×
           </button>
         </header>
 
-        <div class="yf-notification-summary">
+        <div
+          class="yf-v51-notification-summary"
+        >
           <div>
             <span>Önemli</span>
-            <strong id="yfNotificationUrgent">0</strong>
+            <strong
+              id="yfNotificationUrgent"
+            >
+              0
+            </strong>
           </div>
 
           <div>
             <span>Yaklaşan</span>
-            <strong id="yfNotificationUpcoming">0</strong>
+            <strong
+              id="yfNotificationUpcoming"
+            >
+              0
+            </strong>
           </div>
 
           <div>
             <span>Tamamlanan</span>
-            <strong id="yfNotificationCompleted">0</strong>
+            <strong
+              id="yfNotificationCompleted"
+            >
+              0
+            </strong>
           </div>
         </div>
 
-        <div class="yf-notification-actions">
-          <button
-            id="yfNotificationMarkAll"
-            type="button"
-          >
-            Tümünü okundu yap
-          </button>
-        </div>
+        <button
+          id="yfNotificationMarkAll"
+          class="yf-v51-mark-all"
+          type="button"
+        >
+          Tümünü okundu yap
+        </button>
 
         <div
           id="yfNotificationList"
-          class="yf-notification-list"
+          class="yf-v51-notification-list"
         ></div>
       </section>
     `;
 
     document.body.appendChild(layer);
 
+    button.addEventListener(
+      "click",
+      () => {
+        refreshNotifications();
+
+        layer.classList.remove(
+          "hidden"
+        );
+
+        document.body.style.overflow =
+          "hidden";
+      }
+    );
+
     layer
-      .querySelector(".yf-notification-backdrop")
-      ?.addEventListener("click", closeNotificationPanel);
+      .querySelector(
+        ".yf-v51-notification-backdrop"
+      )
+      ?.addEventListener(
+        "click",
+        closeNotifications
+      );
 
-    document
-      .getElementById("yfNotificationClose")
-      ?.addEventListener("click", closeNotificationPanel);
+    $("yfNotificationClose")
+      ?.addEventListener(
+        "click",
+        closeNotifications
+      );
 
-    document
-      .getElementById("yfNotificationMarkAll")
-      ?.addEventListener("click", markAllRead);
+    $("yfNotificationMarkAll")
+      ?.addEventListener(
+        "click",
+        markAllRead
+      );
+
+    refreshNotifications();
   }
 
   function refreshNotifications() {
-    const list = document.getElementById("yfNotificationList");
+    const list =
+      $("yfNotificationList");
+
     if (!list) return;
 
-    const notifications = buildNotifications();
-    const readMap = loadReadMap();
+    const notifications =
+      buildNotifications();
 
-    const enriched = notifications.map(item => ({
-      ...item,
-      read: Boolean(readMap[item.id])
-    }));
+    const readMap =
+      loadReadMap();
 
-    const unread = enriched.filter(item => !item.read);
-    const urgent = enriched.filter(
-      item =>
-        item.kind === "overdue" ||
-        item.kind === "today" ||
-        item.kind === "tomorrow"
+    const enriched =
+      notifications.map(item => ({
+        ...item,
+        read:
+          Boolean(
+            readMap[item.id]
+          )
+      }));
+
+    const unread =
+      enriched.filter(
+        item => !item.read
+      );
+
+    const urgent =
+      enriched.filter(
+        item =>
+          item.kind === "overdue" ||
+          item.kind === "today" ||
+          item.kind === "tomorrow"
+      );
+
+    const upcoming =
+      enriched.filter(
+        item =>
+          item.kind === "upcoming"
+      );
+
+    const completed =
+      enriched.filter(
+        item =>
+          item.kind === "completed"
+      );
+
+    setText(
+      "yfNotificationUrgent",
+      urgent.length
     );
 
-    const upcoming = enriched.filter(
-      item => item.kind === "upcoming"
+    setText(
+      "yfNotificationUpcoming",
+      upcoming.length
     );
 
-    const completed = enriched.filter(
-      item => item.kind === "completed"
+    setText(
+      "yfNotificationCompleted",
+      completed.length
     );
 
-    setText("yfNotificationUrgent", urgent.length);
-    setText("yfNotificationUpcoming", upcoming.length);
-    setText("yfNotificationCompleted", completed.length);
-
-    const count = document.getElementById("yfNotificationCount");
+    const count =
+      $("yfNotificationCount");
 
     if (count) {
       count.textContent =
-        unread.length > 99 ? "99+" : String(unread.length);
+        unread.length > 99
+          ? "99+"
+          : String(unread.length);
 
       count.classList.toggle(
         "hidden",
@@ -14897,389 +15472,292 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (!enriched.length) {
       list.innerHTML = `
-        <div class="yf-notification-empty">
+        <div
+          class="yf-v51-notification-empty"
+        >
           <span>✓</span>
-          <strong>Şimdilik önemli bir uyarı yok</strong>
+          <strong>
+            Şimdilik önemli bir uyarı yok
+          </strong>
           <small>
-            Kart ve kredi tarihleri yaklaştığında burada görünecek.
+            Yaklaşan kart ve kredi
+            ödemeleri burada görünecek.
           </small>
         </div>
       `;
+
       return;
     }
 
     enriched
       .sort(sortNotifications)
       .forEach(item => {
-        list.appendChild(
-          createNotificationRow(item)
+        const row =
+          document.createElement(
+            "button"
+          );
+
+        row.type = "button";
+
+        row.className =
+          `yf-v51-notification-row ` +
+          `${item.kind} ` +
+          `${item.read ? "read" : "unread"}`;
+
+        row.innerHTML = `
+          <span
+            class="yf-v51-notification-icon"
+          >
+            ${item.icon}
+          </span>
+
+          <span
+            class="yf-v51-notification-main"
+          >
+            <strong>
+              ${escapeHtml(item.title)}
+            </strong>
+
+            <small>
+              ${escapeHtml(item.message)}
+            </small>
+
+            <em>
+              ${escapeHtml(item.timeText)}
+            </em>
+          </span>
+
+          ${
+            item.read
+              ? ""
+              : '<i class="yf-v51-notification-dot"></i>'
+          }
+        `;
+
+        row.addEventListener(
+          "click",
+          () => {
+            markRead(item.id);
+            closeNotifications();
+
+            if (
+              item.kind ===
+              "completed"
+            ) {
+              document
+                .querySelector(
+                  '[data-page="cardsPage"]'
+                )
+                ?.click();
+
+              return;
+            }
+
+            document
+              .querySelector(
+                '[data-page="debtPaymentPage"]'
+              )
+              ?.click();
+
+            setTimeout(() => {
+              const select =
+                $("debtPaymentCard");
+
+              if (!select) return;
+
+              select.value =
+                String(
+                  item.debtId
+                );
+
+              select.dispatchEvent(
+                new Event(
+                  "change",
+                  {
+                    bubbles: true
+                  }
+                )
+              );
+            }, 280);
+          }
         );
+
+        list.appendChild(row);
       });
   }
 
   function buildNotifications() {
-    const debts = loadJson(DEBT_KEY);
-    const transactions = loadJson(TX_KEY);
+    const debts =
+      loadJson(DEBT_KEY);
+
+    const transactions =
+      loadJson(TX_KEY);
+
     const result = [];
 
     debts.forEach(debt => {
-      if (Number(debt.debt || 0) <= 0) return;
+      if (
+        Number(debt.debt || 0) <= 0
+      ) {
+        return;
+      }
 
-      if (debt.type === "personal-loan") {
-        buildLoanNotification(
-          result,
-          debt
-        );
+      if (
+        debt.type ===
+        "personal-loan"
+      ) {
+        const date =
+          debt.nextPaymentDate ||
+          debt.dueDate;
+
+        if (!date) return;
+
+        const days =
+          daysLeft(date);
+
+        if (days > 14) return;
+
+        let kind =
+          "upcoming";
+
+        let title =
+          "Kredi taksiti yaklaşıyor";
+
+        if (days < 0) {
+          kind = "overdue";
+          title =
+            "Kredi taksiti gecikti";
+        } else if (days === 0) {
+          kind = "today";
+          title =
+            "Kredi taksiti bugün";
+        } else if (days === 1) {
+          kind =
+            "tomorrow";
+
+          title =
+            "Kredi taksiti yarın";
+        }
+
+        result.push({
+          id:
+            `loan-${debt.id}-${date}`,
+          debtId:
+            debt.id,
+          kind,
+          icon: "🏦",
+          title,
+          message:
+            `${debt.bank} · ` +
+            `${debt.name} · ` +
+            `${formatMoney(
+              debt.monthlyInstallment
+            )}`,
+          timeText:
+            timeText(days)
+        });
 
         return;
       }
 
-      buildCardNotifications(
-        result,
-        debt,
-        transactions
-      );
+      const info =
+        getMinimumInfo(
+          debt,
+          transactions
+        );
+
+      if (
+        info.remaining <= 0
+      ) {
+        result.push({
+          id:
+            `paid-${debt.id}-${debt.statementCycle || ""}`,
+          debtId:
+            debt.id,
+          kind:
+            "completed",
+          icon: "✓",
+          title:
+            "Asgari ödeme tamamlandı",
+          message:
+            `${debt.bank} · ` +
+            `${debt.name}`,
+          timeText:
+            "Tamamlandı"
+        });
+
+        return;
+      }
+
+      if (!debt.dueDate) return;
+
+      const days =
+        daysLeft(
+          debt.dueDate
+        );
+
+      if (days > 14) return;
+
+      let kind =
+        "upcoming";
+
+      let title =
+        "Kart asgarisi yaklaşıyor";
+
+      if (days < 0) {
+        kind = "overdue";
+        title =
+          "Kart ödemesi gecikti";
+      } else if (days === 0) {
+        kind = "today";
+        title =
+          "Kart son ödeme günü bugün";
+      } else if (days === 1) {
+        kind =
+          "tomorrow";
+
+        title =
+          "Kart son ödeme günü yarın";
+      }
+
+      result.push({
+        id:
+          `card-${debt.id}-${debt.dueDate}`,
+        debtId:
+          debt.id,
+        kind,
+        icon: "💳",
+        title,
+        message:
+          `${debt.bank} · ` +
+          `${debt.name} · ` +
+          `${formatMoney(
+            info.remaining
+          )} kaldı`,
+        timeText:
+          timeText(days)
+      });
     });
 
     return result;
   }
 
-  // -------------------------------------------------
-  // KREDİ BİLDİRİMLERİ
-  // -------------------------------------------------
-  function buildLoanNotification(result, loan) {
-    const date =
-      loan.nextPaymentDate || loan.dueDate;
-
-    if (!date) return;
-
-    const days = daysLeft(date);
-
-    // 14 günden uzak kredileri bildirim merkezinde göstermiyoruz.
-    if (days > 14) return;
-
-    let kind = "upcoming";
-    let title = "Kredi taksiti yaklaşıyor";
-    let message =
-      `${loan.bank} · ${loan.name} — ` +
-      `${formatMoney(loan.monthlyInstallment)} taksit`;
-
-    if (days < 0) {
-      kind = "overdue";
-      title = "Kredi taksiti gecikti";
-      message += ` · ${Math.abs(days)} gün gecikmiş`;
-    } else if (days === 0) {
-      kind = "today";
-      title = "Kredi taksiti bugün";
-      message += " · bugün ödenmeli";
-    } else if (days === 1) {
-      kind = "tomorrow";
-      title = "Kredi taksiti yarın";
-      message += " · yarın son gün";
-    } else {
-      message += ` · ${days} gün kaldı`;
-    }
-
-    result.push({
-      id:
-        `loan-${loan.id}-${date}-${kind}`,
-      debtId: loan.id,
-      debtType: "personal-loan",
-      kind,
-      icon: "🏦",
-      title,
-      message,
-      date,
-      days
-    });
-  }
-
-  // -------------------------------------------------
-  // KREDİ KARTI BİLDİRİMLERİ
-  // -------------------------------------------------
-  function buildCardNotifications(
-    result,
-    card,
-    transactions
-  ) {
-    const waitingNextStatement =
-      Boolean(
-        card.lastAutoRolledCycle &&
-        parseDate(card.statementDate) &&
-        parseDate(card.statementDate) >
-          startOfDay(new Date())
+  function closeNotifications() {
+    $("yfNotificationLayer")
+      ?.classList.add(
+        "hidden"
       );
 
-    if (waitingNextStatement) {
-      result.push({
-        id:
-          `card-paid-${card.id}-${card.lastAutoRolledCycle}`,
-        debtId: card.id,
-        debtType: "credit-card",
-        kind: "completed",
-        icon: "✓",
-        title: "Asgari ödeme tamamlandı",
-        message:
-          `${card.bank} · ${card.name} — ` +
-          `son dönem asgarisi ödendi`,
-        date: card.statementDate,
-        days: 999
-      });
-
-      return;
-    }
-
-    const minimum = getMinimumInfo(
-      card,
-      transactions
-    );
-
-    if (minimum.remaining <= 0) {
-      result.push({
-        id:
-          `card-paid-${card.id}-${minimum.cycle}`,
-        debtId: card.id,
-        debtType: "credit-card",
-        kind: "completed",
-        icon: "✓",
-        title: "Asgari ödeme tamamlandı",
-        message:
-          `${card.bank} · ${card.name} — ` +
-          `${formatMoney(minimum.minimum)} ödendi`,
-        date: card.dueDate,
-        days: 999
-      });
-
-      return;
-    }
-
-    if (!card.dueDate) return;
-
-    const days = daysLeft(card.dueDate);
-
-    if (days > 14) return;
-
-    let kind = "upcoming";
-    let title = "Kart asgarisi yaklaşıyor";
-    let message =
-      `${card.bank} · ${card.name} — ` +
-      `${formatMoney(minimum.remaining)} kaldı`;
-
-    if (days < 0) {
-      kind = "overdue";
-      title = "Kart ödemesi gecikti";
-      message += ` · ${Math.abs(days)} gün gecikmiş`;
-    } else if (days === 0) {
-      kind = "today";
-      title = "Kart son ödeme günü bugün";
-      message += " · bugün son gün";
-    } else if (days === 1) {
-      kind = "tomorrow";
-      title = "Kart son ödeme günü yarın";
-      message += " · yarın son gün";
-    } else {
-      message += ` · ${days} gün kaldı`;
-    }
-
-    result.push({
-      id:
-        `card-${card.id}-${card.dueDate}-${kind}`,
-      debtId: card.id,
-      debtType: "credit-card",
-      kind,
-      icon: "💳",
-      title,
-      message,
-      date: card.dueDate,
-      days
-    });
-
-    // Ekstre kesimine 3 gün veya daha az kaldıysa ayrı bilgi.
-    if (card.statementDate) {
-      const statementDays =
-        daysLeft(card.statementDate);
-
-      if (
-        statementDays >= 0 &&
-        statementDays <= 3
-      ) {
-        result.push({
-          id:
-            `statement-${card.id}-${card.statementDate}`,
-          debtId: card.id,
-          debtType: "credit-card",
-          kind:
-            statementDays === 0
-              ? "today"
-              : "upcoming",
-          icon: "📄",
-          title:
-            statementDays === 0
-              ? "Ekstre bugün kesiliyor"
-              : "Ekstre kesimi yaklaşıyor",
-          message:
-            `${card.bank} · ${card.name} — ` +
-            (
-              statementDays === 0
-                ? "bugün ekstre kesim günü"
-                : `${statementDays} gün kaldı`
-            ),
-          date: card.statementDate,
-          days: statementDays
-        });
-      }
-    }
+    document.body.style.overflow =
+      "";
   }
 
-  function getMinimumInfo(
-    card,
-    transactions
-  ) {
-    const statementDebt = Math.max(
-      0,
-      Number(
-        card.statementDebt !== undefined
-          ? card.statementDebt
-          : card.debt || 0
-      )
-    );
-
-    const minimum = roundMoney(
-      statementDebt * 0.20
-    );
-
-    const cycle =
-      card.statementCycle ||
-      cycleKey(card.dueDate);
-
-    const paid = roundMoney(
-      transactions
-        .filter(tx => {
-          if (
-            tx.type !== "card-payment" ||
-            String(tx.cardId) !==
-              String(card.id)
-          ) {
-            return false;
-          }
-
-          if (tx.statementCycle) {
-            return tx.statementCycle === cycle;
-          }
-
-          return isSameMonth(
-            tx.createdAt || tx.date,
-            card.dueDate
-          );
-        })
-        .reduce(
-          (sum, tx) =>
-            sum + Number(tx.amount || 0),
-          0
-        )
-    );
-
-    return {
-      cycle,
-      minimum,
-      paid,
-      remaining: roundMoney(
-        Math.max(0, minimum - paid)
-      )
-    };
-  }
-
-  // -------------------------------------------------
-  // BİLDİRİM SATIRI
-  // -------------------------------------------------
-  function createNotificationRow(item) {
-    const row = document.createElement("button");
-    row.type = "button";
-
-    row.className =
-      `yf-notification-row ${item.kind} ` +
-      `${item.read ? "read" : "unread"}`;
-
-    row.innerHTML = `
-      <span class="yf-notification-row-icon">
-        ${item.icon}
-      </span>
-
-      <span class="yf-notification-row-main">
-        <strong>${escapeHtml(item.title)}</strong>
-        <small>${escapeHtml(item.message)}</small>
-        <em>${notificationTimeText(item)}</em>
-      </span>
-
-      ${
-        item.read
-          ? ""
-          : '<span class="yf-notification-dot"></span>'
-      }
-    `;
-
-    row.addEventListener("click", () => {
-      markRead(item.id);
-      closeNotificationPanel();
-
-      if (item.kind === "completed") {
-        document
-          .querySelector('[data-page="cardsPage"]')
-          ?.click();
-
-        return;
-      }
-
-      document
-        .querySelector('[data-page="debtPaymentPage"]')
-        ?.click();
-
-      setTimeout(() => {
-        const select =
-          document.getElementById("debtPaymentCard");
-
-        if (!select) return;
-
-        select.value = String(item.debtId);
-
-        select.dispatchEvent(
-          new Event("change", {
-            bubbles: true
-          })
-        );
-      }, 280);
-    });
-
-    return row;
-  }
-
-  function notificationTimeText(item) {
-    if (item.kind === "completed") {
-      return "Tamamlandı";
-    }
-
-    if (item.days < 0) {
-      return `${Math.abs(item.days)} gün gecikmiş`;
-    }
-
-    if (item.days === 0) {
-      return "Bugün";
-    }
-
-    if (item.days === 1) {
-      return "Yarın";
-    }
-
-    return `${item.days} gün sonra`;
-  }
-
-  // -------------------------------------------------
-  // OKUNDU DURUMU
-  // -------------------------------------------------
   function markRead(id) {
-    const map = loadReadMap();
+    const map =
+      loadReadMap();
 
-    map[id] = Date.now();
+    map[id] =
+      Date.now();
 
     localStorage.setItem(
       READ_KEY,
@@ -15290,11 +15768,14 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function markAllRead() {
-    const map = loadReadMap();
+    const map =
+      loadReadMap();
 
-    buildNotifications().forEach(item => {
-      map[item.id] = Date.now();
-    });
+    buildNotifications()
+      .forEach(item => {
+        map[item.id] =
+          Date.now();
+      });
 
     localStorage.setItem(
       READ_KEY,
@@ -15307,39 +15788,19 @@ document.addEventListener("DOMContentLoaded", () => {
   function loadReadMap() {
     try {
       return JSON.parse(
-        localStorage.getItem(READ_KEY) ||
-        "{}"
+        localStorage.getItem(
+          READ_KEY
+        ) || "{}"
       );
     } catch {
       return {};
     }
   }
 
-  // -------------------------------------------------
-  // PANEL
-  // -------------------------------------------------
-  function openNotificationPanel() {
-    refreshNotifications();
-
-    document
-      .getElementById("yfNotificationLayer")
-      ?.classList.remove("hidden");
-
-    document.body.style.overflow = "hidden";
-  }
-
-  function closeNotificationPanel() {
-    document
-      .getElementById("yfNotificationLayer")
-      ?.classList.add("hidden");
-
-    document.body.style.overflow = "";
-  }
-
-  // -------------------------------------------------
-  // YARDIMCILAR
-  // -------------------------------------------------
-  function sortNotifications(a, b) {
+  function sortNotifications(
+    a,
+    b
+  ) {
     const priority = {
       overdue: 0,
       today: 1,
@@ -15348,58 +15809,95 @@ document.addEventListener("DOMContentLoaded", () => {
       completed: 4
     };
 
-    const priorityDiff =
+    return (
       (priority[a.kind] ?? 9) -
-      (priority[b.kind] ?? 9);
-
-    if (priorityDiff !== 0) {
-      return priorityDiff;
-    }
-
-    return Number(a.days || 0) -
-      Number(b.days || 0);
+      (priority[b.kind] ?? 9)
+    );
   }
 
-  function daysLeft(value) {
-    const date = parseDate(value);
+  function timeText(days) {
+    if (days < 0) {
+      return `${Math.abs(days)} gün gecikmiş`;
+    }
 
-    if (!date) return 999999;
+    if (days === 0) {
+      return "Bugün";
+    }
+
+    if (days === 1) {
+      return "Yarın";
+    }
+
+    return `${days} gün sonra`;
+  }
+
+  // =================================================
+  // ORTAK YARDIMCILAR
+  // =================================================
+  function daysLeft(value) {
+    const date =
+      parseDate(value);
+
+    if (!date) {
+      return 999999;
+    }
 
     const today =
-      startOfDay(new Date());
+      startOfDay(
+        new Date()
+      );
 
-    date.setHours(0, 0, 0, 0);
+    date.setHours(
+      0,
+      0,
+      0,
+      0
+    );
 
     return Math.ceil(
-      (date - today) / 86400000
+      (date - today) /
+      86400000
     );
   }
 
   function parseDate(value) {
     if (!value) return null;
 
-    const date = new Date(
-      String(value).includes("T")
-        ? value
-        : `${value}T12:00:00`
-    );
+    const date =
+      new Date(
+        String(value)
+          .includes("T")
+          ? value
+          : `${value}T12:00:00`
+      );
 
-    return Number.isNaN(date.getTime())
+    return Number.isNaN(
+      date.getTime()
+    )
       ? null
       : date;
   }
 
   function startOfDay(value) {
-    const date = new Date(value);
-    date.setHours(0, 0, 0, 0);
+    const date =
+      new Date(value);
+
+    date.setHours(
+      0,
+      0,
+      0,
+      0
+    );
+
     return date;
   }
 
   function cycleKey(value) {
     const match =
-      String(value || "").match(
-        /^(\d{4})-(\d{2})/
-      );
+      String(value || "")
+        .match(
+          /^(\d{4})-(\d{2})/
+        );
 
     return match
       ? `${match[1]}-${match[2]}`
@@ -15410,13 +15908,26 @@ document.addEventListener("DOMContentLoaded", () => {
     firstValue,
     secondValue
   ) {
-    const first = parseDate(firstValue);
-    const second = parseDate(secondValue);
+    const first =
+      parseDate(
+        firstValue
+      );
 
-    if (!first || !second) return false;
+    const second =
+      parseDate(
+        secondValue
+      );
+
+    if (
+      !first ||
+      !second
+    ) {
+      return false;
+    }
 
     return (
-      first.getMonth() === second.getMonth() &&
+      first.getMonth() ===
+        second.getMonth() &&
       first.getFullYear() ===
         second.getFullYear()
     );
@@ -15424,8 +15935,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function roundMoney(value) {
     return Math.round(
-      (Number(value) +
-        Number.EPSILON) * 100
+      (
+        Number(value) +
+        Number.EPSILON
+      ) * 100
     ) / 100;
   }
 
@@ -15436,12 +15949,27 @@ document.addEventListener("DOMContentLoaded", () => {
         style: "currency",
         currency: "TRY"
       }
-    ).format(Number(value) || 0);
+    ).format(
+      Number(value) || 0
+    );
   }
 
-  function setText(id, value) {
+  function setMoneyElement(
+    element,
+    value
+  ) {
+    if (element) {
+      element.textContent =
+        formatMoney(value);
+    }
+  }
+
+  function setText(
+    id,
+    value
+  ) {
     const element =
-      document.getElementById(id);
+      $(id);
 
     if (element) {
       element.textContent =
@@ -15452,8 +15980,9 @@ document.addEventListener("DOMContentLoaded", () => {
   function loadJson(key) {
     try {
       return JSON.parse(
-        localStorage.getItem(key) ||
-        "[]"
+        localStorage.getItem(
+          key
+        ) || "[]"
       );
     } catch {
       return [];
@@ -15461,60 +15990,73 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function escapeHtml(value) {
-    return String(value ?? "")
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#039;");
+    return String(
+      value ?? ""
+    )
+      .replaceAll(
+        "&",
+        "&amp;"
+      )
+      .replaceAll(
+        "<",
+        "&lt;"
+      )
+      .replaceAll(
+        ">",
+        "&gt;"
+      )
+      .replaceAll(
+        '"',
+        "&quot;"
+      )
+      .replaceAll(
+        "'",
+        "&#039;"
+      );
   }
 
-  // -------------------------------------------------
+  // =================================================
   // TASARIM
-  // -------------------------------------------------
-  function installNotificationStyles() {
+  // =================================================
+  function installV51Styles() {
     if (
-      document.getElementById(
-        "yfNotificationStylesV50"
-      )
+      $("yfV51Styles")
     ) {
       return;
     }
 
     const style =
-      document.createElement("style");
+      document.createElement(
+        "style"
+      );
 
     style.id =
-      "yfNotificationStylesV50";
+      "yfV51Styles";
 
     style.textContent = `
-      .yf-notification-button {
-        position: relative;
-        width: 38px;
-        height: 38px;
-        flex: 0 0 38px;
-        display: inline-flex;
+      .yf-v51-notification-button {
+        position: fixed !important;
+        z-index: 9500 !important;
+        top: calc(14px + env(safe-area-inset-top));
+        right: 58px;
+        width: 40px;
+        height: 40px;
+        display: flex !important;
         align-items: center;
         justify-content: center;
-        border: 1px solid rgba(255,255,255,.08);
-        border-radius: 12px;
+        border: 1px solid rgba(255,255,255,.11);
+        border-radius: 13px;
         color: inherit;
-        background: rgba(255,255,255,.035);
+        background: rgba(14,31,45,.94);
+        box-shadow: 0 8px 25px rgba(0,0,0,.24);
         font: inherit;
       }
 
-      .yf-notification-floating {
-        position: fixed;
-        z-index: 70;
-        top: 18px;
-        right: 68px;
+      .yf-v51-notification-button > span {
+        font-size: 17px;
       }
 
-      .yf-notification-bell {
-        font-size: 16px;
-      }
-
-      .yf-notification-count {
+      .yf-v51-notification-button > strong {
         position: absolute;
         top: -5px;
         right: -5px;
@@ -15529,10 +16071,9 @@ document.addEventListener("DOMContentLoaded", () => {
         color: #fff;
         background: #e95c5c;
         font-size: 8px;
-        font-weight: 900;
       }
 
-      .yf-notification-layer {
+      .yf-v51-notification-layer {
         position: fixed;
         z-index: 9999;
         inset: 0;
@@ -15541,57 +16082,58 @@ document.addEventListener("DOMContentLoaded", () => {
         justify-content: center;
       }
 
-      .yf-notification-layer.hidden {
+      .yf-v51-notification-layer.hidden {
         display: none !important;
       }
 
-      .yf-notification-backdrop {
+      .yf-v51-notification-backdrop {
         position: absolute;
         inset: 0;
-        background: rgba(0,0,0,.62);
+        background: rgba(0,0,0,.65);
         backdrop-filter: blur(4px);
       }
 
-      .yf-notification-sheet {
+      .yf-v51-notification-sheet {
         position: relative;
         width: min(100%,520px);
         max-height: 88vh;
-        overflow: auto;
-        padding: 10px 16px 24px;
-        border: 1px solid rgba(255,255,255,.08);
+        overflow-y: auto;
+        padding: 10px 16px 26px;
         border-radius: 25px 25px 0 0;
+        border: 1px solid rgba(255,255,255,.09);
+        color: #fff;
         background: #101b26;
-        box-shadow: 0 -22px 60px rgba(0,0,0,.34);
+        box-shadow: 0 -25px 65px rgba(0,0,0,.4);
       }
 
-      .yf-notification-handle {
+      .yf-v51-notification-handle {
         width: 44px;
         height: 4px;
         margin: 0 auto 15px;
         border-radius: 999px;
-        background: rgba(255,255,255,.15);
+        background: rgba(255,255,255,.16);
       }
 
-      .yf-notification-header {
+      .yf-v51-notification-header {
         display: flex;
-        align-items: flex-start;
         justify-content: space-between;
+        align-items: flex-start;
         gap: 12px;
       }
 
-      .yf-notification-header > div > span {
+      .yf-v51-notification-header span {
         color: #4ce0aa;
         font-size: 8px;
         font-weight: 900;
         letter-spacing: .14em;
       }
 
-      .yf-notification-header h2 {
+      .yf-v51-notification-header h2 {
         margin: 5px 0 0;
         font-size: 21px;
       }
 
-      .yf-notification-close {
+      .yf-v51-notification-header button {
         width: 36px;
         height: 36px;
         border: 0;
@@ -15601,88 +16143,80 @@ document.addEventListener("DOMContentLoaded", () => {
         font-size: 21px;
       }
 
-      .yf-notification-summary {
+      .yf-v51-notification-summary {
         display: grid;
         grid-template-columns: repeat(3,minmax(0,1fr));
         gap: 8px;
-        margin-top: 16px;
+        margin-top: 15px;
       }
 
-      .yf-notification-summary > div {
+      .yf-v51-notification-summary > div {
         padding: 11px;
-        border: 1px solid rgba(255,255,255,.06);
         border-radius: 14px;
-        background: rgba(255,255,255,.025);
+        background: rgba(255,255,255,.035);
       }
 
-      .yf-notification-summary span,
-      .yf-notification-summary strong {
+      .yf-v51-notification-summary span,
+      .yf-v51-notification-summary strong {
         display: block;
       }
 
-      .yf-notification-summary span {
+      .yf-v51-notification-summary span {
         color: #8295a9;
         font-size: 8px;
       }
 
-      .yf-notification-summary strong {
+      .yf-v51-notification-summary strong {
         margin-top: 5px;
         font-size: 17px;
       }
 
-      .yf-notification-actions {
-        display: flex;
-        justify-content: flex-end;
-        margin-top: 11px;
-      }
-
-      .yf-notification-actions button {
+      .yf-v51-mark-all {
+        display: block;
+        margin: 11px 0 7px auto;
         border: 0;
         color: #91a4b8;
         background: transparent;
         font-size: 8px;
-        font-weight: 800;
       }
 
-      .yf-notification-list {
+      .yf-v51-notification-list {
         display: grid;
         gap: 8px;
-        margin-top: 7px;
       }
 
-      .yf-notification-row {
-        position: relative;
+      .yf-v51-notification-row {
         width: 100%;
         display: flex;
         align-items: center;
         gap: 11px;
         padding: 12px;
-        border: 1px solid rgba(255,255,255,.06);
+        border: 1px solid rgba(255,255,255,.07);
         border-radius: 15px;
         color: inherit;
-        background: rgba(255,255,255,.025);
+        background: rgba(255,255,255,.03);
         text-align: left;
         font: inherit;
       }
 
-      .yf-notification-row.unread {
-        background: rgba(255,255,255,.045);
+      .yf-v51-notification-row.unread {
+        background: rgba(255,255,255,.055);
       }
 
-      .yf-notification-row.overdue {
-        border-color: rgba(233,92,92,.22);
+      .yf-v51-notification-row.overdue {
+        border-color: rgba(233,92,92,.25);
       }
 
-      .yf-notification-row.today,
-      .yf-notification-row.tomorrow {
-        border-color: rgba(255,177,72,.20);
+      .yf-v51-notification-row.today,
+      .yf-v51-notification-row.tomorrow {
+        border-color: rgba(255,177,72,.24);
       }
 
-      .yf-notification-row.completed {
-        border-color: rgba(76,224,170,.15);
+      .yf-v51-notification-row.completed {
+        border-color: rgba(76,224,170,.18);
       }
 
-      .yf-notification-row-icon {
+      .yf-v51-notification-icon {
         width: 39px;
         height: 39px;
         flex: 0 0 39px;
@@ -15690,40 +16224,39 @@ document.addEventListener("DOMContentLoaded", () => {
         align-items: center;
         justify-content: center;
         border-radius: 12px;
-        background: rgba(255,255,255,.05);
+        background: rgba(255,255,255,.055);
         font-size: 16px;
       }
 
-      .yf-notification-row-main {
+      .yf-v51-notification-main {
         min-width: 0;
         flex: 1;
       }
 
-      .yf-notification-row-main strong,
-      .yf-notification-row-main small,
-      .yf-notification-row-main em {
+      .yf-v51-notification-main strong,
+      .yf-v51-notification-main small,
+      .yf-v51-notification-main em {
         display: block;
       }
 
-      .yf-notification-row-main strong {
+      .yf-v51-notification-main strong {
         font-size: 10px;
       }
 
-      .yf-notification-row-main small {
+      .yf-v51-notification-main small {
         margin-top: 4px;
         color: #94a5b7;
         font-size: 8px;
-        line-height: 1.45;
       }
 
-      .yf-notification-row-main em {
+      .yf-v51-notification-main em {
         margin-top: 5px;
         color: #6f8498;
         font-size: 7px;
         font-style: normal;
       }
 
-      .yf-notification-dot {
+      .yf-v51-notification-dot {
         width: 7px;
         height: 7px;
         flex: 0 0 7px;
@@ -15731,59 +16264,50 @@ document.addEventListener("DOMContentLoaded", () => {
         background: #4ce0aa;
       }
 
-      .yf-notification-empty {
-        padding: 30px 18px;
-        border: 1px dashed rgba(255,255,255,.08);
+      .yf-v51-notification-empty {
+        padding: 28px 16px;
+        border: 1px dashed rgba(255,255,255,.09);
         border-radius: 16px;
         text-align: center;
       }
 
-      .yf-notification-empty span,
-      .yf-notification-empty strong,
-      .yf-notification-empty small {
+      .yf-v51-notification-empty span,
+      .yf-v51-notification-empty strong,
+      .yf-v51-notification-empty small {
         display: block;
       }
 
-      .yf-notification-empty span {
-        width: 42px;
-        height: 42px;
-        margin: 0 auto 10px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 13px;
-        color: #4ce0aa;
-        background: rgba(76,224,170,.08);
-        font-size: 17px;
+      .yf-v51-notification-empty span {
+        font-size: 20px;
       }
 
-      .yf-notification-empty strong {
+      .yf-v51-notification-empty strong {
+        margin-top: 8px;
         font-size: 11px;
       }
 
-      .yf-notification-empty small {
+      .yf-v51-notification-empty small {
         margin-top: 6px;
         color: #8295a9;
         font-size: 8px;
-        line-height: 1.5;
       }
 
-      body.light-theme .yf-notification-sheet {
+      body.light-theme
+      .yf-v51-notification-button {
+        color: #102033;
+        background: rgba(255,255,255,.96);
+        border-color: rgba(20,73,112,.10);
+      }
+
+      body.light-theme
+      .yf-v51-notification-sheet {
         color: #102033;
         background: #f7f9fb;
       }
-
-      body.light-theme .yf-notification-count {
-        border-color: #f7f9fb;
-      }
-
-      body.light-theme .yf-notification-row,
-      body.light-theme .yf-notification-summary > div {
-        background: rgba(20,73,112,.035);
-        border-color: rgba(20,73,112,.07);
-      }
     `;
 
-    document.head.appendChild(style);
+    document.head.appendChild(
+      style
+    );
   }
 });
