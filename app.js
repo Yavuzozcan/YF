@@ -10992,3 +10992,386 @@ document.addEventListener("DOMContentLoaded", () => {
     ) / 100;
   }
 });
+
+// =========================================
+// YF v4.2 — KART ÖDEMESİ SİLİNCE DÖNEMİ GERİ AL
+// Ödeme ile ileri giden ekstre/son ödeme tarihi,
+// ödeme silinince gerekirse eski aya döner.
+// =========================================
+
+document.addEventListener("DOMContentLoaded", () => {
+  const DEBT_KEY = "yf_cards_v1";
+  const TX_KEY = "yf_transactions_v1";
+  const MINIMUM_RATE = 0.20;
+
+  repairPreviouslyRolledCards();
+
+  // Eski silme kodlarından ÖNCE çalışır.
+  document.addEventListener(
+    "click",
+    event => {
+      const deleteButton = event.target.closest(
+        "[data-del], [data-fixed-tx-delete]"
+      );
+
+      if (!deleteButton) return;
+
+      const transactionId =
+        deleteButton.dataset.del ||
+        deleteButton.dataset.fixedTxDelete;
+
+      if (!transactionId) return;
+
+      const transactions = loadJson(TX_KEY);
+      const transaction = transactions.find(
+        item => item.id === transactionId
+      );
+
+      // Sadece kredi kartı ödemesini burada yönetiyoruz.
+      // Kredi taksiti için mevcut çalışan sistem devam etsin.
+      if (
+        !transaction ||
+        transaction.type !== "card-payment"
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+
+      const approved = confirm(
+        "Bu kart ödemesi silinsin ve kart bilgileri eski haline getirilsin mi?"
+      );
+
+      if (!approved) return;
+
+      const debts = loadJson(DEBT_KEY);
+      const card = debts.find(
+        item =>
+          item.id === transaction.cardId &&
+          item.type !== "personal-loan"
+      );
+
+      if (!card) {
+        alert("Kredi kartı kaydı bulunamadı.");
+        return;
+      }
+
+      // Önce ödeme tutarını borca geri ekle.
+      card.debt = roundMoney(
+        Number(card.debt || 0) +
+        Number(transaction.amount || 0)
+      );
+
+      const remainingTransactions = transactions.filter(
+        item => item.id !== transactionId
+      );
+
+      rollbackCycleIfNeeded(
+        card,
+        transaction,
+        remainingTransactions
+      );
+
+      card.updatedAt = new Date().toISOString();
+
+      saveJson(DEBT_KEY, debts);
+      saveJson(TX_KEY, remainingTransactions);
+
+      window.dispatchEvent(
+        new CustomEvent("yf-refresh-dashboard")
+      );
+
+      window.dispatchEvent(
+        new CustomEvent("yf-refresh-payment-cards")
+      );
+
+      window.dispatchEvent(
+        new CustomEvent("yf-refresh-upcoming-payments")
+      );
+
+      sessionStorage.setItem(
+        "yf_open_transactions_after_card_delete_v42",
+        "1"
+      );
+
+      window.location.reload();
+    },
+    true
+  );
+
+  if (
+    sessionStorage.getItem(
+      "yf_open_transactions_after_card_delete_v42"
+    ) === "1"
+  ) {
+    sessionStorage.removeItem(
+      "yf_open_transactions_after_card_delete_v42"
+    );
+
+    setTimeout(() => {
+      document
+        .querySelector('[data-page="transactionsPage"]')
+        ?.click();
+    }, 300);
+  }
+
+  // -----------------------------------------
+  // SİLİNEN ÖDEME DÖNEMİ BOZUYORSA GERİ AL
+  // -----------------------------------------
+  function rollbackCycleIfNeeded(
+    card,
+    deletedTransaction,
+    remainingTransactions
+  ) {
+    const rolledCycle =
+      card.lastAutoRolledCycle || "";
+
+    if (!rolledCycle) return;
+
+    const deletedCycle =
+      deletedTransaction.statementCycle || "";
+
+    // Silinen ödeme, kartı ileri taşıyan döneme ait değilse
+    // tarihleri geri alma.
+    if (
+      deletedCycle &&
+      deletedCycle !== rolledCycle
+    ) {
+      return;
+    }
+
+    const paidRemaining = getCyclePaid(
+      card.id,
+      rolledCycle,
+      remainingTransactions
+    );
+
+    /*
+      Kart kullanımı yapılmayan düzende:
+      Eski dönem borcu =
+      ödeme silindikten sonraki güncel borç
+      + o eski dönemde hâlâ kayıtlı ödemeler.
+    */
+    const oldStatementDebt = roundMoney(
+      Number(card.debt || 0) +
+      paidRemaining
+    );
+
+    const oldMinimum = roundMoney(
+      oldStatementDebt * MINIMUM_RATE
+    );
+
+    // Diğer ödemeler hâlâ asgariyi karşılıyorsa
+    // dönem geri gitmez; yeni dönem başlangıç borcunu güncelle.
+    if (paidRemaining + 0.009 >= oldMinimum) {
+      card.statementDebt = roundMoney(
+        Number(card.debt || 0)
+      );
+      return;
+    }
+
+    rollbackOneMonth(
+      card,
+      rolledCycle,
+      oldStatementDebt
+    );
+  }
+
+  // -----------------------------------------
+  // DAHA ÖNCE HATALI ŞEKİLDE İLERİDE KALAN
+  // KARTLARI UYGULAMA AÇILIRKEN ONAR
+  // -----------------------------------------
+  function repairPreviouslyRolledCards() {
+    const debts = loadJson(DEBT_KEY);
+    const transactions = loadJson(TX_KEY);
+
+    let changed = false;
+
+    debts.forEach(card => {
+      if (card.type === "personal-loan") return;
+
+      const rolledCycle =
+        card.lastAutoRolledCycle || "";
+
+      if (!rolledCycle) return;
+
+      const paid = getCyclePaid(
+        card.id,
+        rolledCycle,
+        transactions
+      );
+
+      const oldStatementDebt = roundMoney(
+        Number(card.debt || 0) + paid
+      );
+
+      const minimum = roundMoney(
+        oldStatementDebt * MINIMUM_RATE
+      );
+
+      if (paid + 0.009 >= minimum) {
+        return;
+      }
+
+      rollbackOneMonth(
+        card,
+        rolledCycle,
+        oldStatementDebt
+      );
+
+      card.updatedAt = new Date().toISOString();
+      changed = true;
+    });
+
+    if (changed) {
+      saveJson(DEBT_KEY, debts);
+
+      window.dispatchEvent(
+        new CustomEvent("yf-refresh-dashboard")
+      );
+
+      window.dispatchEvent(
+        new CustomEvent("yf-refresh-payment-cards")
+      );
+
+      window.dispatchEvent(
+        new CustomEvent("yf-refresh-upcoming-payments")
+      );
+    }
+  }
+
+  function rollbackOneMonth(
+    card,
+    oldCycle,
+    oldStatementDebt
+  ) {
+    card.statementDate =
+      subtractOneMonthFixedDay(
+        card.statementDate,
+        Number(
+          card.statementDay ||
+          dayOf(card.statementDate)
+        )
+      );
+
+    card.dueDate =
+      subtractOneMonthFixedDay(
+        card.dueDate,
+        Number(
+          card.dueDay ||
+          dayOf(card.dueDate)
+        )
+      );
+
+    card.statementCycle = oldCycle;
+
+    card.statementDebt = roundMoney(
+      oldStatementDebt
+    );
+
+    // Artık kart eski dönemine döndü.
+    // Asgari tekrar tamamlanırsa v4.0 yeniden ileri taşıyabilir.
+    card.lastAutoRolledCycle = "";
+  }
+
+  function getCyclePaid(
+    cardId,
+    cycle,
+    transactions
+  ) {
+    return roundMoney(
+      transactions
+        .filter(item =>
+          item.type === "card-payment" &&
+          item.cardId === cardId &&
+          item.statementCycle === cycle
+        )
+        .reduce(
+          (sum, item) =>
+            sum + Number(item.amount || 0),
+          0
+        )
+    );
+  }
+
+  function subtractOneMonthFixedDay(
+    value,
+    fixedDay
+  ) {
+    const date = parseDate(value);
+
+    if (!date) return value || "";
+
+    let targetYear = date.getFullYear();
+    let targetMonth = date.getMonth() - 1;
+
+    if (targetMonth < 0) {
+      targetMonth = 11;
+      targetYear -= 1;
+    }
+
+    const lastDay = new Date(
+      targetYear,
+      targetMonth + 1,
+      0
+    ).getDate();
+
+    const day = Math.min(
+      Math.max(
+        1,
+        Number(fixedDay || date.getDate())
+      ),
+      lastDay
+    );
+
+    return [
+      targetYear,
+      String(targetMonth + 1).padStart(2, "0"),
+      String(day).padStart(2, "0")
+    ].join("-");
+  }
+
+  function dayOf(value) {
+    const date = parseDate(value);
+    return date ? date.getDate() : 0;
+  }
+
+  function parseDate(value) {
+    if (!value) return null;
+
+    const date = new Date(
+      String(value).includes("T")
+        ? value
+        : `${value}T12:00:00`
+    );
+
+    return Number.isNaN(date.getTime())
+      ? null
+      : date;
+  }
+
+  function roundMoney(value) {
+    return Math.round(
+      (Number(value) + Number.EPSILON) * 100
+    ) / 100;
+  }
+
+  function loadJson(key) {
+    try {
+      return JSON.parse(
+        localStorage.getItem(key) || "[]"
+      );
+    } catch {
+      return [];
+    }
+  }
+
+  function saveJson(key, value) {
+    localStorage.setItem(
+      key,
+      JSON.stringify(value)
+    );
+  }
+});
