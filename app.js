@@ -14692,9 +14692,10 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // =========================================
-// YF v5.1 — ASGARİ PANELİ GERİ GETİR + SABİT BİLDİRİM MERKEZİ
-// v5.0 kullanılmaz.
+// YF v5.5 — KURTARMA / STABİL SÜRÜM
 // Taban: çalışan v4.9
+// Bildirim yok. Agresif temizlik yok.
+// Asgari ödeme + borç toplamı güvence altına alınır.
 // =========================================
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -14703,298 +14704,72 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const $ = id => document.getElementById(id);
 
-  installV51Styles();
-  repairMinimumPanel();
-  createFixedNotificationCenter();
+  installStableMinimum();
+  refreshStableMinimum();
+  refreshDebtTotals();
 
-  setTimeout(refreshMinimumPanel, 120);
-  setTimeout(refreshNotifications, 150);
+  document.addEventListener("change", event => {
+    if (event.target?.id === "debtPaymentCard") {
+      setTimeout(refreshStableMinimum, 20);
+    }
+  }, true);
 
-  document.addEventListener(
-    "change",
-    event => {
-      if (event.target?.id === "debtPaymentCard") {
-        setTimeout(refreshMinimumPanel, 30);
-      }
-    },
-    true
-  );
+  document.addEventListener("click", event => {
+    const minimumButton = event.target.closest("#payMinimumButton");
 
-  document.addEventListener(
-    "click",
-    event => {
-      const minimumButton =
-        event.target.closest("#payMinimumButton");
+    if (minimumButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      payRemainingMinimum();
+      return;
+    }
 
-      if (minimumButton) {
-        event.preventDefault();
-        event.stopPropagation();
-        event.stopImmediatePropagation();
+    const pageButton = event.target.closest("[data-page]");
 
-        payExactMinimum();
-        return;
-      }
-
-      const pageButton =
-        event.target.closest("[data-page]");
-
-      if (pageButton) {
-        setTimeout(refreshMinimumPanel, 120);
-        setTimeout(refreshNotifications, 150);
-      }
-    },
-    true
-  );
+    if (pageButton) {
+      setTimeout(refreshStableMinimum, 80);
+      setTimeout(refreshDebtTotals, 80);
+      setTimeout(refreshDebtTotals, 300);
+    }
+  }, true);
 
   window.addEventListener("pageshow", () => {
-    refreshMinimumPanel();
-    });
+    refreshStableMinimum();
+    refreshDebtTotals();
+  });
 
   window.addEventListener("storage", () => {
-    refreshMinimumPanel();
-    });
+    refreshStableMinimum();
+    refreshDebtTotals();
+  });
 
-  window.addEventListener(
-    "yf-refresh-dashboard",
-    () => {
-      setTimeout(refreshMinimumPanel, 100);
-      setTimeout(refreshNotifications, 100);
-    }
-  );
+  window.addEventListener("yf-refresh-dashboard", () => {
+    setTimeout(refreshStableMinimum, 80);
+    setTimeout(refreshDebtTotals, 80);
+  });
 
-  // =================================================
-  // 1) ASGARİ ÖDEME PANELİ ONARIMI
-  // =================================================
-  function repairMinimumPanel() {
-    const form = $("debtPaymentForm");
-    const summary =
-      document.querySelector(
-        "#debtPaymentPage .debt-payment-summary"
-      );
+  window.addEventListener("yf-refresh-payment-cards", () => {
+    setTimeout(refreshStableMinimum, 80);
+    setTimeout(refreshDebtTotals, 80);
+  });
 
-    if (!form || !summary) return;
+  // -------------------------------------------------
+  // ASGARİ PANELİ — TEK VE BAĞIMSIZ
+  // -------------------------------------------------
+  function installStableMinimum() {
+    const page = $("debtPaymentPage");
+    const summary = page?.querySelector(".debt-payment-summary");
 
-    let panel = $("smartMinimumPanel");
+    if (!page || !summary) return;
 
-    // Panel hiç yoksa yeniden kur.
-    if (!panel) {
-      panel = document.createElement("section");
-      panel.id = "smartMinimumPanel";
-      panel.className = "smart-minimum-panel";
+    page
+      .querySelectorAll("#smartMinimumPanel")
+      .forEach(node => node.remove());
 
-      panel.innerHTML = `
-        <div class="smart-minimum-head">
-          <div>
-            <span>Otomatik Asgari (%20)</span>
-            <strong id="smartMinimumAmount">₺0,00</strong>
-          </div>
-
-          <span
-            id="smartMinimumBadge"
-            class="smart-minimum-badge waiting"
-          >
-            Kart seç
-          </span>
-        </div>
-
-        <div class="smart-minimum-grid">
-          <div>
-            <span>Bu dönem ödendi</span>
-            <strong id="smartPaidAmount">₺0,00</strong>
-          </div>
-
-          <div>
-            <span>Kalan asgari</span>
-            <strong id="smartRemainingAmount">₺0,00</strong>
-          </div>
-        </div>
-
-        <div class="smart-minimum-track">
-          <div id="smartMinimumProgress"></div>
-        </div>
-
-        <small id="smartMinimumText">
-          Kart seçildiğinde otomatik hesaplanır.
-        </small>
-
-        <button
-          id="payMinimumButton"
-          class="smart-minimum-button"
-          type="button"
-          disabled
-        >
-          ⚡ Kalan Asgariyi Öde
-        </button>
-      `;
-
-      summary.insertAdjacentElement(
-        "afterend",
-        panel
-      );
-    }
-
-    refreshMinimumPanel();
-  }
-
-  function refreshMinimumPanel() {
-    repairPanelOnlyIfNeeded();
-
-    const panel = $("smartMinimumPanel");
-    const select = $("debtPaymentCard");
-
-    if (!panel || !select) return;
-
-    const debt = loadJson(DEBT_KEY).find(
-      item =>
-        String(item.id) ===
-        String(select.value)
-    );
-
-    const amountEl =
-      $("smartMinimumAmount");
-
-    const paidEl =
-      $("smartPaidAmount");
-
-    const remainingEl =
-      $("smartRemainingAmount");
-
-    const badge =
-      $("smartMinimumBadge");
-
-    const fill =
-      $("smartMinimumProgress");
-
-    const text =
-      $("smartMinimumText");
-
-    const button =
-      $("payMinimumButton");
-
-    if (!debt) {
-      panel.classList.remove("hidden");
-
-      setMoneyElement(amountEl, 0);
-      setMoneyElement(paidEl, 0);
-      setMoneyElement(remainingEl, 0);
-
-      if (badge) {
-        badge.textContent = "Kart seç";
-        badge.className =
-          "smart-minimum-badge waiting";
-      }
-
-      if (fill) {
-        fill.style.width = "0%";
-      }
-
-      if (text) {
-        text.textContent =
-          "Kart seçildiğinde otomatik hesaplanır.";
-      }
-
-      if (button) {
-        button.disabled = true;
-      }
-
-      return;
-    }
-
-    // İhtiyaç kredisinde asgari paneli kesinlikle görünmez.
-    if (debt.type === "personal-loan") {
-      panel.classList.add("hidden");
-      return;
-    }
-
-    panel.classList.remove("hidden");
-
-    const info = getMinimumInfo(
-      debt,
-      loadJson(TX_KEY)
-    );
-
-    setMoneyElement(
-      amountEl,
-      info.minimum
-    );
-
-    setMoneyElement(
-      paidEl,
-      info.paid
-    );
-
-    setMoneyElement(
-      remainingEl,
-      info.remaining
-    );
-
-    if (fill) {
-      fill.style.width =
-        `${info.percent}%`;
-    }
-
-    if (text) {
-      text.textContent =
-        `${formatMoney(info.paid)} / ` +
-        `${formatMoney(info.minimum)} · ` +
-        `%${info.percent}`;
-    }
-
-    if (info.remaining <= 0) {
-      if (badge) {
-        badge.textContent =
-          "Asgari ödendi ✓";
-
-        badge.className =
-          "smart-minimum-badge completed";
-      }
-
-      if (button) {
-        button.disabled = true;
-      }
-    } else if (info.paid > 0) {
-      if (badge) {
-        badge.textContent =
-          "Kısmen ödendi";
-
-        badge.className =
-          "smart-minimum-badge partial";
-      }
-
-      if (button) {
-        button.disabled = false;
-      }
-    } else {
-      if (badge) {
-        badge.textContent =
-          "Asgari bekliyor";
-
-        badge.className =
-          "smart-minimum-badge waiting";
-      }
-
-      if (button) {
-        button.disabled = false;
-      }
-    }
-  }
-
-  function repairPanelOnlyIfNeeded() {
-    if ($("smartMinimumPanel")) return;
-
-    const summary =
-      document.querySelector(
-        "#debtPaymentPage .debt-payment-summary"
-      );
-
-    if (!summary) return;
-
-    const panel =
-      document.createElement("section");
-
+    const panel = document.createElement("section");
     panel.id = "smartMinimumPanel";
-    panel.className =
-      "smart-minimum-panel";
+    panel.className = "smart-minimum-panel";
 
     panel.innerHTML = `
       <div class="smart-minimum-head">
@@ -15041,171 +14816,202 @@ document.addEventListener("DOMContentLoaded", () => {
       </button>
     `;
 
-    summary.insertAdjacentElement(
-      "afterend",
-      panel
-    );
+    summary.insertAdjacentElement("afterend", panel);
   }
 
-  function payExactMinimum() {
-    const select =
-      $("debtPaymentCard");
+  function refreshStableMinimum() {
+    const panel = $("smartMinimumPanel");
+    const select = $("debtPaymentCard");
 
-    const amountInput =
-      $("debtPaymentAmount");
+    if (!panel || !select) return;
 
-    const form =
-      $("debtPaymentForm");
+    const debt = loadJson(DEBT_KEY).find(
+      item => String(item.id) === String(select.value)
+    );
 
-    if (
-      !select ||
-      !amountInput ||
-      !form
-    ) {
+    const amount = $("smartMinimumAmount");
+    const paid = $("smartPaidAmount");
+    const remaining = $("smartRemainingAmount");
+    const badge = $("smartMinimumBadge");
+    const progress = $("smartMinimumProgress");
+    const text = $("smartMinimumText");
+    const button = $("payMinimumButton");
+
+    if (!debt) {
+      panel.classList.remove("hidden");
+
+      setMoney(amount, 0);
+      setMoney(paid, 0);
+      setMoney(remaining, 0);
+
+      if (badge) {
+        badge.textContent = "Kart seç";
+        badge.className = "smart-minimum-badge waiting";
+      }
+
+      if (progress) progress.style.width = "0%";
+
+      if (text) {
+        text.textContent = "Kart seçildiğinde otomatik hesaplanır.";
+      }
+
+      if (button) button.disabled = true;
+
       return;
     }
 
-    const card =
-      loadJson(DEBT_KEY).find(
-        item =>
-          String(item.id) ===
-          String(select.value)
-      );
-
-    if (
-      !card ||
-      card.type === "personal-loan"
-    ) {
+    if (debt.type === "personal-loan") {
+      panel.classList.add("hidden");
       return;
     }
 
-    const info =
-      getMinimumInfo(
-        card,
-        loadJson(TX_KEY)
-      );
+    panel.classList.remove("hidden");
+
+    const info = getMinimumInfo(
+      debt,
+      loadJson(TX_KEY)
+    );
+
+    setMoney(amount, info.minimum);
+    setMoney(paid, info.paid);
+    setMoney(remaining, info.remaining);
+
+    if (progress) {
+      progress.style.width = `${info.percent}%`;
+    }
+
+    if (text) {
+      text.textContent =
+        `${formatMoney(info.paid)} / ${formatMoney(info.minimum)} · %${info.percent}`;
+    }
 
     if (info.remaining <= 0) {
-      return;
-    }
+      if (badge) {
+        badge.textContent = "Asgari ödendi ✓";
+        badge.className = "smart-minimum-badge completed";
+      }
 
-    amountInput.value =
-      Math.min(
-        Number(info.remaining),
-        Number(card.debt || 0)
-      ).toFixed(2);
+      if (button) button.disabled = true;
+    } else if (info.paid > 0) {
+      if (badge) {
+        badge.textContent = "Kısmen ödendi";
+        badge.className = "smart-minimum-badge partial";
+      }
+
+      if (button) button.disabled = false;
+    } else {
+      if (badge) {
+        badge.textContent = "Asgari bekliyor";
+        badge.className = "smart-minimum-badge waiting";
+      }
+
+      if (button) button.disabled = false;
+    }
+  }
+
+  function payRemainingMinimum() {
+    const select = $("debtPaymentCard");
+    const amountInput = $("debtPaymentAmount");
+    const form = $("debtPaymentForm");
+
+    if (!select || !amountInput || !form) return;
+
+    const card = loadJson(DEBT_KEY).find(
+      item => String(item.id) === String(select.value)
+    );
+
+    if (!card || card.type === "personal-loan") return;
+
+    const info = getMinimumInfo(
+      card,
+      loadJson(TX_KEY)
+    );
+
+    if (info.remaining <= 0) return;
+
+    amountInput.value = Math.min(
+      Number(info.remaining),
+      Number(card.debt || 0)
+    ).toFixed(2);
 
     form.requestSubmit();
   }
 
-  function getMinimumInfo(
-    card,
-    transactions
-  ) {
-    // Yeni döneme geçti ama yeni ekstre daha kesilmediyse
-    // eski dönem ödemesini tamamlanmış göster.
-    const statementDate =
-      parseDate(card.statementDate);
+  function getMinimumInfo(card, transactions) {
+    const statementDate = parseDate(card.statementDate);
 
     const waitingNextStatement =
       Boolean(
         card.lastAutoRolledCycle &&
         statementDate &&
-        statementDate >
-          startOfDay(new Date())
+        statementDate > startOfDay(new Date())
       );
 
     if (waitingNextStatement) {
-      const oldPaid =
-        roundMoney(
-          transactions
-            .filter(tx =>
-              tx.type ===
-                "card-payment" &&
-              String(tx.cardId) ===
-                String(card.id) &&
-              tx.statementCycle ===
-                card.lastAutoRolledCycle
-            )
-            .reduce(
-              (sum, tx) =>
-                sum +
-                Number(tx.amount || 0),
-              0
-            )
-        );
+      const paid = roundMoney(
+        transactions
+          .filter(tx =>
+            tx.type === "card-payment" &&
+            String(tx.cardId) === String(card.id) &&
+            tx.statementCycle === card.lastAutoRolledCycle
+          )
+          .reduce(
+            (sum, tx) => sum + Number(tx.amount || 0),
+            0
+          )
+      );
 
       return {
-        minimum: oldPaid,
-        paid: oldPaid,
+        minimum: paid,
+        paid,
         remaining: 0,
         percent: 100
       };
     }
 
-    const statementDebt =
-      Math.max(
-        0,
-        Number(
-          card.statementDebt !==
-          undefined
-            ? card.statementDebt
-            : card.debt || 0
-        )
-      );
+    const statementDebt = Math.max(
+      0,
+      Number(
+        card.statementDebt !== undefined
+          ? card.statementDebt
+          : card.debt || 0
+      )
+    );
 
-    const minimum =
-      roundMoney(
-        statementDebt * 0.20
-      );
+    const minimum = roundMoney(statementDebt * 0.20);
 
     const cycle =
       card.statementCycle ||
       cycleKey(card.dueDate);
 
-    const paid =
-      roundMoney(
-        transactions
-          .filter(tx => {
-            if (
-              tx.type !==
-                "card-payment" ||
-              String(tx.cardId) !==
-                String(card.id)
-            ) {
-              return false;
-            }
+    const paid = roundMoney(
+      transactions
+        .filter(tx => {
+          if (
+            tx.type !== "card-payment" ||
+            String(tx.cardId) !== String(card.id)
+          ) {
+            return false;
+          }
 
-            if (
-              tx.statementCycle
-            ) {
-              return (
-                tx.statementCycle ===
-                cycle
-              );
-            }
+          if (tx.statementCycle) {
+            return tx.statementCycle === cycle;
+          }
 
-            return isSameMonth(
-              tx.createdAt ||
-                tx.date,
-              card.dueDate
-            );
-          })
-          .reduce(
-            (sum, tx) =>
-              sum +
-              Number(tx.amount || 0),
-            0
-          )
-      );
-
-    const remaining =
-      roundMoney(
-        Math.max(
-          0,
-          minimum - paid
+          return isSameMonth(
+            tx.createdAt || tx.date,
+            card.dueDate
+          );
+        })
+        .reduce(
+          (sum, tx) => sum + Number(tx.amount || 0),
+          0
         )
-      );
+    );
+
+    const remaining = roundMoney(
+      Math.max(0, minimum - paid)
+    );
 
     const percent =
       minimum > 0
@@ -15213,10 +15019,7 @@ document.addEventListener("DOMContentLoaded", () => {
             100,
             Math.max(
               0,
-              Math.round(
-                (paid / minimum) *
-                  100
-              )
+              Math.round((paid / minimum) * 100)
             )
           )
         : 100;
@@ -15229,114 +15032,112 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   }
 
-  // =================================================
-  // ORTAK YARDIMCILAR
-  // =================================================
-  function daysLeft(value) {
-    const date =
-      parseDate(value);
+  // -------------------------------------------------
+  // TOPLAM BORÇ — TÜM KART + TÜM KREDİ
+  // -------------------------------------------------
+  function refreshDebtTotals() {
+    const debts = loadJson(DEBT_KEY);
 
-    if (!date) {
-      return 999999;
-    }
-
-    const today =
-      startOfDay(
-        new Date()
-      );
-
-    date.setHours(
-      0,
-      0,
-      0,
-      0
+    const totalDebt = roundMoney(
+      debts.reduce(
+        (sum, item) => sum + Number(item.debt || 0),
+        0
+      )
     );
 
-    return Math.ceil(
-      (date - today) /
-      86400000
-    );
+    [
+      "totalDebt",
+      "cardsTotalDebt",
+      "dpDebt"
+    ].forEach(id => {
+      const el = $(id);
+
+      if (el) {
+        el.textContent = formatMoney(totalDebt);
+        el.dataset.v = String(totalDebt);
+      }
+    });
+
+    /*
+      Eski arayüzde "Net Borç" isimli ayrı bir alan varsa,
+      kullanıcı için gerçek toplam kart+kredi borcunu göster.
+    */
+    document
+      .querySelectorAll(
+        "#dashboardPage section, " +
+        "#dashboardPage article, " +
+        "#dashboardPage .content-card, " +
+        "#dashboardPage .summary-card"
+      )
+      .forEach(container => {
+        const text = String(
+          container.textContent || ""
+        )
+          .toLocaleLowerCase("tr-TR")
+          .replace(/\s+/g, " ");
+
+        if (!text.includes("net borç")) return;
+
+        const value =
+          container.querySelector(
+            "strong, .value, .amount"
+          );
+
+        if (value) {
+          value.textContent = formatMoney(totalDebt);
+        }
+      });
   }
 
+  // -------------------------------------------------
+  // YARDIMCILAR
+  // -------------------------------------------------
   function parseDate(value) {
     if (!value) return null;
 
-    const date =
-      new Date(
-        String(value)
-          .includes("T")
-          ? value
-          : `${value}T12:00:00`
-      );
+    const date = new Date(
+      String(value).includes("T")
+        ? value
+        : `${value}T12:00:00`
+    );
 
-    return Number.isNaN(
-      date.getTime()
-    )
+    return Number.isNaN(date.getTime())
       ? null
       : date;
   }
 
   function startOfDay(value) {
-    const date =
-      new Date(value);
-
-    date.setHours(
-      0,
-      0,
-      0,
-      0
-    );
-
+    const date = new Date(value);
+    date.setHours(0, 0, 0, 0);
     return date;
   }
 
   function cycleKey(value) {
     const match =
-      String(value || "")
-        .match(
-          /^(\d{4})-(\d{2})/
-        );
+      String(value || "").match(
+        /^(\d{4})-(\d{2})/
+      );
 
     return match
       ? `${match[1]}-${match[2]}`
       : "";
   }
 
-  function isSameMonth(
-    firstValue,
-    secondValue
-  ) {
-    const first =
-      parseDate(
-        firstValue
-      );
+  function isSameMonth(firstValue, secondValue) {
+    const first = parseDate(firstValue);
+    const second = parseDate(secondValue);
 
-    const second =
-      parseDate(
-        secondValue
-      );
-
-    if (
-      !first ||
-      !second
-    ) {
-      return false;
-    }
+    if (!first || !second) return false;
 
     return (
-      first.getMonth() ===
-        second.getMonth() &&
-      first.getFullYear() ===
-        second.getFullYear()
+      first.getMonth() === second.getMonth() &&
+      first.getFullYear() === second.getFullYear()
     );
   }
 
   function roundMoney(value) {
     return Math.round(
-      (
-        Number(value) +
-        Number.EPSILON
-      ) * 100
+      (Number(value) + Number.EPSILON) * 100
     ) / 100;
   }
 
@@ -15347,96 +15148,22 @@ document.addEventListener("DOMContentLoaded", () => {
         style: "currency",
         currency: "TRY"
       }
-    ).format(
-      Number(value) || 0
-    );
+    ).format(Number(value) || 0);
   }
 
-  function setMoneyElement(
-    element,
-    value
-  ) {
+  function setMoney(element, value) {
     if (element) {
-      element.textContent =
-        formatMoney(value);
-    }
-  }
-
-  function setText(
-    id,
-    value
-  ) {
-    const element =
-      $(id);
-
-    if (element) {
-      element.textContent =
-        String(value);
+      element.textContent = formatMoney(value);
     }
   }
 
   function loadJson(key) {
     try {
       return JSON.parse(
-        localStorage.getItem(
-          key
-        ) || "[]"
+        localStorage.getItem(key) || "[]"
       );
     } catch {
       return [];
     }
-  }
-
-  function escapeHtml(value) {
-    return String(
-      value ?? ""
-    )
-      .replaceAll(
-        "&",
-        "&amp;"
-      )
-      .replaceAll(
-        "<",
-        "&lt;"
-      )
-      .replaceAll(
-        ">",
-        "&gt;"
-      )
-      .replaceAll(
-        '"',
-        "&quot;"
-      )
-      .replaceAll(
-        "'",
-        "&#039;"
-      );
-  }
-
-  // =================================================
-  // TASARIM
-  // =================================================
-  function installV51Styles() {
-    if (
-      $("yfV51Styles")
-    ) {
-      return;
-    }
-
-    const style =
-      document.createElement(
-        "style"
-      );
-
-    style.id =
-      "yfV51Styles";
-
-    style.textContent = `
-
-    `;
-
-    document.head.appendChild(
-      style
-    );
   }
 });
