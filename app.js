@@ -13224,3 +13224,903 @@ document.addEventListener("DOMContentLoaded", () => {
     document.head.appendChild(style);
   }
 });
+
+// =========================================
+// YF v4.6 — GARANTİ KREDİ KARTI TARİHİ + AYLIK PLAN GEÇMİŞİ
+// 1) Eski yanlış tarih rozetleri gizlenir.
+// 2) Güncel kart tarihi yalnızca gerçek ID'den hesaplanır.
+// 3) Bu ay ödenmiş kart/kredi, tarih sonraki aya geçse bile
+//    ana sayfadaki aylık planda görünmeye devam eder.
+// =========================================
+
+document.addEventListener("DOMContentLoaded", () => {
+  const DEBT_KEY = "yf_cards_v1";
+  const TX_KEY = "yf_transactions_v1";
+
+  installV46Styles();
+  refreshExactCardBadges();
+  refreshMonthlyPlanV46();
+
+  document.addEventListener(
+    "click",
+    event => {
+      const pageButton = event.target.closest("[data-page]");
+
+      if (pageButton) {
+        setTimeout(refreshExactCardBadges, 180);
+        setTimeout(refreshExactCardBadges, 600);
+        setTimeout(refreshMonthlyPlanV46, 180);
+        setTimeout(refreshMonthlyPlanV46, 600);
+      }
+    },
+    true
+  );
+
+  document
+    .getElementById("cardForm")
+    ?.addEventListener(
+      "submit",
+      () => {
+        setTimeout(refreshExactCardBadges, 400);
+        setTimeout(refreshExactCardBadges, 1100);
+        setTimeout(refreshMonthlyPlanV46, 500);
+      },
+      true
+    );
+
+  document
+    .getElementById("debtPaymentForm")
+    ?.addEventListener(
+      "submit",
+      () => {
+        setTimeout(refreshExactCardBadges, 450);
+        setTimeout(refreshExactCardBadges, 1200);
+        setTimeout(refreshMonthlyPlanV46, 500);
+        setTimeout(refreshMonthlyPlanV46, 1300);
+      },
+      true
+    );
+
+  window.addEventListener("pageshow", () => {
+    setTimeout(refreshExactCardBadges, 200);
+    setTimeout(refreshMonthlyPlanV46, 220);
+  });
+
+  window.addEventListener("storage", () => {
+    setTimeout(refreshExactCardBadges, 150);
+    setTimeout(refreshMonthlyPlanV46, 150);
+  });
+
+  window.addEventListener("yf-refresh-dashboard", () => {
+    setTimeout(refreshExactCardBadges, 150);
+    setTimeout(refreshMonthlyPlanV46, 150);
+  });
+
+  // -------------------------------------------------
+  // KARTLARDA TEK VE GERÇEK TARİH ROZETİ
+  // -------------------------------------------------
+  function refreshExactCardBadges() {
+    const list = document.getElementById("cardsList");
+    if (!list) return;
+
+    const debts = loadJson(DEBT_KEY);
+    const transactions = loadJson(TX_KEY);
+
+    const debtMap = new Map(
+      debts.map(item => [String(item.id), item])
+    );
+
+    const visibleCards = [
+      ...list.querySelectorAll(".bank-card")
+    ];
+
+    visibleCards.forEach(cardElement => {
+      const id = getExactDebtId(cardElement);
+      if (!id) return;
+
+      const debt = debtMap.get(String(id));
+      if (!debt) return;
+
+      // v4.6 kendi rozetini yeniden kurar.
+      cardElement
+        .querySelectorAll(".yf-v46-exact-badge")
+        .forEach(node => node.remove());
+
+      const badge = document.createElement("span");
+      badge.className =
+        "yf-card-urgency-badge yf-v46-exact-badge";
+
+      if (debt.type === "personal-loan") {
+        const days = daysLeft(
+          debt.nextPaymentDate || debt.dueDate
+        );
+
+        badge.textContent = loanText(days);
+        badge.classList.add(urgencyClass(days));
+      } else {
+        const minimum = getCardMinimumInfo(
+          debt,
+          transactions
+        );
+
+        const waitingNextStatement =
+          Boolean(
+            debt.lastAutoRolledCycle &&
+            parseDate(debt.statementDate) &&
+            parseDate(debt.statementDate) >
+              startOfDay(new Date())
+          );
+
+        if (waitingNextStatement) {
+          badge.textContent =
+            "Son dönem asgari ödendi ✓";
+          badge.classList.add("paid");
+        } else if (minimum.remaining <= 0) {
+          badge.textContent = "Asgari ödendi ✓";
+          badge.classList.add("paid");
+        } else {
+          const days = daysLeft(debt.dueDate);
+
+          badge.textContent = cardText(days);
+          badge.classList.add(urgencyClass(days));
+        }
+      }
+
+      const header =
+        cardElement.querySelector(".bank-card-header") ||
+        cardElement.firstElementChild;
+
+      header?.insertAdjacentElement(
+        "afterend",
+        badge
+      );
+
+      // Karttaki ekstre/son ödeme sayaçlarını da gerçek ID ile yenile.
+      refreshCountdown(cardElement, debt);
+    });
+  }
+
+  function refreshCountdown(cardElement, debt) {
+    if (debt.type === "personal-loan") return;
+
+    cardElement
+      .querySelectorAll(".yf-cycle-countdown")
+      .forEach(node => node.remove());
+
+    if (!debt.statementDate || !debt.dueDate) return;
+
+    const statementDays = daysLeft(debt.statementDate);
+    const dueDays = daysLeft(debt.dueDate);
+
+    const box = document.createElement("div");
+    box.className = "yf-cycle-countdown yf-v46-countdown";
+
+    box.innerHTML = `
+      <div>
+        <span>Ekstre Kesimi</span>
+        <strong>${escapeHtml(
+          countdownText(statementDays, "statement")
+        )}</strong>
+      </div>
+
+      <div>
+        <span>Son Ödeme</span>
+        <strong class="${urgencyClass(dueDays)}">
+          ${escapeHtml(
+            countdownText(dueDays, "due")
+          )}
+        </strong>
+      </div>
+    `;
+
+    const dates =
+      cardElement.querySelector(".bank-card-dates");
+
+    if (dates) {
+      dates.insertAdjacentElement(
+        "beforebegin",
+        box
+      );
+    } else {
+      cardElement.appendChild(box);
+    }
+  }
+
+  function getExactDebtId(cardElement) {
+    const loanEdit = cardElement.querySelector(
+      "[data-loan-edit]"
+    );
+
+    if (loanEdit?.dataset.loanEdit) {
+      return String(loanEdit.dataset.loanEdit);
+    }
+
+    const cardEdit = cardElement.querySelector(
+      "[data-card-edit]"
+    );
+
+    if (cardEdit?.dataset.cardEdit) {
+      return String(cardEdit.dataset.cardEdit);
+    }
+
+    const oldEdit = cardElement.querySelector(
+      "[data-edit]"
+    );
+
+    if (oldEdit?.dataset.edit) {
+      return String(oldEdit.dataset.edit);
+    }
+
+    return String(
+      cardElement.dataset.yfDebtId || ""
+    );
+  }
+
+  // -------------------------------------------------
+  // ANA SAYFA — BU AY ÖDENENLERİ KAYBETME
+  // -------------------------------------------------
+  function refreshMonthlyPlanV46() {
+    const list =
+      document.getElementById("monthlyPlanList");
+
+    if (!list) return;
+
+    const debts = loadJson(DEBT_KEY);
+    const transactions = loadJson(TX_KEY);
+
+    const rows = [];
+
+    debts.forEach(debt => {
+      const isLoan =
+        debt.type === "personal-loan";
+
+      const paymentsThisMonth =
+        transactions
+          .filter(tx =>
+            String(tx.cardId || "") ===
+              String(debt.id || "") &&
+            (
+              tx.type === "card-payment" ||
+              tx.type === "loan-payment"
+            ) &&
+            isCurrentMonth(
+              tx.createdAt || tx.date
+            )
+          );
+
+      const paidThisMonth = roundMoney(
+        paymentsThisMonth.reduce(
+          (sum, tx) =>
+            sum + Number(tx.amount || 0),
+          0
+        )
+      );
+
+      const latestPaymentDate =
+        paymentsThisMonth.length
+          ? paymentsThisMonth
+              .map(tx => tx.createdAt || tx.date)
+              .sort(
+                (a, b) =>
+                  new Date(b) - new Date(a)
+              )[0]
+          : "";
+
+      if (isLoan) {
+        const paymentDate =
+          debt.nextPaymentDate || debt.dueDate;
+
+        if (isCurrentMonth(paymentDate)) {
+          const planned = roundMoney(
+            Math.min(
+              Number(
+                debt.monthlyInstallment || 0
+              ),
+              Number(debt.debt || 0) +
+                paidThisMonth
+            )
+          );
+
+          const paid = Math.min(
+            planned,
+            paidThisMonth
+          );
+
+          rows.push({
+            id: debt.id,
+            type: "loan",
+            bank: debt.bank || "Banka",
+            name: debt.name || "İhtiyaç Kredisi",
+            date: paymentDate,
+            planned,
+            paid,
+            remaining: roundMoney(
+              Math.max(0, planned - paid)
+            )
+          });
+
+          return;
+        }
+
+        // Taksit ödendi ve sistem tarihi sonraki aya taşıdıysa,
+        // bu ayki tamamlanmış ödeme satırını yine göster.
+        if (paidThisMonth > 0) {
+          rows.push({
+            id: debt.id,
+            type: "loan",
+            bank: debt.bank || "Banka",
+            name: debt.name || "İhtiyaç Kredisi",
+            date: latestPaymentDate,
+            planned: paidThisMonth,
+            paid: paidThisMonth,
+            remaining: 0
+          });
+        }
+
+        return;
+      }
+
+      const dueThisMonth =
+        isCurrentMonth(debt.dueDate);
+
+      if (dueThisMonth) {
+        const minimum =
+          getCardMinimumInfo(
+            debt,
+            transactions
+          );
+
+        rows.push({
+          id: debt.id,
+          type: "card",
+          bank: debt.bank || "Banka",
+          name: debt.name || "Kredi Kartı",
+          date: debt.dueDate,
+          planned: minimum.minimum,
+          paid: Math.min(
+            minimum.minimum,
+            minimum.paid
+          ),
+          remaining: minimum.remaining
+        });
+
+        return;
+      }
+
+      // Kart asgarisi ödendi, dueDate sonraki aya geçti.
+      // Yine de bu ay yapılan ödeme kaybolmasın.
+      if (paidThisMonth > 0) {
+        rows.push({
+          id: debt.id,
+          type: "card",
+          bank: debt.bank || "Banka",
+          name: debt.name || "Kredi Kartı",
+          date: latestPaymentDate,
+          planned: paidThisMonth,
+          paid: paidThisMonth,
+          remaining: 0
+        });
+      }
+    });
+
+    rows.sort((a, b) => {
+      const ad = parseDate(a.date);
+      const bd = parseDate(b.date);
+
+      if (!ad && !bd) return 0;
+      if (!ad) return 1;
+      if (!bd) return -1;
+
+      return ad - bd;
+    });
+
+    const totalPlan = roundMoney(
+      rows.reduce(
+        (sum, row) =>
+          sum + Number(row.planned || 0),
+        0
+      )
+    );
+
+    const totalPaid = roundMoney(
+      rows.reduce(
+        (sum, row) =>
+          sum + Number(row.paid || 0),
+        0
+      )
+    );
+
+    const totalRemaining = roundMoney(
+      rows.reduce(
+        (sum, row) =>
+          sum + Number(row.remaining || 0),
+        0
+      )
+    );
+
+    const percent =
+      totalPlan > 0
+        ? Math.min(
+            100,
+            Math.max(
+              0,
+              Math.round(
+                (totalPaid / totalPlan) * 100
+              )
+            )
+          )
+        : 100;
+
+    setMoney(
+      "monthlyPlanRemaining",
+      totalRemaining
+    );
+
+    setMoney(
+      "monthlyPlanPaid",
+      totalPaid
+    );
+
+    setMoney(
+      "monthlyPlanTotal",
+      totalPlan
+    );
+
+    setText(
+      "monthlyPlanPercent",
+      `%${percent}`
+    );
+
+    const fill =
+      document.getElementById(
+        "monthlyPlanFill"
+      );
+
+    if (fill) {
+      fill.style.width = `${percent}%`;
+    }
+
+    const status =
+      document.getElementById(
+        "monthlyPlanStatus"
+      );
+
+    if (status) {
+      const openCount =
+        rows.filter(
+          row => row.remaining > 0
+        ).length;
+
+      if (!rows.length) {
+        status.textContent = "Ödeme yok";
+        status.className =
+          "monthly-plan-status completed";
+      } else if (openCount === 0) {
+        status.textContent = "Tamamlandı ✓";
+        status.className =
+          "monthly-plan-status completed";
+      } else {
+        status.textContent =
+          `${openCount} ödeme kaldı`;
+
+        status.className =
+          "monthly-plan-status";
+      }
+    }
+
+    list.innerHTML = "";
+
+    if (!rows.length) {
+      list.innerHTML = `
+        <div class="monthly-plan-empty">
+          Bu ay için ödeme kaydı bulunmuyor.
+        </div>
+      `;
+      return;
+    }
+
+    rows.forEach(rowData => {
+      const row =
+        document.createElement("button");
+
+      row.type = "button";
+
+      row.className =
+        `monthly-plan-row ${
+          rowData.remaining <= 0
+            ? "completed"
+            : ""
+        }`;
+
+      row.innerHTML = `
+        <span class="monthly-plan-row-icon">
+          ${rowData.type === "loan" ? "🏦" : "💳"}
+        </span>
+
+        <span class="monthly-plan-row-info">
+          <strong>${escapeHtml(
+            rowData.bank
+          )}</strong>
+
+          <small>${escapeHtml(
+            rowData.name
+          )}</small>
+
+          <em>
+            ${formatDate(rowData.date)}
+            ·
+            ${
+              rowData.remaining <= 0
+                ? "Ödendi ✓"
+                : `${formatMoney(
+                    rowData.remaining
+                  )} kaldı`
+            }
+          </em>
+        </span>
+
+        <span class="monthly-plan-row-side">
+          <strong>${formatMoney(
+            rowData.planned
+          )}</strong>
+
+          <small>
+            ${
+              rowData.type === "loan"
+                ? "Taksit"
+                : "Asgari"
+            }
+          </small>
+        </span>
+      `;
+
+      if (rowData.remaining > 0) {
+        row.addEventListener(
+          "click",
+          () => {
+            document
+              .querySelector(
+                '[data-page="debtPaymentPage"]'
+              )
+              ?.click();
+
+            setTimeout(() => {
+              const select =
+                document.getElementById(
+                  "debtPaymentCard"
+                );
+
+              if (!select) return;
+
+              select.value = rowData.id;
+
+              select.dispatchEvent(
+                new Event(
+                  "change",
+                  { bubbles: true }
+                )
+              );
+            }, 250);
+          }
+        );
+      }
+
+      list.appendChild(row);
+    });
+  }
+
+  function getCardMinimumInfo(
+    card,
+    transactions
+  ) {
+    const statementDate =
+      parseDate(card.statementDate);
+
+    const waitingNextStatement =
+      Boolean(
+        card.lastAutoRolledCycle &&
+        statementDate &&
+        statementDate >
+          startOfDay(new Date())
+      );
+
+    if (waitingNextStatement) {
+      const paid = roundMoney(
+        transactions
+          .filter(tx =>
+            tx.type === "card-payment" &&
+            String(tx.cardId) ===
+              String(card.id) &&
+            tx.statementCycle ===
+              card.lastAutoRolledCycle
+          )
+          .reduce(
+            (sum, tx) =>
+              sum + Number(tx.amount || 0),
+            0
+          )
+      );
+
+      return {
+        minimum: paid,
+        paid,
+        remaining: 0
+      };
+    }
+
+    const statementDebt =
+      Math.max(
+        0,
+        Number(
+          card.statementDebt !== undefined
+            ? card.statementDebt
+            : card.debt || 0
+        )
+      );
+
+    const minimum = roundMoney(
+      statementDebt * 0.20
+    );
+
+    const cycle =
+      card.statementCycle ||
+      cycleKey(card.dueDate);
+
+    const paid = roundMoney(
+      transactions
+        .filter(tx => {
+          if (
+            tx.type !== "card-payment" ||
+            String(tx.cardId) !==
+              String(card.id)
+          ) {
+            return false;
+          }
+
+          if (tx.statementCycle) {
+            return (
+              tx.statementCycle === cycle
+            );
+          }
+
+          return isCurrentMonth(
+            tx.createdAt || tx.date
+          );
+        })
+        .reduce(
+          (sum, tx) =>
+            sum + Number(tx.amount || 0),
+          0
+        )
+    );
+
+    return {
+      minimum,
+      paid,
+      remaining: roundMoney(
+        Math.max(0, minimum - paid)
+      )
+    };
+  }
+
+  function loanText(days) {
+    if (days === 999999) {
+      return "Taksit tarihi yok";
+    }
+
+    if (days < 0) {
+      return `Taksit ${Math.abs(days)} gün gecikti`;
+    }
+
+    if (days === 0) return "Taksit bugün";
+    if (days === 1) return "Taksit yarın";
+
+    return `Taksit ${days} gün sonra`;
+  }
+
+  function cardText(days) {
+    if (days === 999999) {
+      return "Son ödeme tarihi yok";
+    }
+
+    if (days < 0) {
+      return `Asgari ${Math.abs(days)} gün gecikti`;
+    }
+
+    if (days === 0) return "Asgari bugün";
+    if (days === 1) return "Asgari yarın";
+
+    return `Asgari ${days} gün sonra`;
+  }
+
+  function countdownText(days, type) {
+    if (days === 999999) return "Tarih yok";
+
+    if (days < 0) {
+      return type === "due"
+        ? `${Math.abs(days)} gün geçti`
+        : `${Math.abs(days)} gün önce kesildi`;
+    }
+
+    if (days === 0) {
+      return type === "due"
+        ? "Bugün son gün"
+        : "Bugün kesiliyor";
+    }
+
+    if (days === 1) return "Yarın";
+
+    return `${days} gün kaldı`;
+  }
+
+  function urgencyClass(days) {
+    if (days < 0) return "overdue";
+    if (days <= 1) return "today";
+    if (days <= 7) return "warning";
+    return "upcoming";
+  }
+
+  function daysLeft(value) {
+    const date = parseDate(value);
+
+    if (!date) return 999999;
+
+    const today =
+      startOfDay(new Date());
+
+    date.setHours(0, 0, 0, 0);
+
+    return Math.ceil(
+      (date - today) / 86400000
+    );
+  }
+
+  function isCurrentMonth(value) {
+    const date = parseDate(value);
+    if (!date) return false;
+
+    const now = new Date();
+
+    return (
+      date.getMonth() === now.getMonth() &&
+      date.getFullYear() === now.getFullYear()
+    );
+  }
+
+  function formatDate(value) {
+    const date = parseDate(value);
+
+    if (!date) return "Tarih yok";
+
+    return date.toLocaleDateString(
+      "tr-TR",
+      {
+        day: "numeric",
+        month: "long"
+      }
+    );
+  }
+
+  function parseDate(value) {
+    if (!value) return null;
+
+    const date = new Date(
+      String(value).includes("T")
+        ? value
+        : `${value}T12:00:00`
+    );
+
+    return Number.isNaN(date.getTime())
+      ? null
+      : date;
+  }
+
+  function startOfDay(value) {
+    const date = new Date(value);
+    date.setHours(0, 0, 0, 0);
+    return date;
+  }
+
+  function cycleKey(value) {
+    const match =
+      String(value || "").match(
+        /^(\d{4})-(\d{2})/
+      );
+
+    return match
+      ? `${match[1]}-${match[2]}`
+      : "";
+  }
+
+  function roundMoney(value) {
+    return Math.round(
+      (Number(value) + Number.EPSILON) *
+        100
+    ) / 100;
+  }
+
+  function formatMoney(value) {
+    return new Intl.NumberFormat(
+      "tr-TR",
+      {
+        style: "currency",
+        currency: "TRY"
+      }
+    ).format(Number(value) || 0);
+  }
+
+  function setMoney(id, value) {
+    const element =
+      document.getElementById(id);
+
+    if (element) {
+      element.textContent =
+        formatMoney(value);
+    }
+  }
+
+  function setText(id, value) {
+    const element =
+      document.getElementById(id);
+
+    if (element) {
+      element.textContent =
+        String(value);
+    }
+  }
+
+  function loadJson(key) {
+    try {
+      return JSON.parse(
+        localStorage.getItem(key) || "[]"
+      );
+    } catch {
+      return [];
+    }
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function installV46Styles() {
+    if (
+      document.getElementById(
+        "yfV46Styles"
+      )
+    ) {
+      return;
+    }
+
+    const style =
+      document.createElement("style");
+
+    style.id = "yfV46Styles";
+
+    style.textContent = `
+      /*
+        v3.9/v4.1 gibi eski kodların yanlış oluşturduğu
+        rozetler artık görünmez.
+        Yalnızca v4.6'nın gerçek-ID rozeti görünür.
+      */
+      .yf-card-urgency-badge:not(.yf-v46-exact-badge) {
+        display: none !important;
+      }
+
+      .yf-v46-exact-badge {
+        display: inline-flex !important;
+      }
+
+      .yf-v46-countdown {
+        display: grid !important;
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+});
