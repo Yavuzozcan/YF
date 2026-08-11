@@ -12423,3 +12423,804 @@ document.addEventListener("DOMContentLoaded", () => {
     document.head.appendChild(style);
   }
 });
+
+// =========================================
+// YF v4.5 — BU AY NE KADAR ÖDEYECEĞİM?
+// Ana sayfada aylık ödeme planı
+// =========================================
+
+document.addEventListener("DOMContentLoaded", () => {
+  const DEBT_KEY = "yf_cards_v1";
+  const TX_KEY = "yf_transactions_v1";
+
+  installMonthlyPlanStyles();
+  createMonthlyPlanCard();
+  refreshMonthlyPlan();
+
+  document.addEventListener(
+    "click",
+    event => {
+      const pageButton = event.target.closest("[data-page]");
+      if (!pageButton) return;
+
+      setTimeout(refreshMonthlyPlan, 120);
+      setTimeout(refreshMonthlyPlan, 420);
+    },
+    true
+  );
+
+  window.addEventListener("storage", refreshMonthlyPlan);
+  window.addEventListener("pageshow", refreshMonthlyPlan);
+  window.addEventListener("yf-refresh-dashboard", refreshMonthlyPlan);
+  window.addEventListener("yf-refresh-upcoming-payments", refreshMonthlyPlan);
+
+  function createMonthlyPlanCard() {
+    if (document.getElementById("monthlyPaymentPlanCard")) return;
+
+    const dashboard = document.getElementById("dashboardPage");
+    if (!dashboard) return;
+
+    const reference =
+      document.getElementById("dashboardProPanel") ||
+      document.getElementById("dashboardAssetCard") ||
+      document.getElementById("todayTasksCard") ||
+      dashboard.querySelector(".hero-card");
+
+    const card = document.createElement("section");
+    card.id = "monthlyPaymentPlanCard";
+    card.className = "monthly-plan-card";
+
+    card.innerHTML = `
+      <div class="monthly-plan-head">
+        <div>
+          <span>BU AY NE KADAR ÖDEYECEĞİM?</span>
+          <h2 id="monthlyPlanTitle">Aylık ödeme planı</h2>
+        </div>
+
+        <span id="monthlyPlanStatus" class="monthly-plan-status">
+          Güncel
+        </span>
+      </div>
+
+      <div class="monthly-plan-summary">
+        <article class="primary">
+          <span>Bu Ay Kalan</span>
+          <strong id="monthlyPlanRemaining">₺0,00</strong>
+          <small>Henüz ödenmemiş tutar</small>
+        </article>
+
+        <article>
+          <span>Bu Ay Ödenen</span>
+          <strong id="monthlyPlanPaid">₺0,00</strong>
+          <small>Kart + kredi</small>
+        </article>
+
+        <article>
+          <span>Toplam Plan</span>
+          <strong id="monthlyPlanTotal">₺0,00</strong>
+          <small>Bu ay için</small>
+        </article>
+      </div>
+
+      <div class="monthly-plan-progress-wrap">
+        <div class="monthly-plan-progress-head">
+          <span>Ödeme ilerlemesi</span>
+          <strong id="monthlyPlanPercent">%0</strong>
+        </div>
+
+        <div class="monthly-plan-track">
+          <div id="monthlyPlanFill"></div>
+        </div>
+      </div>
+
+      <div id="monthlyPlanList" class="monthly-plan-list"></div>
+    `;
+
+    if (reference) {
+      reference.insertAdjacentElement("afterend", card);
+    } else {
+      dashboard.appendChild(card);
+    }
+  }
+
+  function refreshMonthlyPlan() {
+    const list = document.getElementById("monthlyPlanList");
+    if (!list) return;
+
+    const debts = loadJson(DEBT_KEY);
+    const transactions = loadJson(TX_KEY);
+
+    const monthItems = [];
+
+    debts.forEach(debt => {
+      if (Number(debt.debt || 0) <= 0) return;
+
+      if (debt.type === "personal-loan") {
+        const paymentDate =
+          debt.nextPaymentDate || debt.dueDate;
+
+        if (!isCurrentMonth(paymentDate)) return;
+
+        const dueAmount = roundMoney(
+          Math.min(
+            Number(debt.monthlyInstallment || 0),
+            Number(debt.debt || 0)
+          )
+        );
+
+        const paidThisMonth = roundMoney(
+          transactions
+            .filter(tx =>
+              tx.type === "loan-payment" &&
+              String(tx.cardId) === String(debt.id) &&
+              isCurrentMonth(tx.createdAt || tx.date)
+            )
+            .reduce(
+              (sum, tx) =>
+                sum + Number(tx.amount || 0),
+              0
+            )
+        );
+
+        const remaining = roundMoney(
+          Math.max(0, dueAmount - paidThisMonth)
+        );
+
+        monthItems.push({
+          id: debt.id,
+          type: "loan",
+          bank: debt.bank || "Banka",
+          name: debt.name || "İhtiyaç Kredisi",
+          date: paymentDate,
+          planned: dueAmount,
+          paid: Math.min(dueAmount, paidThisMonth),
+          remaining
+        });
+
+        return;
+      }
+
+      if (!isCurrentMonth(debt.dueDate)) return;
+
+      const minimumInfo = getCardMinimumInfo(
+        debt,
+        transactions
+      );
+
+      monthItems.push({
+        id: debt.id,
+        type: "card",
+        bank: debt.bank || "Banka",
+        name: debt.name || "Kredi Kartı",
+        date: debt.dueDate,
+        planned: minimumInfo.minimum,
+        paid: Math.min(
+          minimumInfo.minimum,
+          minimumInfo.paid
+        ),
+        remaining: minimumInfo.remaining
+      });
+    });
+
+    monthItems.sort((a, b) => {
+      const first = parseDate(a.date);
+      const second = parseDate(b.date);
+
+      if (!first && !second) return 0;
+      if (!first) return 1;
+      if (!second) return -1;
+
+      return first - second;
+    });
+
+    const totalPlan = roundMoney(
+      monthItems.reduce(
+        (sum, item) => sum + Number(item.planned || 0),
+        0
+      )
+    );
+
+    const totalPaid = roundMoney(
+      monthItems.reduce(
+        (sum, item) => sum + Number(item.paid || 0),
+        0
+      )
+    );
+
+    const totalRemaining = roundMoney(
+      monthItems.reduce(
+        (sum, item) => sum + Number(item.remaining || 0),
+        0
+      )
+    );
+
+    const percent =
+      totalPlan > 0
+        ? Math.min(
+            100,
+            Math.max(
+              0,
+              Math.round((totalPaid / totalPlan) * 100)
+            )
+          )
+        : 100;
+
+    setMoney("monthlyPlanRemaining", totalRemaining);
+    setMoney("monthlyPlanPaid", totalPaid);
+    setMoney("monthlyPlanTotal", totalPlan);
+
+    setText(
+      "monthlyPlanPercent",
+      `%${percent}`
+    );
+
+    const fill = document.getElementById("monthlyPlanFill");
+
+    if (fill) {
+      fill.style.width = `${percent}%`;
+    }
+
+    const title = document.getElementById("monthlyPlanTitle");
+
+    if (title) {
+      title.textContent =
+        `${currentMonthName()} ödeme planı`;
+    }
+
+    const status = document.getElementById("monthlyPlanStatus");
+
+    if (status) {
+      if (!monthItems.length) {
+        status.textContent = "Ödeme yok";
+        status.className = "monthly-plan-status completed";
+      } else if (totalRemaining <= 0) {
+        status.textContent = "Tamamlandı ✓";
+        status.className = "monthly-plan-status completed";
+      } else {
+        status.textContent = `${monthItems.filter(item => item.remaining > 0).length} ödeme kaldı`;
+        status.className = "monthly-plan-status";
+      }
+    }
+
+    list.innerHTML = "";
+
+    if (!monthItems.length) {
+      list.innerHTML = `
+        <div class="monthly-plan-empty">
+          Bu ay için kart asgarisi veya kredi taksiti bulunmuyor.
+        </div>
+      `;
+      return;
+    }
+
+    monthItems.forEach(item => {
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = `monthly-plan-row ${
+        item.remaining <= 0 ? "completed" : ""
+      }`;
+
+      row.innerHTML = `
+        <span class="monthly-plan-row-icon">
+          ${item.type === "loan" ? "🏦" : "💳"}
+        </span>
+
+        <span class="monthly-plan-row-info">
+          <strong>${escapeHtml(item.bank)}</strong>
+          <small>${escapeHtml(item.name)}</small>
+          <em>
+            ${formatDate(item.date)}
+            ·
+            ${
+              item.remaining <= 0
+                ? "Ödendi ✓"
+                : `${formatMoney(item.remaining)} kaldı`
+            }
+          </em>
+        </span>
+
+        <span class="monthly-plan-row-side">
+          <strong>${formatMoney(item.planned)}</strong>
+          <small>
+            ${item.type === "loan" ? "Taksit" : "Asgari"}
+          </small>
+        </span>
+      `;
+
+      row.addEventListener("click", () => {
+        if (item.remaining <= 0) return;
+
+        document
+          .querySelector('[data-page="debtPaymentPage"]')
+          ?.click();
+
+        setTimeout(() => {
+          const select = document.getElementById("debtPaymentCard");
+
+          if (!select) return;
+
+          select.value = item.id;
+
+          select.dispatchEvent(
+            new Event("change", { bubbles: true })
+          );
+        }, 240);
+      });
+
+      list.appendChild(row);
+    });
+  }
+
+  function getCardMinimumInfo(card, transactions) {
+    /*
+      Eğer dönem otomatik ileri alındı ve yeni ekstre henüz kesilmediyse,
+      bu ayın eski dönem ödemesini tamamlanmış kabul et.
+    */
+    const statementDate = parseDate(card.statementDate);
+    const today = startOfDay(new Date());
+
+    const waitingNextStatement =
+      Boolean(
+        card.lastAutoRolledCycle &&
+        statementDate &&
+        statementDate > today
+      );
+
+    if (waitingNextStatement) {
+      const paid = roundMoney(
+        transactions
+          .filter(tx =>
+            tx.type === "card-payment" &&
+            String(tx.cardId) === String(card.id) &&
+            tx.statementCycle === card.lastAutoRolledCycle
+          )
+          .reduce(
+            (sum, tx) =>
+              sum + Number(tx.amount || 0),
+            0
+          )
+      );
+
+      return {
+        minimum: paid,
+        paid,
+        remaining: 0
+      };
+    }
+
+    const statementDebt = Math.max(
+      0,
+      Number(
+        card.statementDebt !== undefined
+          ? card.statementDebt
+          : card.debt || 0
+      )
+    );
+
+    const minimum = roundMoney(
+      statementDebt * 0.20
+    );
+
+    const cycle =
+      card.statementCycle ||
+      cycleKey(card.dueDate);
+
+    const paid = roundMoney(
+      transactions
+        .filter(tx => {
+          if (
+            tx.type !== "card-payment" ||
+            String(tx.cardId) !== String(card.id)
+          ) {
+            return false;
+          }
+
+          if (tx.statementCycle) {
+            return tx.statementCycle === cycle;
+          }
+
+          return isCurrentMonth(
+            tx.createdAt || tx.date
+          );
+        })
+        .reduce(
+          (sum, tx) =>
+            sum + Number(tx.amount || 0),
+          0
+        )
+    );
+
+    return {
+      minimum,
+      paid,
+      remaining: roundMoney(
+        Math.max(0, minimum - paid)
+      )
+    };
+  }
+
+  function isCurrentMonth(value) {
+    const date = parseDate(value);
+    if (!date) return false;
+
+    const now = new Date();
+
+    return (
+      date.getMonth() === now.getMonth() &&
+      date.getFullYear() === now.getFullYear()
+    );
+  }
+
+  function currentMonthName() {
+    return new Date().toLocaleDateString(
+      "tr-TR",
+      {
+        month: "long",
+        year: "numeric"
+      }
+    );
+  }
+
+  function formatDate(value) {
+    const date = parseDate(value);
+
+    if (!date) return "Tarih yok";
+
+    return date.toLocaleDateString(
+      "tr-TR",
+      {
+        day: "numeric",
+        month: "long"
+      }
+    );
+  }
+
+  function parseDate(value) {
+    if (!value) return null;
+
+    const date = new Date(
+      String(value).includes("T")
+        ? value
+        : `${value}T12:00:00`
+    );
+
+    return Number.isNaN(date.getTime())
+      ? null
+      : date;
+  }
+
+  function startOfDay(date) {
+    const result = new Date(date);
+    result.setHours(0, 0, 0, 0);
+    return result;
+  }
+
+  function cycleKey(value) {
+    const match =
+      String(value || "").match(/^(\d{4})-(\d{2})/);
+
+    return match
+      ? `${match[1]}-${match[2]}`
+      : "";
+  }
+
+  function roundMoney(value) {
+    return Math.round(
+      (Number(value) + Number.EPSILON) * 100
+    ) / 100;
+  }
+
+  function formatMoney(value) {
+    return new Intl.NumberFormat(
+      "tr-TR",
+      {
+        style: "currency",
+        currency: "TRY"
+      }
+    ).format(Number(value) || 0);
+  }
+
+  function setMoney(id, value) {
+    const element = document.getElementById(id);
+
+    if (element) {
+      element.textContent = formatMoney(value);
+    }
+  }
+
+  function setText(id, value) {
+    const element = document.getElementById(id);
+
+    if (element) {
+      element.textContent = String(value);
+    }
+  }
+
+  function loadJson(key) {
+    try {
+      return JSON.parse(
+        localStorage.getItem(key) || "[]"
+      );
+    } catch {
+      return [];
+    }
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function installMonthlyPlanStyles() {
+    if (document.getElementById("yfMonthlyPlanStyles")) return;
+
+    const style = document.createElement("style");
+    style.id = "yfMonthlyPlanStyles";
+
+    style.textContent = `
+      .monthly-plan-card {
+        margin: 18px 0;
+        padding: 18px;
+        border: 1px solid rgba(255,177,72,.16);
+        border-radius: 24px;
+        background:
+          radial-gradient(
+            circle at 95% 0,
+            rgba(255,177,72,.13),
+            transparent 34%
+          ),
+          linear-gradient(
+            145deg,
+            rgba(53,45,27,.97),
+            rgba(17,31,43,.97)
+          );
+        box-shadow: 0 18px 42px rgba(0,0,0,.18);
+      }
+
+      .monthly-plan-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 15px;
+      }
+
+      .monthly-plan-head > div > span {
+        display: block;
+        color: #ffd073;
+        font-size: 9px;
+        font-weight: 900;
+        letter-spacing: .13em;
+      }
+
+      .monthly-plan-head h2 {
+        margin: 5px 0 0;
+        font-size: 20px;
+      }
+
+      .monthly-plan-status {
+        min-height: 26px;
+        display: inline-flex;
+        align-items: center;
+        padding: 0 9px;
+        border: 1px solid rgba(255,177,72,.18);
+        border-radius: 999px;
+        color: #ffd073;
+        background: rgba(255,177,72,.09);
+        font-size: 8px;
+        font-weight: 850;
+      }
+
+      .monthly-plan-status.completed {
+        color: #4ce0aa;
+        border-color: rgba(43,211,154,.18);
+        background: rgba(43,211,154,.09);
+      }
+
+      .monthly-plan-summary {
+        display: grid;
+        grid-template-columns: repeat(3,minmax(0,1fr));
+        gap: 9px;
+      }
+
+      .monthly-plan-summary article {
+        min-width: 0;
+        padding: 13px 11px;
+        border: 1px solid rgba(255,255,255,.07);
+        border-radius: 15px;
+        background: rgba(255,255,255,.035);
+      }
+
+      .monthly-plan-summary article.primary {
+        border-color: rgba(255,177,72,.16);
+        background: rgba(255,177,72,.06);
+      }
+
+      .monthly-plan-summary span,
+      .monthly-plan-summary strong,
+      .monthly-plan-summary small {
+        display: block;
+      }
+
+      .monthly-plan-summary span {
+        color: #8fa2ba;
+        font-size: 8px;
+      }
+
+      .monthly-plan-summary strong {
+        margin-top: 6px;
+        overflow: hidden;
+        font-size: 13px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .monthly-plan-summary article.primary strong {
+        color: #ffd073;
+      }
+
+      .monthly-plan-summary small {
+        margin-top: 5px;
+        color: #71859a;
+        font-size: 7px;
+      }
+
+      .monthly-plan-progress-wrap {
+        margin-top: 12px;
+        padding: 12px;
+        border-radius: 15px;
+        background: rgba(255,255,255,.025);
+      }
+
+      .monthly-plan-progress-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        color: #8fa2ba;
+        font-size: 8px;
+      }
+
+      .monthly-plan-progress-head strong {
+        color: #4ce0aa;
+      }
+
+      .monthly-plan-track {
+        height: 8px;
+        margin-top: 9px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: rgba(255,255,255,.08);
+      }
+
+      .monthly-plan-track > div {
+        width: 0;
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg,#ffd073,#52e6b2);
+        transition: width .45s ease;
+      }
+
+      .monthly-plan-list {
+        display: grid;
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      .monthly-plan-row {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 11px;
+        border: 1px solid rgba(255,255,255,.06);
+        border-radius: 14px;
+        color: inherit;
+        background: rgba(255,255,255,.025);
+        text-align: left;
+        font: inherit;
+      }
+
+      .monthly-plan-row.completed {
+        opacity: .72;
+      }
+
+      .monthly-plan-row-icon {
+        width: 36px;
+        height: 36px;
+        flex: 0 0 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 11px;
+        background: rgba(255,255,255,.045);
+      }
+
+      .monthly-plan-row-info {
+        min-width: 0;
+        flex: 1;
+      }
+
+      .monthly-plan-row-info strong,
+      .monthly-plan-row-info small,
+      .monthly-plan-row-info em {
+        display: block;
+      }
+
+      .monthly-plan-row-info strong {
+        font-size: 10px;
+      }
+
+      .monthly-plan-row-info small {
+        margin-top: 3px;
+        color: #9aabba;
+        font-size: 8px;
+      }
+
+      .monthly-plan-row-info em {
+        margin-top: 4px;
+        color: #71859a;
+        font-size: 7.5px;
+        font-style: normal;
+      }
+
+      .monthly-plan-row-side {
+        flex: 0 0 auto;
+        text-align: right;
+      }
+
+      .monthly-plan-row-side strong,
+      .monthly-plan-row-side small {
+        display: block;
+      }
+
+      .monthly-plan-row-side strong {
+        font-size: 10px;
+      }
+
+      .monthly-plan-row-side small {
+        margin-top: 4px;
+        color: #8fa2ba;
+        font-size: 7px;
+      }
+
+      .monthly-plan-empty {
+        padding: 18px;
+        border: 1px dashed rgba(255,255,255,.08);
+        border-radius: 14px;
+        color: #8fa2ba;
+        text-align: center;
+        font-size: 10px;
+      }
+
+      body.light-theme .monthly-plan-card {
+        color: #102033;
+        background:
+          linear-gradient(
+            145deg,
+            rgba(255,255,255,.98),
+            rgba(255,248,231,.98)
+          );
+        border-color: rgba(120,89,20,.10);
+      }
+
+      body.light-theme .monthly-plan-summary article,
+      body.light-theme .monthly-plan-row,
+      body.light-theme .monthly-plan-progress-wrap {
+        background: rgba(255,255,255,.75);
+        border-color: rgba(20,73,112,.07);
+      }
+
+      @media(max-width:390px) {
+        .monthly-plan-summary {
+          grid-template-columns: 1fr;
+        }
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+});
