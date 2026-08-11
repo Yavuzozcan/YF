@@ -11375,3 +11375,1051 @@ document.addEventListener("DOMContentLoaded", () => {
     );
   }
 });
+
+// =========================================
+// YF v4.4 — TÜM KART/KREDİ İLERLEMELERİNİ GERÇEK ID İLE DÜZELT
+// Banka adına göre eşleştirme kullanılmaz.
+// Garanti dahil aynı bankadaki tüm ürünler birbirinden bağımsızdır.
+// =========================================
+
+document.addEventListener("DOMContentLoaded", () => {
+  const DEBT_KEY = "yf_cards_v1";
+  const TX_KEY = "yf_transactions_v1";
+
+  let refreshTimer = null;
+  let observer = null;
+
+  scheduleRefresh(80);
+  scheduleRefresh(350);
+  scheduleRefresh(900);
+
+  document.addEventListener(
+    "click",
+    event => {
+      const pageButton = event.target.closest("[data-page]");
+
+      if (pageButton) {
+        scheduleRefresh(120);
+        scheduleRefresh(420);
+        scheduleRefresh(900);
+      }
+    },
+    true
+  );
+
+  document
+    .getElementById("debtPaymentForm")
+    ?.addEventListener(
+      "submit",
+      () => {
+        scheduleRefresh(350);
+        scheduleRefresh(900);
+        scheduleRefresh(1600);
+      },
+      true
+    );
+
+  window.addEventListener("pageshow", () => {
+    scheduleRefresh(120);
+    scheduleRefresh(500);
+  });
+
+  window.addEventListener("storage", () => {
+    scheduleRefresh(120);
+    scheduleRefresh(500);
+  });
+
+  window.addEventListener("yf-refresh-dashboard", () => {
+    scheduleRefresh(150);
+    scheduleRefresh(500);
+  });
+
+  startObserver();
+
+  function scheduleRefresh(delay = 0) {
+    setTimeout(() => {
+      refreshAllExactIdProgress();
+    }, delay);
+  }
+
+  function startObserver() {
+    const list = document.getElementById("cardsList");
+    if (!list || observer) return;
+
+    observer = new MutationObserver(() => {
+      clearTimeout(refreshTimer);
+
+      refreshTimer = setTimeout(() => {
+        refreshAllExactIdProgress();
+      }, 60);
+    });
+
+    observer.observe(list, {
+      childList: true,
+      subtree: true
+    });
+  }
+
+  function refreshAllExactIdProgress() {
+    const list = document.getElementById("cardsList");
+    if (!list) return;
+
+    const debts = loadJson(DEBT_KEY);
+    const transactions = loadJson(TX_KEY);
+
+    const debtMap = new Map(
+      debts.map(debt => [String(debt.id), debt])
+    );
+
+    const cards = [
+      ...list.querySelectorAll(".bank-card")
+    ];
+
+    cards.forEach(cardElement => {
+      const id = getExactDebtId(cardElement);
+      if (!id) return;
+
+      cardElement.dataset.yfDebtId = id;
+
+      const debt = debtMap.get(String(id));
+      if (!debt) return;
+
+      // Eski banka-adı eşleştirmesinden kalan rozetleri temizle.
+      cardElement
+        .querySelectorAll(".yf-card-urgency-badge")
+        .forEach(node => node.remove());
+
+      if (debt.type === "personal-loan") {
+        refreshLoanCard(
+          cardElement,
+          debt,
+          transactions
+        );
+      } else {
+        refreshCreditCard(
+          cardElement,
+          debt,
+          transactions
+        );
+      }
+
+      addExactUrgencyBadge(
+        cardElement,
+        debt,
+        transactions
+      );
+    });
+
+    reorderCardsByExactId(
+      list,
+      cards,
+      debts,
+      transactions
+    );
+
+    refreshOpenDetailPage(
+      debtMap,
+      transactions
+    );
+
+    installStyles();
+  }
+
+  // -----------------------------------------
+  // DOM KARTININ GERÇEK ID'SİNİ BUL
+  // -----------------------------------------
+  function getExactDebtId(cardElement) {
+    const loanEdit = cardElement.querySelector(
+      "[data-loan-edit]"
+    );
+
+    if (loanEdit?.dataset.loanEdit) {
+      return String(loanEdit.dataset.loanEdit);
+    }
+
+    const cardEdit = cardElement.querySelector(
+      "[data-card-edit]"
+    );
+
+    if (cardEdit?.dataset.cardEdit) {
+      return String(cardEdit.dataset.cardEdit);
+    }
+
+    const oldEdit = cardElement.querySelector(
+      "[data-edit]"
+    );
+
+    if (oldEdit?.dataset.edit) {
+      return String(oldEdit.dataset.edit);
+    }
+
+    if (cardElement.dataset.yfDebtId) {
+      return String(cardElement.dataset.yfDebtId);
+    }
+
+    return "";
+  }
+
+  // -----------------------------------------
+  // İHTİYAÇ KREDİSİ İLERLEMESİ
+  // -----------------------------------------
+  function refreshLoanCard(
+    cardElement,
+    loan,
+    transactions
+  ) {
+    const recordedPaid = roundMoney(
+      transactions
+        .filter(transaction =>
+          transaction.type === "loan-payment" &&
+          String(transaction.cardId) === String(loan.id)
+        )
+        .reduce(
+          (sum, transaction) =>
+            sum + Number(transaction.amount || 0),
+          0
+        )
+    );
+
+    const debtNow = roundMoney(
+      Number(loan.debt || 0)
+    );
+
+    /*
+      Bazı eski kredi kayıtlarında originalDebt yanlış/eksik olabilir.
+      ID'ye ait ödeme geçmişinden güvenli başlangıç borcunu kur.
+    */
+    const calculatedOriginal = roundMoney(
+      debtNow + recordedPaid
+    );
+
+    const originalDebt = roundMoney(
+      Math.max(
+        Number(loan.originalDebt || 0),
+        calculatedOriginal,
+        debtNow
+      )
+    );
+
+    const paidByDebtDifference = roundMoney(
+      Math.max(0, originalDebt - debtNow)
+    );
+
+    const effectivePaid = roundMoney(
+      Math.max(
+        recordedPaid,
+        paidByDebtDifference
+      )
+    );
+
+    const percent =
+      originalDebt > 0
+        ? clampPercent(
+            Math.round(
+              (effectivePaid / originalDebt) * 100
+            )
+          )
+        : 0;
+
+    const track = cardElement.querySelector(
+      ".card-minimum-status-track"
+    );
+
+    if (track) {
+      let fill = track.firstElementChild;
+
+      if (!fill) {
+        fill = document.createElement("div");
+        track.appendChild(fill);
+      }
+
+      fill.style.width = `${percent}%`;
+      fill.dataset.yfExactProgress = "1";
+    }
+
+    let text = cardElement.querySelector(
+      ".loan-progress-text"
+    );
+
+    if (!text) {
+      text = document.createElement("small");
+      text.className = "loan-progress-text";
+
+      if (track) {
+        track.insertAdjacentElement(
+          "afterend",
+          text
+        );
+      }
+    }
+
+    if (text) {
+      text.textContent =
+        `Toplam ilerleme: %${percent}`;
+    }
+
+    let detail = cardElement.querySelector(
+      ".yf-exact-loan-progress-detail"
+    );
+
+    if (!detail) {
+      detail = document.createElement("div");
+      detail.className =
+        "yf-exact-loan-progress-detail";
+
+      if (text) {
+        text.insertAdjacentElement(
+          "afterend",
+          detail
+        );
+      } else {
+        cardElement.appendChild(detail);
+      }
+    }
+
+    detail.innerHTML = `
+      <div>
+        <span>Ödenen</span>
+        <strong>${formatMoney(effectivePaid)}</strong>
+      </div>
+
+      <div>
+        <span>Kalan</span>
+        <strong>${formatMoney(debtNow)}</strong>
+      </div>
+    `;
+
+    cardElement.dataset.yfProgressPercent =
+      String(percent);
+  }
+
+  // -----------------------------------------
+  // KREDİ KARTI ASGARİ İLERLEMESİ
+  // -----------------------------------------
+  function refreshCreditCard(
+    cardElement,
+    card,
+    transactions
+  ) {
+    const minimumBox = cardElement.querySelector(
+      ".card-minimum-status"
+    );
+
+    if (!minimumBox) return;
+
+    const currentStatementDate =
+      parseDate(card.statementDate);
+
+    const today = startOfDay(new Date());
+
+    /*
+      Asgari tamamlandığında v4.0 tarihi bir sonraki aya geçiriyor.
+      Yeni ekstre tarihi henüz gelmediyse, kullanıcıya önceki dönemin
+      başarıyla tamamlandığını göstermeye devam et.
+    */
+    const waitingForNextStatement =
+      Boolean(
+        card.lastAutoRolledCycle &&
+        currentStatementDate &&
+        currentStatementDate > today
+      );
+
+    if (waitingForNextStatement) {
+      setCardMinimumVisual(
+        minimumBox,
+        {
+          minimum: getLastCyclePaid(
+            card,
+            transactions
+          ),
+          paid: getLastCyclePaid(
+            card,
+            transactions
+          ),
+          remaining: 0,
+          percent: 100,
+          label: "Son dönem asgari ödendi ✓",
+          state: "completed",
+          footer: "Yeni ekstre kesimi bekleniyor"
+        }
+      );
+
+      return;
+    }
+
+    const info = getCurrentMinimumInfo(
+      card,
+      transactions
+    );
+
+    let label = "Asgari bekliyor";
+    let state = "waiting";
+
+    if (info.remaining <= 0) {
+      label = "Asgari ödendi ✓";
+      state = "completed";
+    } else if (info.paid > 0) {
+      label = `${formatMoney(info.remaining)} kaldı`;
+      state = "partial";
+    }
+
+    setCardMinimumVisual(
+      minimumBox,
+      {
+        minimum: info.minimum,
+        paid: info.paid,
+        remaining: info.remaining,
+        percent: info.percent,
+        label,
+        state,
+        footer:
+          `Bu dönem: ${formatMoney(info.paid)} / ` +
+          `${formatMoney(info.minimum)}`
+      }
+    );
+  }
+
+  function setCardMinimumVisual(
+    minimumBox,
+    data
+  ) {
+    const amountStrong =
+      minimumBox.querySelector(
+        ".card-minimum-status-head > div strong"
+      );
+
+    if (amountStrong) {
+      amountStrong.textContent =
+        formatMoney(data.minimum);
+    }
+
+    const badge =
+      minimumBox.querySelector(
+        ".card-minimum-status-badge"
+      );
+
+    if (badge) {
+      badge.textContent = data.label;
+      badge.className =
+        `card-minimum-status-badge ${data.state}`;
+    }
+
+    const track =
+      minimumBox.querySelector(
+        ".card-minimum-status-track"
+      );
+
+    if (track) {
+      let fill = track.firstElementChild;
+
+      if (!fill) {
+        fill = document.createElement("div");
+        track.appendChild(fill);
+      }
+
+      fill.style.width =
+        `${clampPercent(data.percent)}%`;
+
+      fill.dataset.yfExactProgress = "1";
+    }
+
+    const footer =
+      minimumBox.querySelector("small");
+
+    if (footer) {
+      footer.textContent = data.footer;
+    }
+  }
+
+  function getCurrentMinimumInfo(
+    card,
+    transactions
+  ) {
+    const statementDebt = Math.max(
+      0,
+      Number(
+        card.statementDebt !== undefined
+          ? card.statementDebt
+          : card.debt || 0
+      )
+    );
+
+    const minimum = roundMoney(
+      statementDebt * 0.20
+    );
+
+    const cycle =
+      card.statementCycle ||
+      cycleKey(card.dueDate);
+
+    const paid = roundMoney(
+      transactions
+        .filter(transaction => {
+          if (
+            transaction.type !== "card-payment" ||
+            String(transaction.cardId) !==
+              String(card.id)
+          ) {
+            return false;
+          }
+
+          if (transaction.statementCycle) {
+            return (
+              transaction.statementCycle === cycle
+            );
+          }
+
+          return isSameMonth(
+            transaction.createdAt ||
+              transaction.date,
+            card.dueDate
+          );
+        })
+        .reduce(
+          (sum, transaction) =>
+            sum + Number(transaction.amount || 0),
+          0
+        )
+    );
+
+    const remaining = roundMoney(
+      Math.max(0, minimum - paid)
+    );
+
+    const percent =
+      minimum > 0
+        ? clampPercent(
+            Math.round(
+              (paid / minimum) * 100
+            )
+          )
+        : 100;
+
+    return {
+      minimum,
+      paid,
+      remaining,
+      percent
+    };
+  }
+
+  function getLastCyclePaid(
+    card,
+    transactions
+  ) {
+    const cycle =
+      card.lastAutoRolledCycle || "";
+
+    if (!cycle) return 0;
+
+    return roundMoney(
+      transactions
+        .filter(transaction =>
+          transaction.type === "card-payment" &&
+          String(transaction.cardId) ===
+            String(card.id) &&
+          transaction.statementCycle === cycle
+        )
+        .reduce(
+          (sum, transaction) =>
+            sum + Number(transaction.amount || 0),
+          0
+        )
+    );
+  }
+
+  // -----------------------------------------
+  // ACİLİYET ROZETİ — SADECE ID
+  // -----------------------------------------
+  function addExactUrgencyBadge(
+    cardElement,
+    debt,
+    transactions
+  ) {
+    if (Number(debt.debt || 0) <= 0) {
+      return;
+    }
+
+    const badge = document.createElement("span");
+    badge.className = "yf-card-urgency-badge";
+
+    if (debt.type === "personal-loan") {
+      const days = daysLeft(
+        debt.nextPaymentDate || debt.dueDate
+      );
+
+      badge.textContent =
+        loanUrgencyText(days);
+
+      badge.classList.add(
+        urgencyClass(days)
+      );
+    } else {
+      const currentStatementDate =
+        parseDate(debt.statementDate);
+
+      const waitingNext =
+        Boolean(
+          debt.lastAutoRolledCycle &&
+          currentStatementDate &&
+          currentStatementDate >
+            startOfDay(new Date())
+        );
+
+      if (waitingNext) {
+        badge.textContent =
+          "Son dönem asgari ödendi ✓";
+        badge.classList.add("paid");
+      } else {
+        const minimum =
+          getCurrentMinimumInfo(
+            debt,
+            transactions
+          );
+
+        if (minimum.remaining <= 0) {
+          badge.textContent =
+            "Asgari ödendi ✓";
+          badge.classList.add("paid");
+        } else {
+          const days = daysLeft(debt.dueDate);
+
+          badge.textContent =
+            cardUrgencyText(days);
+
+          badge.classList.add(
+            urgencyClass(days)
+          );
+        }
+      }
+    }
+
+    const header =
+      cardElement.querySelector(
+        ".bank-card-header"
+      ) ||
+      cardElement.firstElementChild;
+
+    header?.insertAdjacentElement(
+      "afterend",
+      badge
+    );
+  }
+
+  // -----------------------------------------
+  // KARTLARI ID + TARİH İLE SIRALA
+  // -----------------------------------------
+  function reorderCardsByExactId(
+    list,
+    visibleCards,
+    debts,
+    transactions
+  ) {
+    const elementMap = new Map();
+
+    visibleCards.forEach(cardElement => {
+      const id = getExactDebtId(cardElement);
+
+      if (id) {
+        elementMap.set(
+          String(id),
+          cardElement
+        );
+      }
+    });
+
+    const sorted = [...debts].sort(
+      (a, b) => {
+        const ai = getSortInfo(
+          a,
+          transactions
+        );
+
+        const bi = getSortInfo(
+          b,
+          transactions
+        );
+
+        if (ai.group !== bi.group) {
+          return ai.group - bi.group;
+        }
+
+        if (ai.days !== bi.days) {
+          return ai.days - bi.days;
+        }
+
+        return String(a.id).localeCompare(
+          String(b.id)
+        );
+      }
+    );
+
+    sorted.forEach(debt => {
+      const element = elementMap.get(
+        String(debt.id)
+      );
+
+      if (element) {
+        list.appendChild(element);
+      }
+    });
+  }
+
+  function getSortInfo(
+    debt,
+    transactions
+  ) {
+    if (Number(debt.debt || 0) <= 0) {
+      return {
+        group: 9,
+        days: 999999
+      };
+    }
+
+    if (debt.type === "personal-loan") {
+      return {
+        group: 2,
+        days: daysLeft(
+          debt.nextPaymentDate ||
+            debt.dueDate
+        )
+      };
+    }
+
+    const statementDate =
+      parseDate(debt.statementDate);
+
+    const waitingNext =
+      Boolean(
+        debt.lastAutoRolledCycle &&
+        statementDate &&
+        statementDate >
+          startOfDay(new Date())
+      );
+
+    if (waitingNext) {
+      return {
+        group: 3,
+        days: daysLeft(debt.dueDate)
+      };
+    }
+
+    const info =
+      getCurrentMinimumInfo(
+        debt,
+        transactions
+      );
+
+    if (info.remaining > 0) {
+      return {
+        group: 1,
+        days: daysLeft(debt.dueDate)
+      };
+    }
+
+    return {
+      group: 3,
+      days: daysLeft(debt.dueDate)
+    };
+  }
+
+  // -----------------------------------------
+  // AÇIK KART DETAYINDA KREDİ İLERLEMESİNİ DE ID İLE DÜZELT
+  // -----------------------------------------
+  function refreshOpenDetailPage(
+    debtMap,
+    transactions
+  ) {
+    const page =
+      document.getElementById(
+        "cardDetailPage"
+      );
+
+    if (!page) return;
+
+    const id = String(
+      page.dataset.debtId || ""
+    );
+
+    if (!id) return;
+
+    const debt = debtMap.get(id);
+    if (!debt) return;
+
+    if (debt.type !== "personal-loan") {
+      return;
+    }
+
+    const paid = roundMoney(
+      transactions
+        .filter(transaction =>
+          transaction.type === "loan-payment" &&
+          String(transaction.cardId) === id
+        )
+        .reduce(
+          (sum, transaction) =>
+            sum + Number(transaction.amount || 0),
+          0
+        )
+    );
+
+    const currentDebt =
+      roundMoney(
+        Number(debt.debt || 0)
+      );
+
+    const originalDebt =
+      roundMoney(
+        Math.max(
+          Number(debt.originalDebt || 0),
+          currentDebt + paid,
+          currentDebt
+        )
+      );
+
+    const effectivePaid =
+      roundMoney(
+        Math.max(
+          paid,
+          originalDebt - currentDebt
+        )
+      );
+
+    const percent =
+      originalDebt > 0
+        ? clampPercent(
+            Math.round(
+              (effectivePaid /
+                originalDebt) *
+                100
+            )
+          )
+        : 0;
+
+    const fill =
+      document.getElementById(
+        "detailProgressFill"
+      );
+
+    if (fill) {
+      fill.style.width = `${percent}%`;
+    }
+
+    const text =
+      document.getElementById(
+        "detailProgressText"
+      );
+
+    if (text) {
+      text.textContent =
+        `Kredinin %${percent} kadarı ödendi`;
+    }
+  }
+
+  function loanUrgencyText(days) {
+    if (days === 999999) {
+      return "Taksit tarihi yok";
+    }
+
+    if (days < 0) {
+      return `Taksit ${Math.abs(days)} gün gecikti`;
+    }
+
+    if (days === 0) {
+      return "Taksit bugün";
+    }
+
+    if (days === 1) {
+      return "Taksit yarın";
+    }
+
+    return `Taksit ${days} gün sonra`;
+  }
+
+  function cardUrgencyText(days) {
+    if (days === 999999) {
+      return "Son ödeme tarihi yok";
+    }
+
+    if (days < 0) {
+      return `Asgari ${Math.abs(days)} gün gecikti`;
+    }
+
+    if (days === 0) {
+      return "Asgari bugün";
+    }
+
+    if (days === 1) {
+      return "Asgari yarın";
+    }
+
+    return `Asgari ${days} gün sonra`;
+  }
+
+  function urgencyClass(days) {
+    if (days < 0) return "overdue";
+    if (days <= 1) return "today";
+    if (days <= 7) return "warning";
+    return "upcoming";
+  }
+
+  function daysLeft(value) {
+    const date = parseDate(value);
+
+    if (!date) return 999999;
+
+    const today =
+      startOfDay(new Date());
+
+    date.setHours(0, 0, 0, 0);
+
+    return Math.ceil(
+      (date - today) / 86400000
+    );
+  }
+
+  function startOfDay(date) {
+    const result = new Date(date);
+    result.setHours(0, 0, 0, 0);
+    return result;
+  }
+
+  function parseDate(value) {
+    if (!value) return null;
+
+    const date = new Date(
+      String(value).includes("T")
+        ? value
+        : `${value}T12:00:00`
+    );
+
+    return Number.isNaN(date.getTime())
+      ? null
+      : date;
+  }
+
+  function cycleKey(value) {
+    const match =
+      String(value || "").match(
+        /^(\d{4})-(\d{2})/
+      );
+
+    if (match) {
+      return `${match[1]}-${match[2]}`;
+    }
+
+    return "";
+  }
+
+  function isSameMonth(
+    firstValue,
+    secondValue
+  ) {
+    const first = parseDate(firstValue);
+    const second = parseDate(secondValue);
+
+    if (!first || !second) {
+      return false;
+    }
+
+    return (
+      first.getMonth() === second.getMonth() &&
+      first.getFullYear() ===
+        second.getFullYear()
+    );
+  }
+
+  function clampPercent(value) {
+    return Math.min(
+      100,
+      Math.max(0, Number(value) || 0)
+    );
+  }
+
+  function roundMoney(value) {
+    return Math.round(
+      (Number(value) + Number.EPSILON) *
+        100
+    ) / 100;
+  }
+
+  function formatMoney(value) {
+    return new Intl.NumberFormat(
+      "tr-TR",
+      {
+        style: "currency",
+        currency: "TRY"
+      }
+    ).format(Number(value) || 0);
+  }
+
+  function loadJson(key) {
+    try {
+      return JSON.parse(
+        localStorage.getItem(key) || "[]"
+      );
+    } catch {
+      return [];
+    }
+  }
+
+  function installStyles() {
+    if (
+      document.getElementById(
+        "yfExactIdProgressV44Styles"
+      )
+    ) {
+      return;
+    }
+
+    const style =
+      document.createElement("style");
+
+    style.id =
+      "yfExactIdProgressV44Styles";
+
+    style.textContent = `
+      .yf-exact-loan-progress-detail {
+        display: grid;
+        grid-template-columns:
+          repeat(2,minmax(0,1fr));
+        gap: 8px;
+        margin-top: 9px;
+      }
+
+      .yf-exact-loan-progress-detail > div {
+        padding: 9px 10px;
+        border-radius: 11px;
+        background: rgba(255,255,255,.035);
+      }
+
+      .yf-exact-loan-progress-detail span,
+      .yf-exact-loan-progress-detail strong {
+        display: block;
+      }
+
+      .yf-exact-loan-progress-detail span {
+        color: #8fa2ba;
+        font-size: 8px;
+      }
+
+      .yf-exact-loan-progress-detail strong {
+        margin-top: 4px;
+        color: #fff;
+        font-size: 10px;
+      }
+
+      body.light-theme
+      .yf-exact-loan-progress-detail > div {
+        background: rgba(20,73,112,.04);
+      }
+
+      body.light-theme
+      .yf-exact-loan-progress-detail strong {
+        color: #102033;
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+});
