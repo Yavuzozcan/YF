@@ -15167,3 +15167,658 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 });
+
+// =========================================
+// YF v5.6 — FİNANS TAKVİMİ v1.0
+// Ayrı sayfa. Mevcut ödeme motoruna dokunmaz.
+// =========================================
+document.addEventListener("DOMContentLoaded", () => {
+  const CK = "yf_cards_v1";
+  const TK = "yf_transactions_v1";
+  const $ = id => document.getElementById(id);
+
+  let calendarDate = new Date();
+  calendarDate.setDate(1);
+  let selectedDay = null;
+
+  installCalendarStyles();
+  installCalendarMenuItem();
+  installCalendarPage();
+
+  document.addEventListener("click", e => {
+    const menuItem = e.target.closest("#yfFinanceCalendarMenu");
+    if (menuItem) {
+      e.preventDefault();
+      e.stopPropagation();
+      openCalendarPage();
+    }
+  }, true);
+
+  window.addEventListener("storage", () => {
+    if (isCalendarVisible()) renderCalendar();
+  });
+
+  window.addEventListener("pageshow", () => {
+    if (isCalendarVisible()) renderCalendar();
+  });
+
+  function installCalendarMenuItem() {
+    if ($("yfFinanceCalendarMenu")) return;
+
+    const menu =
+      document.querySelector(".sidebar-menu") ||
+      document.querySelector(".menu-items") ||
+      document.querySelector("#sideMenu nav") ||
+      document.querySelector(".side-menu nav") ||
+      document.querySelector("#sideMenu") ||
+      document.querySelector(".side-menu");
+
+    if (!menu) return;
+
+    const btn = document.createElement("button");
+    btn.id = "yfFinanceCalendarMenu";
+    btn.type = "button";
+    btn.className = "yf-calendar-menu-item";
+    btn.innerHTML = `
+      <span class="yf-calendar-menu-icon">📅</span>
+      <span>Finans Takvimi</span>
+    `;
+
+    menu.appendChild(btn);
+  }
+
+  function installCalendarPage() {
+    if ($("financeCalendarPage")) return;
+
+    const page = document.createElement("section");
+    page.id = "financeCalendarPage";
+    page.className = "page yf-calendar-page";
+
+    page.innerHTML = `
+      <div class="yf-calendar-top">
+        <button id="yfCalendarBack" type="button" aria-label="Geri">‹</button>
+        <div>
+          <small>FİNANS TAKVİMİ</small>
+          <h2 id="yfCalendarMonthTitle">—</h2>
+        </div>
+        <button id="yfCalendarToday" type="button">Bugün</button>
+      </div>
+
+      <div class="yf-calendar-summary">
+        <div>
+          <span>Planlanan</span>
+          <strong id="yfCalendarPlanned">₺0,00</strong>
+        </div>
+        <div>
+          <span>Ödenen</span>
+          <strong id="yfCalendarPaid">₺0,00</strong>
+        </div>
+        <div>
+          <span>Kalan</span>
+          <strong id="yfCalendarRemaining">₺0,00</strong>
+        </div>
+      </div>
+
+      <div class="yf-calendar-card">
+        <div class="yf-calendar-nav">
+          <button id="yfCalendarPrev" type="button">‹</button>
+          <strong id="yfCalendarMonthLabel">—</strong>
+          <button id="yfCalendarNext" type="button">›</button>
+        </div>
+
+        <div class="yf-calendar-weekdays">
+          <span>Pzt</span><span>Sal</span><span>Çar</span>
+          <span>Per</span><span>Cum</span><span>Cmt</span><span>Paz</span>
+        </div>
+
+        <div id="yfCalendarGrid" class="yf-calendar-grid"></div>
+      </div>
+
+      <div class="yf-calendar-legend">
+        <span><i class="income"></i>Gelir</span>
+        <span><i class="payment"></i>Ödeme</span>
+        <span><i class="statement"></i>Ekstre</span>
+        <span><i class="overdue"></i>Gecikmiş</span>
+      </div>
+
+      <div class="yf-calendar-day-card">
+        <div class="yf-calendar-day-head">
+          <div>
+            <small>GÜN DETAYI</small>
+            <h3 id="yfCalendarDayTitle">Bir gün seç</h3>
+          </div>
+          <strong id="yfCalendarDayNet">—</strong>
+        </div>
+        <div id="yfCalendarDayList" class="yf-calendar-day-list">
+          <div class="yf-calendar-empty">Takvimden bir güne dokun.</div>
+        </div>
+      </div>
+    `;
+
+    const main =
+      document.querySelector("main") ||
+      document.querySelector(".main-content") ||
+      document.querySelector("#app") ||
+      document.body;
+
+    main.appendChild(page);
+
+    $("yfCalendarBack")?.addEventListener("click", goHome);
+    $("yfCalendarToday")?.addEventListener("click", () => {
+      calendarDate = new Date();
+      calendarDate.setDate(1);
+      selectedDay = new Date();
+      renderCalendar();
+    });
+    $("yfCalendarPrev")?.addEventListener("click", () => {
+      calendarDate.setMonth(calendarDate.getMonth() - 1);
+      selectedDay = null;
+      renderCalendar();
+    });
+    $("yfCalendarNext")?.addEventListener("click", () => {
+      calendarDate.setMonth(calendarDate.getMonth() + 1);
+      selectedDay = null;
+      renderCalendar();
+    });
+  }
+
+  function openCalendarPage() {
+    document.querySelectorAll(".page").forEach(p => {
+      p.classList.remove("active");
+      p.style.display = "none";
+    });
+
+    const page = $("financeCalendarPage");
+    if (!page) return;
+
+    page.style.display = "block";
+    page.classList.add("active");
+
+    closeSideMenu();
+    renderCalendar();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function goHome() {
+    const homeButton =
+      document.querySelector('[data-page="dashboardPage"]') ||
+      document.querySelector('[data-page="homePage"]');
+
+    if (homeButton) {
+      homeButton.click();
+      return;
+    }
+
+    $("financeCalendarPage")?.classList.remove("active");
+    if ($("financeCalendarPage")) $("financeCalendarPage").style.display = "none";
+
+    const dashboard = $("dashboardPage");
+    if (dashboard) {
+      dashboard.style.display = "block";
+      dashboard.classList.add("active");
+    }
+  }
+
+  function closeSideMenu() {
+    [
+      $("sideMenu"),
+      document.querySelector(".side-menu"),
+      document.querySelector(".sidebar")
+    ].filter(Boolean).forEach(menu => {
+      menu.classList.remove("open", "active", "show");
+    });
+
+    document
+      .querySelectorAll(".menu-overlay,.sidebar-overlay,.overlay")
+      .forEach(x => x.classList.remove("show", "active"));
+  }
+
+  function isCalendarVisible() {
+    return $("financeCalendarPage")?.classList.contains("active");
+  }
+
+  function renderCalendar() {
+    const year = calendarDate.getFullYear();
+    const month = calendarDate.getMonth();
+    const monthName = new Intl.DateTimeFormat("tr-TR", {
+      month: "long",
+      year: "numeric"
+    }).format(calendarDate);
+
+    setText("yfCalendarMonthTitle", titleCase(monthName));
+    setText("yfCalendarMonthLabel", titleCase(monthName));
+
+    const events = buildEvents(year, month);
+    renderSummary(events);
+    renderGrid(year, month, events);
+
+    if (selectedDay &&
+        selectedDay.getFullYear() === year &&
+        selectedDay.getMonth() === month) {
+      renderDay(selectedDay, events);
+    } else {
+      setText("yfCalendarDayTitle", "Bir gün seç");
+      setText("yfCalendarDayNet", "—");
+      const list = $("yfCalendarDayList");
+      if (list) {
+        list.innerHTML =
+          '<div class="yf-calendar-empty">Takvimden bir güne dokun.</div>';
+      }
+    }
+  }
+
+  function buildEvents(year, month) {
+    const cards = loadJson(CK);
+    const txs = loadJson(TK);
+    const events = [];
+
+    cards.forEach(item => {
+      if (item.type === "personal-loan") {
+        const date = parseDate(item.nextPaymentDate || item.dueDate);
+        if (sameMonth(date, year, month)) {
+          events.push({
+            date,
+            kind: "payment",
+            debtId: item.id,
+            title: `${item.bank} · ${item.name}`,
+            subtitle: "Kredi taksiti",
+            amount: Number(item.monthlyInstallment || 0),
+            direction: -1,
+            actionable: true
+          });
+        }
+        return;
+      }
+
+      const due = parseDate(item.dueDate);
+      if (sameMonth(due, year, month)) {
+        const minimum = Math.max(
+          0,
+          Number(
+            item.statementDebt !== undefined
+              ? item.statementDebt
+              : item.debt || 0
+          ) * 0.20
+        );
+
+        events.push({
+          date: due,
+          kind: due < startOfDay(new Date()) ? "overdue" : "payment",
+          debtId: item.id,
+          title: `${item.bank} · ${item.name}`,
+          subtitle: "Kart son ödeme · Asgari",
+          amount: minimum,
+          direction: -1,
+          actionable: true
+        });
+      }
+
+      const statement = parseDate(item.statementDate);
+      if (sameMonth(statement, year, month)) {
+        events.push({
+          date: statement,
+          kind: "statement",
+          debtId: item.id,
+          title: `${item.bank} · ${item.name}`,
+          subtitle: "Ekstre kesim günü",
+          amount: 0,
+          direction: 0,
+          actionable: false
+        });
+      }
+    });
+
+    txs.forEach(tx => {
+      const date = parseDate(tx.date || tx.createdAt);
+      if (!sameMonth(date, year, month)) return;
+
+      const amount = Number(tx.amount || 0);
+
+      if (tx.type === "income") {
+        events.push({
+          date,
+          kind: "income",
+          title: tx.category || "Gelir",
+          subtitle: "Gelir",
+          amount,
+          direction: 1,
+          actionable: false,
+          transaction: true
+        });
+      } else if (tx.type === "card-payment") {
+        const card = cards.find(x => String(x.id) === String(tx.cardId));
+        events.push({
+          date,
+          kind: "paid",
+          title: card ? `${card.bank} · ${card.name}` : "Kart ödemesi",
+          subtitle: "Ödeme yapıldı",
+          amount,
+          direction: -1,
+          actionable: false,
+          transaction: true
+        });
+      } else if (
+        tx.type === "loan-payment" ||
+        tx.type === "personal-loan-payment"
+      ) {
+        const loan = cards.find(x =>
+          String(x.id) === String(tx.loanId || tx.cardId || tx.debtId)
+        );
+        events.push({
+          date,
+          kind: "paid",
+          title: loan ? `${loan.bank} · ${loan.name}` : "Kredi ödemesi",
+          subtitle: "Taksit ödendi",
+          amount,
+          direction: -1,
+          actionable: false,
+          transaction: true
+        });
+      }
+    });
+
+    return events;
+  }
+
+  function renderSummary(events) {
+    const planned = events
+      .filter(e => e.actionable && e.direction < 0)
+      .reduce((s, e) => s + e.amount, 0);
+
+    const paid = events
+      .filter(e => e.transaction && e.kind === "paid")
+      .reduce((s, e) => s + e.amount, 0);
+
+    setText("yfCalendarPlanned", money(planned));
+    setText("yfCalendarPaid", money(paid));
+    setText("yfCalendarRemaining", money(Math.max(0, planned - paid)));
+  }
+
+  function renderGrid(year, month, events) {
+    const grid = $("yfCalendarGrid");
+    if (!grid) return;
+
+    grid.innerHTML = "";
+
+    const first = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0).getDate();
+    const offset = (first.getDay() + 6) % 7;
+    const today = startOfDay(new Date());
+
+    for (let i = 0; i < offset; i++) {
+      const blank = document.createElement("div");
+      blank.className = "yf-calendar-cell blank";
+      grid.appendChild(blank);
+    }
+
+    for (let day = 1; day <= lastDay; day++) {
+      const date = new Date(year, month, day);
+      const dayEvents = events.filter(e => sameDay(e.date, date));
+
+      const cell = document.createElement("button");
+      cell.type = "button";
+      cell.className = "yf-calendar-cell";
+
+      if (sameDay(date, today)) cell.classList.add("today");
+      if (selectedDay && sameDay(date, selectedDay)) cell.classList.add("selected");
+      if (dayEvents.some(e => e.kind === "overdue")) cell.classList.add("has-overdue");
+
+      const dots = [...new Set(dayEvents.map(e => e.kind))]
+        .slice(0, 4)
+        .map(kind => `<i class="${kind}"></i>`)
+        .join("");
+
+      cell.innerHTML = `
+        <span>${day}</span>
+        <div class="yf-calendar-dots">${dots}</div>
+        ${
+          dayEvents.length
+            ? `<small>${dayEvents.length} işlem</small>`
+            : ""
+        }
+      `;
+
+      cell.addEventListener("click", () => {
+        selectedDay = date;
+        renderCalendar();
+      });
+
+      grid.appendChild(cell);
+    }
+  }
+
+  function renderDay(date, events) {
+    const dayEvents = events.filter(e => sameDay(e.date, date));
+    const list = $("yfCalendarDayList");
+
+    setText(
+      "yfCalendarDayTitle",
+      new Intl.DateTimeFormat("tr-TR", {
+        day: "numeric",
+        month: "long",
+        year: "numeric"
+      }).format(date)
+    );
+
+    const net = dayEvents.reduce(
+      (s, e) => s + e.amount * e.direction,
+      0
+    );
+
+    setText(
+      "yfCalendarDayNet",
+      dayEvents.length ? `Net ${signedMoney(net)}` : "—"
+    );
+
+    if (!list) return;
+
+    if (!dayEvents.length) {
+      list.innerHTML =
+        '<div class="yf-calendar-empty">Bu güne ait finans hareketi yok.</div>';
+      return;
+    }
+
+    list.innerHTML = "";
+
+    dayEvents.forEach(event => {
+      const row = document.createElement("div");
+      row.className = `yf-calendar-event ${event.kind}`;
+
+      row.innerHTML = `
+        <span class="yf-calendar-event-icon">${eventIcon(event.kind)}</span>
+        <div class="yf-calendar-event-main">
+          <strong>${escapeHtml(event.title)}</strong>
+          <small>${escapeHtml(event.subtitle)}</small>
+        </div>
+        <div class="yf-calendar-event-right">
+          ${
+            event.amount
+              ? `<strong>${event.direction > 0 ? "+" : event.direction < 0 ? "−" : ""}${money(event.amount)}</strong>`
+              : ""
+          }
+          ${
+            event.actionable
+              ? '<button type="button">Borç Öde</button>'
+              : ""
+          }
+        </div>
+      `;
+
+      row.querySelector("button")?.addEventListener("click", () => {
+        openDebtPayment(event.debtId);
+      });
+
+      list.appendChild(row);
+    });
+  }
+
+  function openDebtPayment(debtId) {
+    const button =
+      document.querySelector('[data-page="debtPaymentPage"]');
+
+    if (!button) return;
+
+    button.click();
+
+    setTimeout(() => {
+      const select = $("debtPaymentCard");
+      if (!select) return;
+
+      select.value = String(debtId);
+      select.dispatchEvent(
+        new Event("change", { bubbles: true })
+      );
+    }, 250);
+  }
+
+  function eventIcon(kind) {
+    return {
+      income: "💵",
+      payment: "💳",
+      paid: "✓",
+      statement: "📄",
+      overdue: "!"
+    }[kind] || "•";
+  }
+
+  function parseDate(value) {
+    if (!value) return null;
+    const d = new Date(
+      String(value).includes("T")
+        ? value
+        : `${value}T12:00:00`
+    );
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  function startOfDay(value) {
+    const d = new Date(value);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+
+  function sameMonth(date, year, month) {
+    return Boolean(
+      date &&
+      date.getFullYear() === year &&
+      date.getMonth() === month
+    );
+  }
+
+  function sameDay(a, b) {
+    return Boolean(
+      a && b &&
+      a.getFullYear() === b.getFullYear() &&
+      a.getMonth() === b.getMonth() &&
+      a.getDate() === b.getDate()
+    );
+  }
+
+  function loadJson(key) {
+    try {
+      return JSON.parse(localStorage.getItem(key) || "[]");
+    } catch {
+      return [];
+    }
+  }
+
+  function money(value) {
+    return new Intl.NumberFormat("tr-TR", {
+      style: "currency",
+      currency: "TRY"
+    }).format(Number(value) || 0);
+  }
+
+  function signedMoney(value) {
+    const n = Number(value) || 0;
+    return `${n > 0 ? "+" : n < 0 ? "−" : ""}${money(Math.abs(n))}`;
+  }
+
+  function setText(id, value) {
+    const el = $(id);
+    if (el) el.textContent = String(value);
+  }
+
+  function titleCase(value) {
+    return String(value || "")
+      .replace(/^./, x => x.toLocaleUpperCase("tr-TR"));
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function installCalendarStyles() {
+    if ($("yfFinanceCalendarStyles")) return;
+
+    const style = document.createElement("style");
+    style.id = "yfFinanceCalendarStyles";
+    style.textContent = `
+      .yf-calendar-menu-item{
+        width:100%;display:flex;align-items:center;gap:12px;
+        padding:12px 14px;border:0;border-radius:12px;
+        color:inherit;background:transparent;text-align:left;font:inherit;
+      }
+      .yf-calendar-menu-icon{width:24px;text-align:center}
+      .yf-calendar-page{display:none;padding:16px 14px 90px}
+      .yf-calendar-page.active{display:block!important}
+      .yf-calendar-top{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+      .yf-calendar-top>div{flex:1}
+      .yf-calendar-top small,.yf-calendar-day-head small{color:#48d9a4;font-size:8px;font-weight:900;letter-spacing:.12em}
+      .yf-calendar-top h2{margin:3px 0 0;font-size:20px}
+      .yf-calendar-top button{border:1px solid rgba(255,255,255,.08);border-radius:11px;color:inherit;background:rgba(255,255,255,.04);min-height:36px;padding:0 11px}
+      #yfCalendarBack{width:36px;padding:0;font-size:24px}
+      .yf-calendar-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:12px}
+      .yf-calendar-summary>div{padding:11px;border:1px solid rgba(255,255,255,.06);border-radius:14px;background:rgba(255,255,255,.025)}
+      .yf-calendar-summary span,.yf-calendar-summary strong{display:block}
+      .yf-calendar-summary span{color:#8093a6;font-size:8px}
+      .yf-calendar-summary strong{margin-top:5px;font-size:11px}
+      .yf-calendar-card,.yf-calendar-day-card{border:1px solid rgba(255,255,255,.06);border-radius:18px;background:rgba(255,255,255,.025);padding:12px}
+      .yf-calendar-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+      .yf-calendar-nav button{width:34px;height:34px;border:0;border-radius:10px;color:inherit;background:rgba(255,255,255,.045);font-size:20px}
+      .yf-calendar-nav strong{font-size:12px}
+      .yf-calendar-weekdays,.yf-calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+      .yf-calendar-weekdays{margin-bottom:5px}
+      .yf-calendar-weekdays span{text-align:center;color:#718599;font-size:7px;padding:5px 0}
+      .yf-calendar-cell{min-width:0;min-height:54px;padding:6px 3px;border:1px solid transparent;border-radius:10px;color:inherit;background:rgba(255,255,255,.018);font:inherit}
+      .yf-calendar-cell.blank{background:transparent}
+      .yf-calendar-cell>span{display:block;font-size:9px;font-weight:800}
+      .yf-calendar-cell small{display:block;margin-top:4px;color:#718599;font-size:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .yf-calendar-cell.today{border-color:rgba(72,217,164,.55)}
+      .yf-calendar-cell.selected{background:rgba(72,217,164,.09);border-color:#48d9a4}
+      .yf-calendar-cell.has-overdue{border-color:rgba(235,91,91,.55)}
+      .yf-calendar-dots{display:flex;justify-content:center;gap:2px;min-height:5px;margin-top:5px}
+      .yf-calendar-dots i,.yf-calendar-legend i{width:5px;height:5px;border-radius:50%;display:inline-block}
+      .yf-calendar-dots .income,.yf-calendar-legend .income{background:#48d9a4}
+      .yf-calendar-dots .payment,.yf-calendar-dots .paid,.yf-calendar-legend .payment{background:#59aaf5}
+      .yf-calendar-dots .statement,.yf-calendar-legend .statement{background:#9b83f4}
+      .yf-calendar-dots .overdue,.yf-calendar-legend .overdue{background:#eb5b5b}
+      .yf-calendar-legend{display:flex;flex-wrap:wrap;gap:12px;padding:10px 4px;color:#718599;font-size:7px}
+      .yf-calendar-legend span{display:flex;align-items:center;gap:5px}
+      .yf-calendar-day-card{margin-top:2px}
+      .yf-calendar-day-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px}
+      .yf-calendar-day-head h3{margin:3px 0 0;font-size:13px}
+      .yf-calendar-day-head>strong{font-size:10px}
+      .yf-calendar-day-list{display:grid;gap:7px}
+      .yf-calendar-empty{padding:20px 10px;text-align:center;color:#718599;font-size:8px}
+      .yf-calendar-event{display:flex;align-items:center;gap:9px;padding:10px;border-radius:12px;background:rgba(255,255,255,.025)}
+      .yf-calendar-event-icon{width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:10px;background:rgba(255,255,255,.045);font-size:12px}
+      .yf-calendar-event-main{min-width:0;flex:1}
+      .yf-calendar-event-main strong,.yf-calendar-event-main small{display:block}
+      .yf-calendar-event-main strong{font-size:9px}
+      .yf-calendar-event-main small{margin-top:3px;color:#8093a6;font-size:7px}
+      .yf-calendar-event-right{text-align:right}
+      .yf-calendar-event-right>strong{display:block;font-size:8px}
+      .yf-calendar-event-right button{margin-top:5px;border:1px solid rgba(72,217,164,.18);border-radius:8px;color:#48d9a4;background:rgba(72,217,164,.06);font-size:7px;padding:5px 7px}
+      body.light-theme .yf-calendar-card,
+      body.light-theme .yf-calendar-day-card,
+      body.light-theme .yf-calendar-summary>div{border-color:rgba(20,73,112,.08);background:rgba(20,73,112,.025)}
+    `;
+    document.head.appendChild(style);
+  }
+});
